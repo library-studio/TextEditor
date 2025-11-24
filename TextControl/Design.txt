@@ -1,0 +1,112 @@
+﻿
+https://learn.microsoft.com/en-us/globalization/fonts-layout/fonts
+Font fallback
+One benefit of Unicode is the ability to represent many languages without additional data specifying script. However, the broad glyph and script support in Unicode is also a problem, since few fonts support more than a few scripts. Indeed, it's difficult to do a good job of making fonts with glyphs for different scripts such that all conform to one set of vertical metrics. To overcome this limitation, and to accommodate complex scripts, most rendering systems (the technology for displaying the font onto the screen) include functionality to detect if the currently selected font doesn't support a particular script and can automatically switch (fall back) to a predefined font that has appropriate glyphs for the desired script. All these operations are transparent to the user.
+
+Here's an example to better understand this mechanism. A user selects the Tahoma font to enter some text first in English, next in Hebrew, and then in Telugu. Tahoma provides support for Latin and Hebrew scripts but doesn't contain any Telugu glyphs. The application or the rendering system detects this lack of font support and automatically renders the Telugu script by using its fallback font. Each application and each operating system can define its own fallback font for any Unicode script range, depending on the technologies used.
+
+The .NET framework supports font fallback via the FontFamily class. There are three options for defining font fallback sequences in .NET:
+
+Specify the fallback sequence in code.
+Use the default composite fonts that are specified as standard with the .NET framework installation.
+Define your own composite font, using FontFamilyMap to specify the set of Unicode code points, language, and target font family.
+For Win32 and Uniscribe, use ScriptShape to determine whether glyphs are supported in a font to implement font fallback.
+
+CSS supports font fallback through the font-family property. You can specify one or more fonts to be used in order of precedence when displaying text. You should always end with one of the generic fonts (serif, sans-serif, monospace, cursive, fantasy) so that the browser is always able to display text if none of the specified fonts is available.
+
+~~~
+https://superuser.com/questions/396160/how-to-change-configure-font-fallback
+If font linking is enabled on your device, you can examine the registry by enumerating the subkeys of the registry key at HKEY_LOCAL_MACHINE–\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontLink\SystemLink to determine the mappings of linked fonts to base fonts. You can add links by using Regedit to create additional subkeys. Once you have located the registry key that has just been mentioned, from the Edit menu, Highlight the font face name of the font you want to link to and then from the Edit menu, click Modify. On a new line in the dialog field "Value data" of the Edit Multi-String dialog box, enter the path and file name to link to, and face name of the font. Use coma to separate the font file name and font face name.
+
+计算机\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontLink\SystemLink
+
+~~~
+http://archives.miloush.net/michkap/archive/2005/10/01/476022.html
+Font Linking vs. Font Fallback
+
+~~~
+https://shajisoft.com/shajisoft_wp/fontlink-for-cjk-on-english-windows-10/
+Fontlink for CJK on English Windows 10
+
+~~~
+https://learn.microsoft.com/zh-cn/typography/fonts/windows_10_font_list#arabic-script-supplemental-fonts
+Windows 10 Font List - Arabic Script Supplemental Fonts
+
+~~~
+https://learn.microsoft.com/zh-cn/typography/font-list/arial-unicode-ms
+
+~~~
+https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/gdiplus/-gdiplus-obtaining-font-metrics-use.md
+
+
+~~~
+https://github.com/fliedonion/WinformsImeControlWithUserControlBasics
+
+
+https://github.com/ufwt/windows-XP-SP1/blob/d521b6360fcff4294ae6c5651c539f1b9a6cbb49/XPSP1/NT/windows/advcore/ctf/aimm1.2/dimm/imewndhd.cpp#L403
+
+https://github.com/dnobori/DN-Poderosa/blob/34d37f63348a348f5d0a6b6119cd1a5cd1eda339/TerminalEmulator/TerminalControl.cs#L742
+
+~~~
+可以考虑为相邻的两个 range 当它们的阅读顺序相反时，在文字底部显示顺序符号。
+
+~~~
+斜体的 f 有一部分伸出方框外沿。
+一个 Line 的最左边 range 的 .a 和最右边 range 的 .c 要考虑到方框的宽度计算中
+刷新显示一个 Range 时，有部分比划可能伸出到方框外面，那么当相邻的 Range 失效时，
+应当能引起本 Range 刷新显示。也就是说，这部分伸出去的区域，应当在本 Range 进行范围
+检测的时候考虑进去，作为属于本 Range 的一部分区域。(从这个角度，两个 Range 之间的区域是有部分重叠的)
+
+显示每个 Range 的 block 背景颜色区域时间，要考虑将一行的背景区域一次性绘制，而不应一个一个 range 地绘制。
+因为一个一个绘制，后一个背景可能覆盖到前一个的字体笔画伸出的部分。
+
+~~~
+键入字符通过一个专门的修改 content 的函数实现，这个函数要把 Undo 功能一并实现。
+
+当键盘输入阿拉伯文时，插入符要出现一种向左旗帜的样子。
+
+~~~
+https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/user-interface/bidirectional-support
+
+https://help.oclc.org/Metadata_Services/Connexion/Connexion_client/International_cataloging/Get_started/40Right_to_left_control_characters
+
+https://marijnhaverbeke.nl/blog/cursor-in-bidi-text.html
+
+~~~
+Line 里面切割 Range 的时候，需要一个 delegate，可用于定制附加的切割要求。
+比如要求在遇到某个特定字符之前进行切割。也就是说，凡是遇到这个字符，即便相邻的其它
+字符原本是适合放在同一个 Range 的，也要在这个字符这里强行切开 Range。类似的需求。
+
+~~~
+https://symbl.cc/en/unicode-table/#basic-latin
+
+https://github.com/delinx/Fixedsys-Core
+
+https://learn.microsoft.com/en-us/answers/questions/1194439/using-custom-font-inside-c-net-core-application
+
+http://tom7.org/fixedersys/
+
+~~~
+键入文字的速度优化。
+
+当 blockOffs1 2 发生变化时，计算出变化前和变化后涉及到的区域，然后只失效这个区域，不要全部 Invalidate()
+算法是，记下 offs1 和 offs2 的 HitInfo，用 HitInfo 计算出范围矩形。
+还有一种算法，就是把这两个 offs 整数直接作为“失效区”参数传递给 Paint() 函数。Paint() 函数自己可以搞清楚需要刷新的区域。但这种方法要经过 WM_INVALIDATE 消息传递自定义的数据结构恐怕有难度
+
+如果要编写一个函数将 offs1 -- offs2 整数范围变换为失效区 Rectangle，可以考虑用一个
+函数一轮遍历解决两个 offs 的转换翻译，提高执行速度
+
+~~~
+Seogoe Fluent Icons
+
+
+
+~~~
+当存在块定义的时候，左方向键是去到块的起始位置，右方向键是去到块的结束位置。
+
+~~~
+https://list.winehq.org/pipermail/wine-patches/2016-June/151047.html
+
+
+
+
