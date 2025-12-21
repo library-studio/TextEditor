@@ -108,5 +108,37 @@ Seogoe Fluent Icons
 https://list.winehq.org/pipermail/wine-patches/2016-June/151047.html
 
 
+~~~
+(未采纳)
+Line 对象即便没有任何 Range，也要获得一次字体，把字体高度和平均字符宽度等参数准备好。
+或者可以这样：任何时候都必须准备至少一个空格字符的 Range，便于获得这些参数。
 
 
+~~~
+字体名的正常顺序
+
+Arial Unicode MS
+Aldhabi
+Microsoft Sans Serif
+PMingLiU
+MS PMincho
+Batang
+Microsoft YaHei UI
+Microsoft JhengHei UI
+Yu Gothic UI
+Malgun Gothic
+
+~~~
+GetFont 函数的参数，最佳实践是适当的 IBox 对象。
+比如 MarcField 对象中的 _name _indicator _content 子对象，让函数
+可以知晓该返回什么字体。
+IBox 对象新增了 Parent 成员，可以探知父级对象，进而探知所有祖先对象。
+MarcField 对象可以考虑增设一些成员，方便探知字段名。这样可以根据字段名
+决定字体。
+比如 001 字段的字体探索过程如下：
+触发 GetFont 函数的对象是 _content，函数执行的时候，先根据 is Paragraph
+可以得知它是 _content。进而用 .Parent 可以得到 MarcField 对象，进而可以
+得到字段名 '001'。
+这里，利用 is Paragraph 判断，是比较脆弱的做法，可以考虑为所有 IBox 对象
+增设一个接口 Name，这样就可以预先为 _content 准备好一个 Name，就方便用来
+随时判断对象类型名字了。

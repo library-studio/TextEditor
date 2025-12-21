@@ -1,6 +1,7 @@
 ﻿// #define CONTENT_STRING
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -67,7 +68,19 @@ namespace LibraryStudio.Forms
         {
             InitializeComponent();
 
-            _line_height = Line.InitialFonts(this.Font);
+            // _line_height = Line.InitialFonts(this.Font);
+
+            _context = new Context
+            {
+                SplitRange = (o, content) =>
+                {
+                    return SimpleText.SegmentSubfields(content);
+                },
+                GetFont = (o, t) =>
+                {
+                    return this.ContentFontGroup;
+                }
+            };
         }
 
         bool _initialized = false;
@@ -95,7 +108,6 @@ namespace LibraryStudio.Forms
             {
                 e.Graphics.FillRectangle(brush, clipRect);
             }
-
 
             var handle = e.Graphics.GetHdc();
             var dc = new SafeHDC(handle);
@@ -130,8 +142,9 @@ namespace LibraryStudio.Forms
                 int y = -this.VerticalScroll.Value;  //  this.TopBlank + this.DocumentOrgY;
 
 
-                _paragraph.Paint(dc,
+                _paragraph.Paint(
                     _context,
+                    dc,
                     x,
                     y,
                     clipRect,
@@ -210,280 +223,9 @@ namespace LibraryStudio.Forms
 
         SafeSCRIPT_CACHE _cache = null;
 
-        int _line_height = 20;
+        // int _line_height = 20;
 
         HitInfo _caretInfo = new HitInfo();
-
-#if REMOVED
-        #region ScrollBar
-
-        /// <summary>
-        /// 内容区域的顶部空白高度
-        /// </summary>
-        public int TopBlank = 0;
-        /// <summary>
-        /// 内容区域的底部空白高度
-        /// </summary>
-        public int BottomBlank = 0;
-        /// <summary>
-        /// 内容区域的左边空白宽度
-        /// </summary>
-        public int LeftBlank = 0;
-        /// <summary>
-        /// 内容区域的右边空白宽度
-        /// </summary>
-        public int RightBlank = 1;
-        int m_nDocumentOrgX = 0;
-        int m_nDocumentOrgY = 0;
-
-        /// <summary>
-        /// 当前文档横向编移量
-        /// </summary>
-        public int DocumentOrgX
-        {
-            get
-            {
-                if (this.DesignMode)
-                    return 0;
-                return this.m_nDocumentOrgX;
-            }
-            set
-            {
-                if (this.DesignMode)
-                    return;
-
-                int nDocumentOrgX_old = this.m_nDocumentOrgX;
-
-                // 视图大于文档
-                if (this.ClientWidth >= this.DocumentWidth)
-                {
-                    this.m_nDocumentOrgX = 0;
-                }
-                else
-                {
-                    if (value <= -this.DocumentWidth + this.ClientWidth)
-                        this.m_nDocumentOrgX = -this.DocumentWidth + this.ClientWidth;
-                    else
-                        this.m_nDocumentOrgX = value;
-
-                    if (this.m_nDocumentOrgX > 0)
-                        this.m_nDocumentOrgX = 0;
-                }
-
-                // 修改卷滚条
-                AfterDocumentChanged(ScrollBarMember.Both,
-                    null);
-
-                // 卷屏
-                int nDelta = this.m_nDocumentOrgX - nDocumentOrgX_old;
-                if (nDelta != 0)
-                {
-                    RECT rect = new RECT();
-                    rect.left = 0;
-                    rect.top = 0;
-                    rect.right = this.ClientWidth;
-                    rect.bottom = this.ClientHeight;
-
-                    ScrollWindowEx(this.Handle,
-                        nDelta,
-                        0,
-                        rect,
-                        null,	//	ref RECT lprcClip,
-                        IntPtr.Zero,	// int hrgnUpdate,
-                        out _,	// ref RECT lprcUpdate,
-                        ScrollWindowFlags.SW_INVALIDATE);
-                }
-            }
-        }
-
-        // 文档纵向偏移量
-        /// <summary>
-        /// 文档纵向偏移量
-        /// </summary>
-        public int DocumentOrgY
-        {
-            get
-            {
-                if (this.DesignMode)
-                    return 0;
-                return this.m_nDocumentOrgY;
-            }
-            set
-            {
-                if (this.DesignMode)
-                    return;
-
-                int nDocumentOrgY_old = this.m_nDocumentOrgY;
-                if (this.ClientHeight >= this.DocumentHeight)
-                {
-                    this.m_nDocumentOrgY = 0;
-                }
-                else
-                {
-                    if (value <= -this.DocumentHeight + this.ClientHeight)
-                        this.m_nDocumentOrgY = -this.DocumentHeight + this.ClientHeight;
-                    else
-                        this.m_nDocumentOrgY = value;
-
-                    if (this.m_nDocumentOrgY > 0)
-                        this.m_nDocumentOrgY = 0;
-                }
-
-                AfterDocumentChanged(ScrollBarMember.Both,
-                    null);
-
-
-                // 屏幕需要卷滚的区域
-                int nDelta = this.m_nDocumentOrgY
-                    - nDocumentOrgY_old;
-                if (nDelta != 0)
-                {
-                    RECT rect = new RECT();
-                    rect.left = 0;
-                    rect.top = 0;
-                    rect.right = this.ClientSize.Width;
-                    rect.bottom = this.ClientSize.Height;
-
-                    ScrollWindowEx(this.Handle,
-                        0,
-                        nDelta,
-                        rect,
-                        null,	//	ref RECT lprcClip,
-                        IntPtr.Zero,	// int hrgnUpdate,
-                        out _,	// ref RECT lprcUpdate,
-                        ScrollWindowFlags.SW_INVALIDATE);
-                }
-            }
-        }
-
-        int _contentPixelWidth = 100; // 内容的像素宽度
-
-        // 文档宽度
-        internal int DocumentWidth
-        {
-            get
-            {
-                return this.LeftBlank
-                    + _contentPixelWidth
-                    + this.RightBlank - 1/*微调*/;
-            }
-        }
-
-        // 文档高度
-        internal int DocumentHeight
-        {
-            get
-            {
-                return this.TopBlank
-                    + _line_height * _lines.Count
-                    + this.BottomBlank;
-            }
-        }
-
-        // 客户区宽度
-        internal int ClientWidth
-        {
-            get
-            {
-                return this.ClientSize.Width;
-            }
-            set
-            {
-                Size newsize = new Size(value, ClientSize.Height);
-                this.ClientSize = newsize;
-
-            }
-        }
-
-        // 客户区高度
-        internal int ClientHeight
-        {
-            get
-            {
-                return this.ClientSize.Height;
-            }
-            set
-            {
-                Size newsize = new Size(ClientSize.Width, value);
-                this.ClientSize = newsize;
-            }
-        }
-
-        // 设卷滚条
-        // parameter:
-        //		member	
-        private void SetScrollBars(ScrollBarMember member)
-        {
-            if (member == ScrollBarMember.Horz
-                || member == ScrollBarMember.Both)
-            {
-                // 水平方向
-                SCROLLINFO si = new SCROLLINFO();
-
-                si.cbSize = (uint)Marshal.SizeOf(si);
-                si.fMask = SIF.SIF_RANGE | SIF.SIF_POS | SIF.SIF_PAGE;
-                si.nMin = 0;
-                si.nMax = this.DocumentWidth;
-                si.nPage = (uint)this.ClientWidth;
-                si.nPos = -this.DocumentOrgX;
-                SetScrollInfo(this.Handle, (int)SB.SB_HORZ, si, true);
-            }
-
-            if (member == ScrollBarMember.Vert
-                || member == ScrollBarMember.Both)
-            {
-                // 垂直方向
-                SCROLLINFO si = new SCROLLINFO();
-
-                si.cbSize = (uint)Marshal.SizeOf(si);
-                si.fMask = SIF.SIF_RANGE | SIF.SIF_POS | SIF.SIF_PAGE;
-                si.nMin = 0;
-                si.nMax = this.DocumentHeight;
-                si.nPage = (uint)this.ClientHeight;
-                si.nPos = -this.DocumentOrgY;
-                SetScrollInfo(this.Handle, (int)SB.SB_VERT, si, true);
-            }
-        }
-
-        // 当文档尺寸和文档原点改变后，
-        // 更新卷滚条，小edit控件 等设施状态，和使文档某区域失效以便文档可见
-        // parameters:
-        //		scrollBarMember	卷滚条枚举值
-        //		iRect	失效区域 当为null，则不失效，如bAll等于true则全部区域
-        internal void AfterDocumentChanged(ScrollBarMember scrollBarMember,
-            InvalidateRect iRect)
-        {
-            // 设卷滚条信息
-            this.SetScrollBars(scrollBarMember);
-
-            // 失效区域
-            if (iRect != null)
-            {
-                if (iRect.bAll == true)
-                    this.Invalidate();
-                else
-                    this.Invalidate(iRect.rect);
-            }
-        }
-
-        // 卷滚条枚举值
-        internal enum ScrollBarMember
-        {
-            Vert = 0,
-            Horz = 1,
-            Both = 2,
-            None = 3,
-        }
-
-        internal class InvalidateRect
-        {
-            public bool bAll = false;
-            public Rectangle rect = new Rectangle(0, 0, 0, 0);
-        }
-
-        #endregion
-
-#endif
 
         void InitializeEnvironment()
         {
@@ -588,16 +330,23 @@ namespace LibraryStudio.Forms
                     return SimpleText.SplitSubfields(content);
                 });
             */
-            var max_pixel_width = _paragraph.ReplaceText(dc,
+            var max_pixel_width = 0;
+            var ret = _paragraph.ReplaceText(
+                _context,
+                dc,
                 0,
                 -1,
                 text,
-                _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth,   // Math.Max(this.ClientSize.Width, 30),
-                _context,
+                _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
+                /*,
                 out string _,
                 out Rectangle update_rect,
                 out Rectangle scroll_rect,
-                out int scroll_distance);
+                out int scroll_distance*/);
+            max_pixel_width = ret.MaxPixel;
+            var update_rect = ret.UpdateRect;
+            var scroll_rect = ret.ScrollRect;
+            var scroll_distance = ret.ScrolledDistance;
 
             int x = -this.HorizontalScroll.Value;
             int y = -this.VerticalScroll.Value;
@@ -614,8 +363,11 @@ namespace LibraryStudio.Forms
                                     out _,
                                     ScrollWindowFlags.SW_INVALIDATE);
             }
-            update_rect.Offset(x, y);
-            this.Invalidate(update_rect);
+            if (update_rect.IsEmpty == false)
+            {
+                update_rect.Offset(x, y);
+                this.Invalidate(update_rect);
+            }
 
 #if CONTENT_STRING
             _content = _paragraph.MergeText();
@@ -785,10 +537,24 @@ out long left_width);
             return str.Length;
         }
 #endif
+        FontContext _fonts = null;
+        IEnumerable<Font> ContentFontGroup
+        {
+            get
+            {
+                if (_fonts == null)
+                    _fonts = new FontContext(this.Font);
+                return _fonts.Fonts;
+            }
+        }
 
         protected override void OnFontChanged(EventArgs e)
         {
-            _line_height = Line.InitialFonts(this.Font);
+            // _line_height = Line.InitialFonts(this.Font);
+            {
+                _fonts?.Dispose();
+                _fonts = null;
+            }
 
             // _fieldProperty.Refresh();
 
@@ -840,13 +606,7 @@ out long left_width);
             }
         }
 
-        IContext _context = new Context { 
-        SplitRange = (content) =>
-        {
-            return SimpleText.SplitSubfields(content);
-        },
-
-        };
+        IContext _context = null;
 
         void ReplaceText(int start,
             int end,
@@ -861,16 +621,24 @@ out long left_width);
                     var handle = g.GetHdc();
                     using (var dc = new SafeHDC(handle))
                     {
-                        var max_pixel_width = _paragraph.ReplaceText(dc,
+                        var max_pixel_width = 0;
+                        var ret = _paragraph.ReplaceText(
+                            _context,
+                            dc,
                             start,
                             end,
                             text,
-                            _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth,   // Math.Max(this.ClientSize.Width, 30),
-                            _context,
+                            _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
+                            /*,
                             out string replaced_text,
                             out Rectangle update_rect,
             out Rectangle scroll_rect,
-            out int scroll_distance);
+            out int scroll_distance*/);
+                        max_pixel_width = ret.MaxPixel;
+                        var replaced_text = ret.ReplacedText;
+                        var update_rect = ret.UpdateRect;
+                        var scroll_rect = ret.ScrollRect;
+                        var scroll_distance = ret.ScrolledDistance;
 
                         int x = -this.HorizontalScroll.Value;
                         int y = -this.VerticalScroll.Value;
@@ -887,8 +655,11 @@ out long left_width);
                                                 out _,
                                                 ScrollWindowFlags.SW_INVALIDATE);
                         }
-                        update_rect.Offset(x, y);
-                        this.Invalidate(update_rect);
+                        if (update_rect.IsEmpty == false)
+                        {
+                            update_rect.Offset(x, y);
+                            this.Invalidate(update_rect);
+                        }
 
 #if CONTENT_STRING
                         // TODO: 这里值得改进加速速度。可以考虑仅仅保留一个 content length 即可
@@ -920,7 +691,7 @@ out long left_width);
 
                         if (add_history)
                         {
-                            _history.Memory(new Action
+                            _history.Memory(new EditAction
                             {
                                 Start = start,
                                 End = end,
@@ -1266,25 +1037,6 @@ out long left_width);
                             InvalidateBlock();
                         }
                     }
-#if REMOVED
-                    if (_caretInfo.ChildIndex > 0)
-                    {
-                        var x = _lastX;
-                        var y = _caretInfo.Y - _line_height;
-                        var result = _paragraph.HitTest(x, y, _line_height);
-                        _global_offs = _paragraph.GetGlobalOffs(result);
-                        MoveCaret(result);
-
-                        if (_shiftPressed)
-                            _blockOffs2 = _global_offs;
-                        else
-                        {
-                            _blockOffs1 = _global_offs;
-                            _blockOffs2 = _global_offs;
-                        }
-                        this.Invalidate();
-                    }
-#endif
                     break;
                 case Keys.Down:
                     // 向下移动一个行
@@ -1695,7 +1447,7 @@ out long left_width);
         protected override void OnLoad(EventArgs e)
         {
             hIMC = Imm32.ImmGetContext(this.Handle);
-            _line_height = Line.InitialFonts(this.Font);
+            // _line_height = Line.InitialFonts(this.Font);
             SetCompositionWindowPos();
             base.OnLoad(e);
         }
@@ -1792,8 +1544,8 @@ out long left_width);
             var bottom = this.VerticalScroll.Value + this.ClientSize.Height;
             if (_caretInfo.Y < top)
                 y_delta = _caretInfo.Y - top;
-            else if (_caretInfo.Y + _line_height >= bottom)
-                y_delta = _caretInfo.Y + _line_height - bottom;
+            else if (_caretInfo.Y + FontContext.DefaultFontHeight >= bottom)
+                y_delta = _caretInfo.Y + FontContext.DefaultFontHeight - bottom;
 
             if (x_delta != 0 || y_delta != 0)
             {

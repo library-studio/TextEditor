@@ -9,7 +9,7 @@ namespace LibraryStudio.Forms
     // 编辑动作的历史
     public class History
     {
-        List<Action> _actions = new List<Action>();
+        List<EditAction> _actions = new List<EditAction>();
 
         // 当前位置
         // 指向下次可新增的一个 index 位置
@@ -21,7 +21,7 @@ namespace LibraryStudio.Forms
             _currentIndex = 0;
         }
 
-        public void Memory(Action action)
+        public void Memory(EditAction action)
         {
             if (_actions.Count > _currentIndex)
                 _actions.RemoveRange(_currentIndex, _actions.Count - _currentIndex);
@@ -29,7 +29,7 @@ namespace LibraryStudio.Forms
             _currentIndex++;
         }
 
-        public Action Back()
+        public EditAction Back()
         {
             if (_currentIndex == 0)
                 return null;
@@ -37,7 +37,7 @@ namespace LibraryStudio.Forms
             return _actions[_currentIndex];
         }
 
-        public Action Forward()
+        public EditAction Forward()
         {
             if (_currentIndex >= _actions.Count)
                 return null;
@@ -59,10 +59,21 @@ namespace LibraryStudio.Forms
                 return true;
             return false;
         }
+
+        public override string ToString()
+        {
+            var text = new StringBuilder();
+            foreach (var action in _actions)
+            {
+                text.AppendLine(action.ToString());
+            }
+
+            return text.ToString();
+        }
     }
 
     // 一个编辑动作
-    public class Action
+    public class EditAction
     {
         // replace select 之一
         public string Name { get; set; }
@@ -73,5 +84,10 @@ namespace LibraryStudio.Forms
         public string OldText { get; set; }
 
         public string NewText { get; set; }
+        
+        public override string ToString()
+        {
+            return $"Name={Name}, Start={Start}, End={End}, OldText='{OldText}', NewText='{NewText}'";
+        }
     }
 }

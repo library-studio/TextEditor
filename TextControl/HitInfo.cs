@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,8 +22,25 @@ namespace LibraryStudio.Forms
         */
         public int TextIndex;    // 点击的文字 index。注意这是 ChildIndex 所指的子对象内部的文本 index，而不是指文档全局的
         public int Offs;    // 插入符所在的字符串线性位置
-        public int LineHeight; // 行高
+
+        int _lineHeight = 0;
+        public int LineHeight   // 行高
+        { 
+            get
+            {
+                return _lineHeight;
+            }
+            set
+            {
+                // Debug.Assert(value == 42);
+                _lineHeight = value;
+            }
+        } 
         public Area Area;
+
+        public object Box;    // 命中的 Box 对象
+
+        public HitInfo InnerHitInfo;
 
         public HitInfo Clone()
         {
@@ -32,7 +50,11 @@ namespace LibraryStudio.Forms
                 Y = this.Y,
                 ChildIndex = this.ChildIndex,
                 TextIndex = this.TextIndex,
-                Area = this.Area
+                Offs = this.Offs,
+                LineHeight = this.LineHeight,
+                Area = this.Area,
+                Box = this.Box,
+                InnerHitInfo = this.InnerHitInfo?.Clone(),
             };
         }
     }

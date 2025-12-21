@@ -9,6 +9,7 @@ using System.Windows.Forms;
 
 using Vanara.Extensions.Reflection;
 using Vanara.PInvoke;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.Usp10;
@@ -21,9 +22,10 @@ namespace LibraryStudio.Forms
     /// </summary>
     public class Paragraph : IBox
     {
-        // public ConvertTextFunc ConvertText { get; set; }
+        public string Name { get; set; }
 
-        // public Color BackColor { get; set; } = Color.Transparent;
+        IBox _parent = null;
+        public IBox Parent => _parent;
 
         List<Line> _lines = new List<Line>();
 
@@ -32,13 +34,14 @@ namespace LibraryStudio.Forms
         static internal SCRIPT_CONTROL sc;
         static internal SCRIPT_STATE ss;
 
-        public Paragraph()
+        public Paragraph(IBox parent)
         {
-
+            _parent = parent;
         }
 
-        public void Paint(SafeHDC dc,
-                        IContext context,
+        public void Paint(
+            IContext context,
+            SafeHDC dc,
             int x,
             int y,
             Rectangle clipRect,
@@ -52,6 +55,33 @@ namespace LibraryStudio.Forms
                 _average_char_width = (int)ComputeAverageWidth(dc, _default_font);
             */
 
+            if (this._lines.Count == 0)
+            {
+                // 绘制一个结束符
+                var rect = new Rectangle(x,
+                    y,
+                    FontContext.DefaultReturnWidth,
+                    FontContext.DefaultFontHeight);
+                if (clipRect.IntersectsWith(rect))
+                {
+                    // 根据是否处在 text block 中决定使用什么背景色
+                    // 要么绘制结束符，要么清除结束符
+                    Color back_color;
+                    if (Utility.InRange(0, blockOffs1, blockOffs2))
+                        back_color = context?.GetBackColor?.Invoke(this, true) ?? SystemColors.Highlight;
+                    else
+                        back_color = context?.GetBackColor?.Invoke(this, false) ?? Color.Transparent;
+                    Line.DrawSolidRectangle(dc,
+                        rect.Left,
+                        rect.Top,
+                        rect.Right,
+                        rect.Bottom,
+                        back_color,
+                        clipRect);
+                }
+                return;
+            }
+
             int current_start_offs = 0;
             var block_start = Math.Min(blockOffs1, blockOffs2);
             var block_end = Math.Max(blockOffs1, blockOffs2);
@@ -62,19 +92,26 @@ namespace LibraryStudio.Forms
                 if (y >= clipRect.Bottom)
                     break;
 
-                int paragraph_width = line.GetPixelWidth();
-                int paragraph_height = line.GetPixelHeight();
-                var rect = new Rectangle(x, y, paragraph_width, paragraph_height);
+                int line_width = line.GetPixelWidth();
+                int line_height = line.GetPixelHeight();
+                var rect = new Rectangle(x, y, line_width, line_height);
+
+                bool is_tail = i == _lines.Count - 1;
+
+                // 把 rect 右侧扩大一点，避免和 clipRect 交叉探测不到
+                if (is_tail)
+                    rect.Width += FontContext.DefaultReturnWidth;
                 if (clipRect.IntersectsWith(rect))
                 {
-                    line.Paint(dc,
+                    line.Paint(
                         context,
+                        dc,
                         x,
                         y,
                         clipRect,
                         block_start - current_start_offs,
                         block_end - current_start_offs,
-                        i == _lines.Count - 1 ? virtual_tail_length : 0);
+                        is_tail ? virtual_tail_length : 0);
                 }
                 y += line.GetPixelHeight();
                 current_start_offs += line.TextLength;
@@ -92,22 +129,21 @@ namespace LibraryStudio.Forms
             return false;
         }
 
-        public int ReplaceText(
-    Gdi32.SafeHDC dc,
-    int start,
-    int end,
-    string text,
-    int pixel_width,
+        public ReplaceTextResult ReplaceText(
             IContext context,
-            out string replaced,
-            out Rectangle update_rect,
-            out Rectangle scroll_rect,
-            out int scroll_distance)
+            SafeHDC dc,
+            int start,
+            int end,
+            string text,
+            int pixel_width)
         {
+            var result = new ReplaceTextResult();
+            /*
             update_rect = System.Drawing.Rectangle.Empty;
             scroll_rect = System.Drawing.Rectangle.Empty;
             scroll_distance = 0;
             replaced = "";
+            */
 
             // 先分别定位到 start 所在的 Line，和 end 所在的 Line
             // 观察被替换的范围 start - end，跨越了多少个 Line
@@ -120,13 +156,14 @@ namespace LibraryStudio.Forms
                 end,
                 out string right_text,
                 out int first_line_index,
-                out replaced);
+                out string replaced);
 
             if (start == 0 && end == -1 /*&& first_line_index == -1*/)
             {
                 first_line_index = 0;
                 // _paragraphs.Clear();
             }
+            result.ReplacedText = replaced;
 
             string content = left_text + text + right_text;
 
@@ -135,13 +172,28 @@ namespace LibraryStudio.Forms
             if (string.IsNullOrEmpty(content) == false)
             {
                 new_lines = BuildLines(
+                    context,
                     dc,
                     // this.ConvertText,
                     content,
                     pixel_width,
-                    context,
+                    this,
                     out max_pixel_width);
             }
+
+            // offs 为(Paragraph)从头开始计算的第一个不同 char 的 offs
+            var index = SameLines(old_lines, new_lines, out int offs);
+            if (index > 0)
+            {
+                if (index < old_lines.Count && index < new_lines.Count)
+                    offs += SameChars(old_lines[index], new_lines[index]);
+                old_lines.RemoveRange(0, index);
+                new_lines.RemoveRange(0, index);
+                first_line_index += index;
+            }
+
+            // TODO: 修改前的最后一个 Line 末尾的回车换行符号区域。
+            // 修改后的最后一个 Line 末尾的回车换行符号区域，都应包含到失效区中
 
             if (old_lines.Count > 0)
                 _lines.RemoveRange(first_line_index, old_lines.Count);
@@ -161,22 +213,63 @@ namespace LibraryStudio.Forms
             int new_h = new_lines.Sum(p => p.GetPixelHeight());
             int y = SumHeight(_lines, first_line_index);
 
-            update_rect = new Rectangle(0,
+            result.UpdateRect = new Rectangle(0,
                 y,
                 max_pixel_width,
                 Math.Max(old_h, new_h));
 
-            scroll_distance = new_h - old_h;
-            if (scroll_distance != 0)
+            result.ScrolledDistance = new_h - old_h;
+            if (result.ScrolledDistance != 0)
             {
                 int move_height = SumHeight(_lines, first_line_index, _lines.Count - first_line_index);
-                scroll_rect = new Rectangle(0,
+                result.ScrollRect = new Rectangle(0,
         y + old_h,
         max_pixel_width,
         move_height);
             }
-            return max_pixel_width;
+
+            ProcessBaseline();
+            result.MaxPixel = max_pixel_width;
+            return result;
         }
+
+        // 检查两组行，前方有连续多少行互相没有不同
+        // parameters:
+        //      offs    [out] 返回第一个不同的 offs
+        // return:
+        //      返回第一个不同的 index
+        static int SameLines(List<Line> lines1,
+            List<Line> lines2,
+            out int offs)
+        {
+            offs = 0;
+            var min_count = Math.Min(lines1.Count, lines2.Count);
+            for (int i = 0; i < min_count; i++)
+            {
+                var text1 = lines1[i].MergeText();
+                if (text1 != lines2[i].MergeText())
+                    return i;
+                offs += text1.Length;
+            }
+            Debug.Assert(min_count <= lines1.Count);
+            Debug.Assert(min_count <= lines2.Count);
+            return min_count;
+        }
+
+        // 比较两行文字，第一处不一样的 char index
+        static int SameChars(Line line1, Line line2)
+        {
+            var text1 = line1.MergeText();
+            var text2 = line2.MergeText();
+            var min_length = Math.Min(text1.Length, text2.Length);
+            for (int i = 0; i < min_length; i++)
+            {
+                if (text1[i] != text2[i])
+                    return i;
+            }
+            return min_length;
+        }
+
 
         static int SumHeight(List<Line> lines, int count)
         {
@@ -273,12 +366,15 @@ namespace LibraryStudio.Forms
             return lines;
         }
 
+        // parameters:
+        //      parent  为 Line 设置 _parent
         static List<Line> BuildLines(
+    IContext context,
     SafeHDC dc,
     // ConvertTextFunc func_convertText,
     string content,
     int pixel_width,
-    IContext context,
+    IBox parent,
     out int max_pixel_width)
         {
             InitializeUspEnvironment();
@@ -292,19 +388,24 @@ namespace LibraryStudio.Forms
 
             if (string.IsNullOrEmpty(content))
             {
-                return new List<Line> { new Line() };
+                return new List<Line> { new Line(parent) };
             }
 
-            string[] contents = null;
-            if (context?.SplitRange != null)
-                contents = context?.SplitRange(content);
-            else
-                contents = new string[] { content };
+            var contents = context?.SplitRange?.Invoke(parent, content)
+                ?? new Segment[] {
+                    new Segment
+                    {
+                        Text = content,
+                        Tag = null
+                    }
+                };
 
-            List<SCRIPT_ITEM> items = new List<SCRIPT_ITEM>();
-            List<string> chunks = new List<string>();
-            foreach (var segment in contents)
+            var items = new List<SCRIPT_ITEM>();
+            var chunks = new List<string>();
+            var tags = new List<object>();
+            foreach (var seg in contents)
             {
+                var segment = seg.Text;
                 int cMaxItems = segment.Length + 1;
                 var pItems = new SCRIPT_ITEM[cMaxItems + 1];
 
@@ -359,17 +460,21 @@ namespace LibraryStudio.Forms
                     }
 
                     chunks.Add(str);
+                    tags.Add(seg.Tag);
                     start_index += str.Length;
                 }
 
                 items.AddRange(pItems);
             }
 
+            Debug.Assert(chunks.Count == tags.Count);
             var lines = SplitLines(dc,// e.Graphics.GetHdc(),
                 context,
 items.ToArray(),
 chunks,
+tags,
 pixel_width,
+parent,
 out int new_width);
             if (new_width > max_pixel_width)
                 max_pixel_width = new_width;
@@ -377,12 +482,42 @@ out int new_width);
 
             string convertText(string t)
             {
-                if (context?.ConvertText != null)
-                    return context?.ConvertText(t);
-                return t;
+                return context?.ConvertText?.Invoke(t) ?? t;
             }
         }
 
+        float _baseLine;
+        float _below;
+
+        public float BaseLine
+        {
+            get
+            {
+                return _baseLine;
+            }
+        }
+
+        public float Below
+        {
+            get
+            {
+                return _below;
+            }
+        }
+
+        // 处理整个 Paragraph 的基线
+        // 以第一行 Line 的基线为基线
+        void ProcessBaseline()
+        {
+            if (this._lines == null || this._lines.Count == 0)
+            {
+                _baseLine = 0;
+                _below = 0;
+                return;
+            }
+            _baseLine = this._lines[0].BaseLine;
+            _below = this._lines[0].Below;  // TODO: 加上除第一行以外的所有行的高度?
+        }
 
         public int Initialize(
             SafeHDC dc,
@@ -401,21 +536,26 @@ out int new_width);
 
             if (string.IsNullOrEmpty(content))
             {
-                _lines.Add(new Line());
+                _lines.Add(new Line(this));
                 return 0;
             }
 
-            string[] contents = null;
-            if (context?.SplitRange != null)
-                contents = context.SplitRange(content);
-            else
-                contents = new string[] { content };
+            Segment[] contents = context?.SplitRange?.Invoke(this, content)
+                ?? new Segment[] {
+                    new Segment
+                    {
+                        Text = content,
+                        Tag = null
+                    }
+                };
 
-            List<SCRIPT_ITEM> items = new List<SCRIPT_ITEM>();
-            List<string> chunks = new List<string>();
+            var items = new List<SCRIPT_ITEM>();
+            var chunks = new List<string>();
+            var tags = new List<object>();
             int max_pixel_width = 0;
-            foreach (var segment in contents)
+            foreach (var seg in contents)
             {
+                var segment = seg.Text;
                 int cMaxItems = segment.Length + 1;
                 var pItems = new SCRIPT_ITEM[cMaxItems + 1];
 
@@ -470,6 +610,7 @@ out int new_width);
                     }
 
                     chunks.Add(str);
+                    tags.Add(seg.Tag);
                     start_index += str.Length;
                 }
 
@@ -477,40 +618,45 @@ out int new_width);
             }
 
             {
+                Debug.Assert(chunks.Count == tags.Count);
                 var lines = SplitLines(dc,// e.Graphics.GetHdc(),
                     context,
 items.ToArray(),
 chunks,
+tags,
 pixel_width,
+this,
 out int new_width);
                 if (new_width > max_pixel_width)
                     max_pixel_width = new_width;
                 _lines.AddRange(lines);
             }
 
+            ProcessBaseline();
             return max_pixel_width;
 
             string convertText(string t)
             {
-                if (context?.ConvertText != null)
-                    return context?.ConvertText(t);
-                return t;
+                return context?.ConvertText?.Invoke(t) ?? t;
             }
         }
 
         static List<Line> SplitLines(SafeHDC dc,
             IContext context,
-SCRIPT_ITEM[] pItems,
-List<string> chunks,
-int line_width,
-out int max_pixel_width)
+            // GetFontFunc func_getfont,
+            SCRIPT_ITEM[] pItems,
+            List<string> chunks,
+            List<object> tags,
+            int line_width,
+            IBox parent,
+            out int max_pixel_width)
         {
             if (sp == null)
                 throw new ArgumentException("Script properties not initialized.");
 
             max_pixel_width = line_width;
             List<Line> lines = new List<Line>();
-            Line line = new Line();
+            Line line = new Line(parent);
             long start_pixel = 0;
 
             for (int i = 0; i < pItems.Length; i++)
@@ -519,6 +665,7 @@ out int max_pixel_width)
 
                 // 析出本 item 的文字
                 string str = chunks[i];
+                var tag = tags[i];
 
                 {
                     Font used_font = null;
@@ -530,9 +677,13 @@ out int max_pixel_width)
                         // return:
                         //      返回 text 中可以切割的 index 位置。如果为 -1，表示没有找到可以切割的位置。
                         var pos = BreakItem(
+                            (p, o) =>
+                            {
+                                return context?.GetFont?.Invoke(parent, tag);
+                            },
                             dc,
                             item,
-        context?.ConvertText == null ? text : context.ConvertText(text),
+        context?.ConvertText?.Invoke(text) ?? text,
         (line_width == -1 ? int.MaxValue : line_width) - start_pixel,
         start_pixel == 0,
         out int left_width,
@@ -547,10 +698,16 @@ out int max_pixel_width)
                         {
                             // 折行
                             lines.Add(line);
-                            line = new Line();
+                            line = new Line(parent);
                             // line.ConvertText = func_convertText;
                             start_pixel = 0;
                             continue;
+                        }
+
+                        if (pos == 0)
+                        {
+                            // throw new Exception();
+                            pos = 1;
                         }
 
                         // 左边部分
@@ -558,7 +715,7 @@ out int max_pixel_width)
                         {
                             if (line == null)
                             {
-                                line = new Line();
+                                line = new Line(parent);
                                 // line.ConvertText = func_convertText;
                             }
                             line.Ranges.Add(NewRange(text.Substring(0, pos), left_width));
@@ -573,7 +730,7 @@ out int max_pixel_width)
                         {
                             // 折行
                             lines.Add(line);
-                            line = new Line();
+                            line = new Line(parent);
                             // line.ConvertText = func_convertText;
                             start_pixel = 0;
 
@@ -587,21 +744,21 @@ out int max_pixel_width)
                             */
                         }
 
-                        Range NewRange(string t, int w)
+                        RangeWrapper NewRange(string t, int w)
                         {
-                            var range = new Range
+                            var range = new RangeWrapper
                             {
                                 Item = item,
                                 a = item.a,
                                 Font = used_font,
                                 Text = t,
                                 DisplayText = context?.ConvertText?.Invoke(t) ?? t,
-                                PixelWidth = w
+                                PixelWidth = w,
+                                Tag = tag,
                             };
                             return range;
                         }
                     }
-
                 }
             }
 
@@ -615,7 +772,14 @@ out int max_pixel_width)
             foreach (var current_line in lines)
             {
                 Line.LayoutLine(current_line);
-                var width = Line.RefreshLine(dc, current_line);
+                var width = Line.RefreshLine(
+                    (p, o) =>
+                    {
+                        return context?.GetFont?.Invoke(current_line, current_line.Tag);
+                    },
+                    dc,
+                    current_line,
+                    line_width);
                 if (width > max_pixel_width)
                     max_pixel_width = width;
             }
@@ -767,6 +931,7 @@ out int max_pixel_width)
         // return:
         //      返回 text 中可以切割的 index 位置。如果为 -1，表示没有找到可以切割的位置。
         static int BreakItem(
+            GetFontFunc func_getfont,
             SafeHDC dc,
             SCRIPT_ITEM item,
             string str,
@@ -783,16 +948,17 @@ out int max_pixel_width)
             var cache = new SafeSCRIPT_CACHE();
             var a = item.a;
             Line.ShapeAndPlace(
+                func_getfont,
+                dc,
                 ref a,
                 cache,
-dc,
 str,
 out ushort[] glfs,
 out int[] piAdvance,
-out _,
+out _, // GOFFSET[] pGoffset,
 out ABC pABC,
-out _,
-out _,
+out _,  //SCRIPT_VISATTR[] sva,   // 中间有关于 ZeroWidth 的信息
+out ushort[] log,
 ref used_font);
             //    item.a = a;
             left_width = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
@@ -809,252 +975,75 @@ ref used_font);
             SCRIPT_LOGATTR[] array = new SCRIPT_LOGATTR[str.Length];
             ScriptBreak(str, str.Length, a, array);
 
+            // piAdvance 数量可能比 str 内的字符要多？
+
+            // Debug.Assert(array.Length == piAdvance.Length);
+
             int start = 0;
             start += pABC.abcA;
             int delta = 0;
             if (pABC.abcC < 0)
                 delta = -pABC.abcC;
+            // i 是 Glyphs 下标
             for (int i = 0; i < piAdvance.Length; i++)
             {
                 int tail = start + piAdvance[i];
+
                 if (i >= (is_left_most ? 1 : 0)   // 避免 i == 0 时返回。确保至少有一个字符被切割
-                    && tail + delta >= pixel_width
-                    && (array[i].fSoftBreak || array[i].fWhiteSpace || array[i].fCharStop))
+                    && tail + delta >= pixel_width)
                 {
-                    left_width = start;
-                    return i;
+                    // chars 下标
+                    var char_index = GetCharIndex(i);
+                    var attr = array[char_index];
+                    if (attr.fSoftBreak || attr.fWhiteSpace || attr.fCharStop)
+                    {
+                        left_width = start;
+                        return char_index;
+                    }
                 }
                 start += piAdvance[i];
             }
 
             return str.Length;
-        }
 
-
-#if REMOVED
-        // parameters:
-        //      block_start     选中范围的开始偏移量。
-        //                      以当前 line 的左边界为 0
-        //                      如果大于本行文字长度，表示未选中本行     
-        //      block_end       选中范围的结束偏移量
-        //                      以当前 line 的左边界为 0
-        //                      如果小于 0，表示未选中本行     
-        //      virtual_tail_length 行末虚拟尾部字符个数。如果这个尾部处在选择范围，需要显示为选择背景色
-        void DisplayLine(
-            SafeHDC hdc,
-            Line line,
-            int x,
-            int y,
-            // int _line_height,
-            int block_start,
-            int block_end,
-            int virtual_tail_length)
-        {
-            block_start = Math.Max(0, block_start);
-            block_end = Math.Min(line.TextLength + virtual_tail_length, block_end);
-
-            //block_start = 0;
-            //block_end = 100;
-
-            // 块的背景矩形数组
-            PRECT[] block_rects = new PRECT[line.Ranges.Count];
-            // 块是否包含全部文字的标志
-            bool[] full_flags = new bool[line.Ranges.Count];
-
-            // 先绘制行和块背景
-            // 以逻辑顺序遍历 Ranges。注意显示位置 x 可能是跳动的
-            // 每个 Range 的块背景色不能在分散到每个 Range 的处理中绘制，因为那样可能会擦掉 Range 伸出去的笔画(例如 Italic 风格的 'f')。
-            if (block_start != block_end)
+            int GetCharIndex(int glyphIndex)
             {
                 int i = 0;
-                foreach (var range in line.Ranges)   // piVisualToLogical
+                foreach (var v in log)
                 {
-                    // 绘制选中范围的背景色
-                    if (block_start <= range.Text.Length && block_end >= 0)
-                    {
-                        var tail_in_block = virtual_tail_length > 0
-                            && block_start < range.Text.Length + virtual_tail_length && block_end >= range.Text.Length;
-                        var block_rect = GetBlockRect(range,
-                            x + range.Left,
-                            y,
-                            _line_height,
-                            block_start,
-                            block_end);
-                        DrawSolidRectangle(hdc,
-                            block_rect.left,
-                            block_rect.top,
-                            block_rect.right + (tail_in_block ? _average_char_width : 0),
-                            block_rect.bottom,
-                            new COLORREF((uint)SystemColors.Highlight.ToArgb()));
-
-                        // clipping 矩形的左右进行微调。避免斜体字的某些笔画伸出去的部分被显示成不同的颜色
-                        var left_delta = range.pABC.abcA;
-                        var right_delta = range.pABC.abcC;
-                        if (block_start <= 0 && left_delta < 0)
-                            block_rect.left -= -left_delta + 1; // 左侧空白
-                        if (block_end >= range.Text.Length && right_delta < 0)
-                            block_rect.right += -right_delta + 1; // 右侧空白
-
-                        block_rects[i] = block_rect; // 记录块背景矩形
-                        full_flags[i] = (block_start <= 0 && block_end >= range.Text.Length); // 标记本 Range 是否全选
-                    }
-
-                    block_start -= range.Text.Length;
-                    block_end -= range.Text.Length;
-
+                    if (v >= glyphIndex)
+                        return i;
                     i++;
                 }
-
-                // 没有任何 Range 的情况，依然要显示 tail char
-                if (i == 0 && virtual_tail_length > 0)
-                {
-                    // 绘制选中范围的背景色
-                    if (block_start <= 0 && block_end >= virtual_tail_length)
-                    {
-                        var block_rect = new PRECT(x, y,
-                            x + _average_char_width,
-                            y + _line_height);
-                        DrawSolidRectangle(hdc,
-                            block_rect.left,
-                            block_rect.top,
-                            block_rect.right,
-                            block_rect.bottom,
-                            new COLORREF((uint)SystemColors.Highlight.ToArgb()));
-                    }
-                }
-            }
-
-            // 再绘制文本
-            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
-            {
-                var range = line.Ranges[index];
-                var block_rect = block_rects[index]; // 获取块背景矩形
-                var full_block = full_flags[index]; // 获取是否全选标志
-
-                Font used_font = range.Font;
-                var cache = new SafeSCRIPT_CACHE();
-                /*
-                var a = line.a;
-                ShapeAndPlace(
-                    ref a,
-                    cache,
-                    hdc,
-                    line.Text,
-                    out ushort[] glfs,
-                    out int[] piAdvance,
-                    out GOFFSET[] pGoffset,
-                    out ABC pABC,
-                    out SCRIPT_VISATTR[] sva,
-                    out ushort[] log,
-                    ref used_font);
-                if (line.Font == null)
-                    line.Font = used_font; // 记录实际使用的字体
-
-                line.sva = sva; // sva 在 SplitLines() 中尚未计算，是在这里首次计算的。TODO: 将来可以改为在 SplieLines() 结束前计算
-                line.advances = piAdvance; // 记录 advances
-                line.glfs = glfs;
-                line.logClust = log;
-                line.PixelWidth = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
-
-                line.a = a;
-                line.Left = x_offset; // 记录 line 的左边界位置。注意这个左边界位置不能靠遍历 Range 元素累加来获得，因为逻辑顺序和显示顺序不一定是一致的
-                */
-
-                int iReserved = 0;
-                uint fuOptions = 0; // /*(int)Gdi32.ETO.ETO_OPAQUE |*/ (int)Gdi32.ETO.ETO_CLIPPED;
-
-
-                // //
-                PRECT item_rect = new PRECT();
-                item_rect.left = range.Left;
-                item_rect.top = y;
-                item_rect.Width = range.PixelWidth;   // (int)(pABC.abcA + pABC.abcB + pABC.abcC);
-                item_rect.Height = _line_height;
-
-                var font_handle = used_font.ToHfont();
-                try
-                {
-                    using (var context = hdc.SelectObject(font_handle))
-                    {
-                        /*
-                        // 绘制选中范围的背景色
-                        if (block_start != block_end
-                            && (block_start < line.Text.Length && block_end >= 0))
-                        {
-                            var block_rect = GetBlockRect(line, block_start, block_end);
-                            DrawSolidRectangle(hdc,
-                                block_rect.left + item_rect.left,
-                                block_rect.top + item_rect.top,
-                                block_rect.right + item_rect.left,
-                                block_rect.bottom + item_rect.top,
-                                new COLORREF(Color.Yellow));
-                        }
-                        */
-
-                        // 第一次显示 Range 内全部文字，用 Text Color
-                        // 如果是全部属于块，这样的第一次显示正常文字可以省略
-                        if (full_block == false || block_rect == null)
-                        {
-                            var result = ScriptTextOut(hdc,
-                                            cache,
-                                            range.Left,
-                                            y + _line_height - (int)GetAscentPixel(used_font),
-                                            fuOptions,
-                                            item_rect,   // [In, Optional] PRECT lprc,
-                                            range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
-                                            range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
-                                            iReserved,  //  [Optional] int iReserved,
-                                            range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
-                                            range.glfs.Length,    // int cGlyphs,
-                                            range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
-                                            null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
-                                            range.pGoffset[0]); // in GOFFSET pGoffset); 
-                            result.ThrowIfFailed();
-                        }
-
-                        // 第二次显示块部分文字，用 Highlight Color
-                        if (block_rect != null)
-                        {
-                            var old_color = Gdi32.SetTextColor(hdc, new COLORREF((uint)SystemColors.HighlightText.ToArgb())); // 设置文本颜色为黑色
-                            //var old_bk_color = Gdi32.SetBkColor(hdc, new COLORREF((uint)SystemColors.Highlight.ToArgb())); // 设置文本颜色为黑色
-                            try
-                            {
-                                var ret = ScriptTextOut(hdc,
-                    cache,
-                    range.Left,
-                    y + _line_height - (int)GetAscentPixel(used_font),
-                    (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
-                    block_rect,   // [In, Optional] PRECT lprc,
-                    range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
-                    range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
-                    iReserved,  //  [Optional] int iReserved,
-                    range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
-                    range.glfs.Length,    // int cGlyphs,
-                    range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
-                    null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
-                    range.pGoffset[0]); // in GOFFSET pGoffset); 
-                                ret.ThrowIfFailed();
-                            }
-                            finally
-                            {
-                                Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
-                                //Gdi32.SetBkColor(hdc, old_bk_color); // 恢复文本颜色
-                            }
-                        }
-
-                        // x_offset += line.PixelWidth;    // pABC.abcA + pABC.abcB + pABC.abcC;
-                    }
-                }
-                finally
-                {
-                    Gdi32.DeleteFont(font_handle);
-                }
-
+                throw new ArgumentException($"glyphIndex {glyphIndex} 在 log 数组中没有找到");
             }
         }
 
-#endif
+#if REMOVED
+        // 将 glyphIndex 映射到逻辑字符索引（返回 -1 表示无法映射）
+        static int GlyphIndexToCharIndex(ushort[] logClust /*可为 null*/, SCRIPT_VISATTR[] sva, int glyphIndex)
+        {
+            if (glyphIndex < 0)
+                return -1;
 
+            // 优先使用 logClust（如果它的语义是 glyph -> char）
+            if (logClust != null && glyphIndex < logClust.Length)
+            {
+                return logClust[glyphIndex]; // 可能需要根据你的 ScriptShape 返回值再调整
+            }
+
+            // 回退：通过 sva 跳过 zero-width / diacritic glyph 来计数
+            int charIndex = 0;
+            for (int i = 0; i <= glyphIndex && i < (sva?.Length ?? 0); i++)
+            {
+                // 当 glyph 不是 zero-width 时，视为对应一个后续的字符位置
+                if (!sva[i].fZeroWidth)
+                    charIndex++;
+            }
+            // 返回字符索引（注意：上面计数得到的是“已通过的字符数”，可能需要 -1/调整以适配你的 array 索引）
+            return Math.Max(0, charIndex - 1);
+        }
+#endif
 
 #if REMOVED
         void ShapeAndPlace(
@@ -1160,9 +1149,10 @@ ref used_font);
             if (_lines == null)
                 return 0;
             if (_lines.Count == 0)
-                return Line._line_height;
-            // return lines.Sum(line => line.GetPixelHeight());
-            return _lines.Count * Line._line_height;
+                return FontContext.DefaultFontHeight;
+            // 注意，每个 Line 的像素高度可能不同
+            return _lines.Sum(line => line.GetPixelHeight());
+            // return _lines.Count * Line._line_height;
         }
 
         public int GetPixelWidth()
@@ -1199,6 +1189,10 @@ ref used_font);
             int y/*,
             int _line_height*/)
         {
+            // 2025/12/3
+            if (y < 0)
+                return new HitInfo { Area = Area.TopBlank };
+
             var result = new HitInfo();
             int current_y = 0;
             int offs = 0;
@@ -1208,7 +1202,7 @@ ref used_font);
                 bool isLastLine = (i == _lines.Count - 1);
                 if (y < current_y)
                     break;
-                if (y >= current_y && (y < current_y + Line._line_height || isLastLine))
+                if (y >= current_y && (y < current_y + line.GetPixelHeight() || isLastLine))
                 {
 #if REMOVED
                     var ret = line.HitTest(x,
@@ -1237,11 +1231,11 @@ ref used_font);
                         TextIndex = result_info.Offs,
                         Offs = offs + result_info.Offs,
                         LineHeight = result_info.LineHeight,
-                        Area = y < current_y + Line._line_height ? Area.Text : Area.BottomBlank,
+                        Area = y < current_y + line.GetPixelHeight() ? Area.Text : Area.BottomBlank,
                     };
                 }
 
-                current_y += Line._line_height;
+                current_y += line.GetPixelHeight();
                 offs += line.TextLength;
             }
 
@@ -1278,7 +1272,7 @@ ref used_font);
             HitInfo info = new HitInfo();
             int offs = 0;
             Line line = null;
-            Range range = null;
+            RangeWrapper range = null;
             int start_x = 0;
             int start_y = 0;
             for (int i = 0; i < _lines.Count; i++)
@@ -1305,7 +1299,7 @@ ref used_font);
                 if (i >= _lines.Count - 1)
                     break;
 
-                start_y += Line._line_height;
+                start_y += line.GetPixelHeight();
 
                 info.ChildIndex++;
             }
@@ -1503,7 +1497,7 @@ ref used_font);
 
                 offs += line_text_length;
 
-                start_y += Line._line_height;
+                start_y += line.GetPixelHeight();
             }
 
             if (infos.Count > 0)
@@ -1522,13 +1516,77 @@ ref used_font);
                 info.Offs = offs + direction;
                 info.TextIndex = 0;
                 info.Area = Area.Text;
-                info.LineHeight = Line._line_height;
+                info.LineHeight = FontContext.DefaultFontHeight;
                 return 0;
             }
 
             info.Area = Area.BottomBlank;
             return 1;
         }
+
+        // 获得一段文本显示范围的 Region
+        // parameters:
+        //      virtual_tail_length 如果为 1，表示需要关注末尾结束符是否在选择范围内，如果在，要加入一个表示结束符的矩形
+        public Region GetRegion(int start_offs = 0,
+            int end_offs = int.MaxValue,
+            int virtual_tail_length = 0)
+        {
+            if (end_offs < start_offs)
+                throw new ArgumentException($"start_offs ({start_offs}) 必须小于或等于 end_offs ({end_offs})");
+
+
+            if (start_offs == end_offs)
+                return null;
+            if (end_offs <= 0)
+                return null;
+            if (start_offs >= this.TextLength + virtual_tail_length)
+                return null;
+
+            if (this._lines?.Count == 0)
+            {
+                // 尾部结束符
+                if (virtual_tail_length > 0
+                    && Utility.InRange(0, start_offs, end_offs))
+                {
+                    return new Region(new RectangleF(0,
+                        0,
+                        FontContext.DefaultReturnWidth,
+                        FontContext.DefaultFontHeight));
+                }
+                return null;
+            }
+
+            Region region = null;
+            int y = 0;
+            int i = 0;
+            foreach (var line in this._lines)
+            {
+                bool is_last_line = i == this._lines.Count - 1;
+                var result = line.GetRegion(start_offs,
+                    end_offs,
+                    is_last_line ? virtual_tail_length : 0);
+                if (result != null)
+                {
+                    result.Offset(0, y);
+
+                    if (region == null)
+                        region = result;
+                    else
+                    {
+                        region.Union(result);
+                        result.Dispose();
+                    }
+                }
+                var length = line.TextLength;
+                start_offs -= length;
+                end_offs -= length;
+                y += line.GetPixelHeight();
+                i++;
+            }
+
+            return region;
+        }
+
 
 #if REMOVED
         // 注意函数中不要改变 info 内容
@@ -1547,6 +1605,14 @@ ref used_font);
             return false;
         }
 #endif
+        Line HitLine(int x, int y)
+        {
+            // 找到 x, y 所在的 line
+            var temp = this.HitTest(x, y);
+            if (temp.ChildIndex < 0 || temp.ChildIndex >= this._lines.Count)
+                return null;
+            return this._lines[temp.ChildIndex];
+        }
 
         // parameters:
         //      x   最近一次左右移动插入符之后，插入符的 x 位置。注意，并不一定等于当前插入符的 x 位置
@@ -1562,7 +1628,21 @@ ref used_font);
             out HitInfo info)
         {
             info = new HitInfo();
-            y += Line._line_height;
+
+            if (y < 0)
+                y = 0;
+
+            // 找到 x, y 所在的 line
+            var line = HitLine(x, y);
+            if (line == null)
+            {
+                return false;
+            }
+
+            var line_height = line.GetPixelHeight();
+
+            // 注：每一个 Line 的行高都可能不一样，不能这样加法
+            y += line_height;
             if (y >= this.GetPixelHeight())
                 return false;
             info = this.HitTest(x, y);
@@ -1575,7 +1655,17 @@ ref used_font);
     out HitInfo info)
         {
             info = new HitInfo();
-            y -= Line._line_height;
+
+            // 找到 x, y 所在的 line
+            var line = HitLine(x, y);
+            if (line == null)
+            {
+                return false;
+            }
+
+            var line_height = line.GetPixelHeight();
+
+            y -= line_height;
             if (y < 0)
                 return false;
             info = this.HitTest(x, y);
@@ -1625,10 +1715,11 @@ ref used_font);
 
         #region 配合测试的代码
 
-        public Paragraph(string text)
+        public Paragraph(IBox parent, string text)
         {
+            _parent = parent;
             _lines = new List<Line>() {
-            new Line(text)
+            new Line(this, text)
             };
         }
 

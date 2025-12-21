@@ -19,14 +19,16 @@ namespace LibraryStudio.Forms
     /// </summary>
     public class SimpleText : IBox
     {
-        // public ConvertTextFunc ConvertText { get; set; }
+        public string Name { get; set; }
 
-        // public Color BackColor { get; set; } = Color.Transparent;
+        IBox _parent = null;
+        public IBox Parent => _parent;
 
         List<Paragraph> _paragraphs = new List<Paragraph>();
 
-        public void Paint(SafeHDC dc,
+        public void Paint(
             IContext context,
+            SafeHDC dc,
     int x,
     int y,
     Rectangle clipRect,
@@ -55,8 +57,9 @@ namespace LibraryStudio.Forms
                 var rect = new Rectangle(x, y, Int32.MaxValue, paragraph_height);
                 if (clipRect.IntersectsWith(rect))
                 {
-                    paragraph.Paint(dc,
+                    paragraph.Paint(
                         context,
+                        dc,
                         x,
                         y,
                         clipRect,
@@ -72,9 +75,13 @@ namespace LibraryStudio.Forms
         }
 
         // 切割为子字段。\ 符号和以后的属于一个完整子字段。切割在 \ 符号之前发生
+        // 子字段符号独立切割出来
         public static string[] SplitSubfields(string text,
-    char delimiter = '\\')
+    char delimeter = '\\')
         {
+            if (text == null)
+                return new string[0];
+
             List<string> lines = new List<string>();
             StringBuilder line = null;  // new StringBuilder();
             foreach (var ch in text)
@@ -83,7 +90,7 @@ namespace LibraryStudio.Forms
                 if (paragraph == null)
                     paragraph = new StringBuilder();
                 */
-                if (ch == delimiter)
+                if (ch == delimeter)
                 {
                     if (line != null && line.Length > 0)
                         lines.Add(line.ToString());
@@ -103,12 +110,202 @@ namespace LibraryStudio.Forms
             if (line != null && line.Length > 0)
                 lines.Add(line.ToString());
 
+            if (lines.Count == 0)
+                lines.Add("");
+
+            return lines.ToArray();
+        }
+
+        public static Segment[] SegmentSubfields(string text,
+            char delimeter = '\\',
+            object delimeter_tag = null)
+        {
+            if (text == null)
+                return new Segment[0];
+
+            var lines = new List<Segment>();
+            StringBuilder line = null;  // new StringBuilder();
+            foreach (var ch in text)
+            {
+                /*
+                if (paragraph == null)
+                    paragraph = new StringBuilder();
+                */
+                if (ch == delimeter)
+                {
+                    if (line != null && line.Length > 0)
+                        lines.Add(new Segment
+                        {
+                            Text = line.ToString(),
+                            Tag = null,
+                        });
+                    line = new StringBuilder();
+                    line.Append(ch);
+                    lines.Add(new Segment
+                    {
+                        Text = line.ToString(),
+                        Tag = delimeter_tag,    // 分隔符
+                    });
+                    line = null;
+                }
+                else
+                {
+                    if (line == null)
+                        line = new StringBuilder();
+                    line.Append(ch);
+                }
+
+            }
+            if (line != null && line.Length > 0)
+                lines.Add(new Segment
+                {
+                    Text = line.ToString(),
+                    Tag = null,
+                });
+
+            if (lines.Count == 0)
+                lines.Add(new Segment
+                {
+                    Text = "",
+                    Tag = null,
+                });
+
+            return lines.ToArray();
+        }
+
+
+        // 子字段符号和子字段名粘连在一起
+        public static string[] SplitSubfields2(string text,
+    char delimeter = '\\',
+    int name_chars = 2)
+        {
+            if (text == null)
+                return new string[0];
+
+            List<string> lines = new List<string>();
+            StringBuilder line = null;
+            bool is_head_delimeter = false; // 指示 line 内容中第一字符是为 delemiter
+            foreach (var ch in text)
+            {
+                /*
+                if (paragraph == null)
+                    paragraph = new StringBuilder();
+                */
+                if (ch == delimeter)
+                {
+                    if (line != null && line.Length > 0)
+                    {
+                        lines.Add(line.ToString());
+                    }
+
+                    line = new StringBuilder();
+                    line.Append(ch);
+                    is_head_delimeter = true;
+                }
+                else
+                {
+                    if (line == null)
+                    {
+                        line = new StringBuilder();
+                        is_head_delimeter = false;
+                    }
+                    line.Append(ch);
+                }
+
+                // 因为(分隔符引导的一段内容)长度到了，主动切割
+                if (is_head_delimeter
+                    && line.Length >= name_chars)
+                {
+                    lines.Add(line.ToString());
+                    line = null;
+                    is_head_delimeter = false;
+                }
+            }
+
+            if (line != null)
+                lines.Add(line.ToString());
+
+            if (lines.Count == 0)
+                lines.Add("");
+            return lines.ToArray();
+        }
+
+        // 子字段符号和子字段名粘连在一起
+        public static Segment[] SegmentSubfields2(string text,
+    char delimeter = '\\',
+    int name_chars = 2,
+    object delimeter_tag = null)
+        {
+            if (text == null)
+                return new Segment[0];
+
+            var lines = new List<Segment>();
+            StringBuilder line = null;
+            bool is_head_delimeter = false; // 指示 line 内容中第一字符是为 delemiter
+            foreach (var ch in text)
+            {
+                /*
+                if (paragraph == null)
+                    paragraph = new StringBuilder();
+                */
+                if (ch == delimeter)
+                {
+                    if (line != null && line.Length > 0)
+                    {
+                        lines.Add(new Segment
+                        {
+                            Text = line.ToString(),
+                            Tag = is_head_delimeter ? delimeter_tag : null,
+                        });
+                    }
+
+                    line = new StringBuilder();
+                    line.Append(ch);
+                    is_head_delimeter = true;
+                }
+                else
+                {
+                    if (line == null)
+                    {
+                        line = new StringBuilder();
+                        is_head_delimeter = false;
+                    }
+                    line.Append(ch);
+                }
+
+                // 因为(分隔符引导的一段内容)长度到了，主动切割
+                if (is_head_delimeter
+                    && line.Length >= name_chars)
+                {
+                    lines.Add(new Segment
+                    {
+                        Text = line.ToString(),
+                        Tag = is_head_delimeter ? delimeter_tag : null,
+                    });
+                    line = null;
+                    is_head_delimeter = false;
+                }
+            }
+
+            if (line != null)
+                lines.Add(new Segment
+                {
+                    Text = line.ToString(),
+                    Tag = is_head_delimeter ? delimeter_tag : null,
+                });
+
+            if (lines.Count == 0)
+                lines.Add(new Segment
+                {
+                    Text = "",
+                    Tag = null,
+                });
             return lines.ToArray();
         }
 
 
         public static string[] SplitLines(string text,
-            char delimiter = '\r',
+            char delimeter = '\r',
             bool contain_return = true)
         {
             List<string> lines = new List<string>();
@@ -119,7 +316,7 @@ namespace LibraryStudio.Forms
                 if (paragraph == null)
                     paragraph = new StringBuilder();
                 */
-                if (ch == delimiter)
+                if (ch == delimeter)
                 {
                     if (contain_return)
                         line.Append(ch);
@@ -136,7 +333,7 @@ namespace LibraryStudio.Forms
             return lines.ToArray();
         }
 
-        public int Initialize(Gdi32.SafeHDC dc,
+        public int Initialize(SafeHDC dc,
             string content,
             int pixel_width,
             IContext context)
@@ -149,7 +346,7 @@ namespace LibraryStudio.Forms
             int max_pixel_width = pixel_width;
             foreach (var line in lines)
             {
-                var paragraph = new Paragraph();
+                var paragraph = new Paragraph(this);
                 var width = paragraph.Initialize(dc, line, pixel_width, context);
                 if (width > max_pixel_width)
                     max_pixel_width = width;
@@ -170,22 +367,25 @@ namespace LibraryStudio.Forms
         //      splitRange  为初始化新行准备
         // return:
         //      进行折行处理以后，所发现的最大行宽像素数。可能比 pixel_width 参数值要大
-        public int ReplaceText(
-            Gdi32.SafeHDC dc,
+        public ReplaceTextResult ReplaceText(
+            IContext context,
+            SafeHDC dc,
             int start,
             int end,
             string text,
-            int pixel_width,
-            IContext context,
+            int pixel_width/*,
             out string replaced,
             out Rectangle update_rect,
             out Rectangle scroll_rect,
-            out int scroll_distance)
+            out int scroll_distance*/)
         {
-            update_rect = System.Drawing.Rectangle.Empty;
+            var update_rect = System.Drawing.Rectangle.Empty;
+            /*
             scroll_rect = System.Drawing.Rectangle.Empty;
             scroll_distance = 0;
             replaced = "";
+            */
+            var result = new ReplaceTextResult();
 
             // 先分别定位到 start 所在的 Paragraph，和 end 所在的 Paragraph
             // 观察被替换的范围 start - end，跨越了多少个 Paragraph
@@ -198,13 +398,15 @@ namespace LibraryStudio.Forms
                 end,
                 out string right_text,
                 out int first_paragraph_index,
-                out replaced);
+                out string replaced);
 
             if (start == 0 && end == -1 /*&& first_paragraph_index == -1*/)
             {
                 first_paragraph_index = 0;
                 // _paragraphs.Clear();
             }
+
+            result.ReplacedText = replaced;
 
             string content = left_text + text + right_text;
 
@@ -223,7 +425,7 @@ namespace LibraryStudio.Forms
                     false);
                 foreach (var line in lines)
                 {
-                    var paragraph = new Paragraph();
+                    var paragraph = new Paragraph(this);
                     var width = paragraph.Initialize(dc, line, pixel_width, context);
                     if (width > max_pixel_width)
                         max_pixel_width = width;
@@ -247,19 +449,22 @@ namespace LibraryStudio.Forms
 
             update_rect = new Rectangle(0,
                 y,
-                max_pixel_width,
+                max_pixel_width,    // TODO: 这里有问题, max_pixel_width 统计时有没有可能没有能包括全部 Paragraph 的最大像素宽度
                 Math.Max(old_h, new_h));
 
-            scroll_distance = new_h - old_h;
-            if (scroll_distance != 0)
+            result.ScrolledDistance = new_h - old_h;
+            if (result.ScrolledDistance != 0)
             {
                 int move_height = SumHeight(_paragraphs, first_paragraph_index, _paragraphs.Count - first_paragraph_index);
-                scroll_rect = new Rectangle(0,
+                result.ScrollRect = new Rectangle(0,
         y + old_h,
         max_pixel_width,
         move_height);
             }
-            return max_pixel_width;
+
+            ProcessBaseline();
+            result.MaxPixel = max_pixel_width;
+            return result;
         }
 
         static int SumHeight(List<Paragraph> paragraphs, int count)
@@ -379,6 +584,40 @@ namespace LibraryStudio.Forms
                 return j == _paragraphs.Count - 1;
             }
         }
+
+
+        float _baseLine;
+        float _below;
+
+        public float BaseLine
+        {
+            get
+            {
+                return _baseLine;
+            }
+        }
+
+        public float Below
+        {
+            get
+            {
+                return _below;
+            }
+        }
+
+        // 以第一行 Line 的基线为基线
+        void ProcessBaseline()
+        {
+            if (this._paragraphs == null || this._paragraphs.Count == 0)
+            {
+                _baseLine = 0;
+                _below = 0;
+                return;
+            }
+            _baseLine = this._paragraphs[0].BaseLine;
+            _below = this._paragraphs[0].Below;  // TODO: 加上除第一行以外的所有行的高度?
+        }
+
 
 
         public void Clear()
@@ -630,6 +869,60 @@ namespace LibraryStudio.Forms
             return 1;
         }
 
+        // 获得一段文本显示范围的 Region
+        public Region GetRegion(int start_offs = 0, 
+            int end_offs = int.MaxValue,
+            int virtual_tail_length = 0)
+        {
+            if (end_offs < start_offs)
+                throw new ArgumentException($"start_offs ({start_offs}) 必须小于或等于 end_offs ({end_offs})");
+
+            if (this._paragraphs?.Count == 0)
+                return null;
+
+            if (start_offs == end_offs)
+                return null;
+            if (end_offs <= 0)
+                return null;
+            if (start_offs >= this.TextLength)
+                return null;
+
+            Region region = null;
+            int current_offs = 0;
+            int y = 0;
+            int i = 0;
+            foreach (var line in this._paragraphs)
+            {
+                bool is_tail = IsTailParagraph(i);
+                // 段落文字最后隐含的 \r 字符个数
+                int return_length = is_tail ? 0 : 1;
+
+                var result = line.GetRegion(start_offs - current_offs,
+                    end_offs - current_offs,
+                    is_tail ? 0 : virtual_tail_length);
+                if (result != null)
+                {
+                    result.Offset(0, y);
+
+                    if (region == null)
+                        region = result;
+                    else
+                    {
+                        region.Union(result);
+                        result.Dispose();
+                    }
+                }
+                current_offs += line.TextLength + return_length;
+                y += line.GetPixelHeight();
+                i++;
+            }
+
+            return region;
+            bool IsTailParagraph(int j)
+            {
+                return j == _paragraphs.Count - 1;
+            }
+        }
 
 
 #if REMOVED
@@ -681,7 +974,7 @@ namespace LibraryStudio.Forms
             out HitInfo info)
         {
             info = new HitInfo();
-            y += Line._line_height;
+            y += FontContext.DefaultFontHeight;
             if (y >= this.GetPixelHeight())
                 return false;
             info = this.HitTest(x, y);
@@ -694,7 +987,7 @@ namespace LibraryStudio.Forms
     out HitInfo info)
         {
             info = new HitInfo();
-            y -= Line._line_height;
+            y -= FontContext.DefaultFontHeight;
             if (y < 0)
                 return false;
             info = this.HitTest(x, y);

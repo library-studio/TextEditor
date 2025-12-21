@@ -50,6 +50,7 @@
     <Compile Include="EditControl1.Designer.cs">
       <DependentUpon>EditControl1.cs</DependentUpon>
     </Compile>
+    <Compile Include="FontContext.cs" />
     <Compile Include="FontLink.cs" />
     <Compile Include="History.cs" />
     <Compile Include="HitInfo.cs" />
@@ -57,8 +58,13 @@
     <Compile Include="Line.cs" />
     <Compile Include="Paragraph.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Range.cs" />
     <Compile Include="SimpleText.cs" />
     <Compile Include="UnitTest.cs" />
+    <Compile Include="UnitTest\TestLine.cs" />
+    <Compile Include="UnitTest\TestRegion.cs" />
+    <Compile Include="UnitTest\TestSimpeText.cs" />
+    <Compile Include="UnitTest\TestUtility.cs" />
     <Compile Include="Utility.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>
@@ -80,6 +86,14 @@
     </PackageReference>
     <PackageReference Include="Vanara.PInvoke.Usp10">
       <Version>4.0.6</Version>
+    </PackageReference>
+    <PackageReference Include="xunit">
+      <Version>2.9.3</Version>
+    </PackageReference>
+    <PackageReference Include="xunit.runner.visualstudio">
+      <Version>3.1.5</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

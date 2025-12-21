@@ -227,7 +227,7 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
+                new Paragraph(null, "123456"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -249,7 +249,7 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
+                new Paragraph(null, "123456"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -271,8 +271,8 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
-                new Paragraph("abcdef"),
+                new Paragraph(null, "123456"),
+                new Paragraph(null, "abcdef"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -294,9 +294,9 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
-                new Paragraph("abcdef"),
-                new Paragraph("ABCDEF"),
+                new Paragraph(null, "123456"),
+                new Paragraph(null, "abcdef"),
+                new Paragraph(null, "ABCDEF"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -319,9 +319,9 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
-                new Paragraph("abcdef"),
-                new Paragraph("ABCDEF"),
+                new Paragraph(null, "123456"),
+                new Paragraph(null, "abcdef"),
+                new Paragraph(null, "ABCDEF"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -344,9 +344,9 @@ namespace LibraryStudio.Forms
         {
             var paragraphs = new List<Paragraph>()
             {
-                new Paragraph("123456"),
-                new Paragraph("abcdef"),
-                new Paragraph("ABCDEF"),
+                new Paragraph(null, "123456"),
+                new Paragraph(null, "abcdef"),
+                new Paragraph(null,"ABCDEF"),
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,
@@ -368,8 +368,8 @@ namespace LibraryStudio.Forms
         public void test_findParagraph_21()
         {
             var paragraphs = new List<Paragraph>() {
-                new Paragraph { },
-                new Paragraph { },
+                new Paragraph(null) { },
+                new Paragraph(null) { },
             };
             var results = SimpleText.FindParagraphs(
         paragraphs,

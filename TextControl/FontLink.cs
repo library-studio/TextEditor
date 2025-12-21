@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
@@ -50,11 +51,7 @@ namespace LibraryStudio.Forms
                     FontFileName = "",
                     FontName = "Arial Unicode MS"   // "Arial Unicode MS",
                 });
-                link.FontInfos.Add(new FontInfo
-                {
-                    FontFileName = "",
-                    FontName = "Aldhabi"   // "Arial Unicode MS",
-                });
+
                 Hashtable name_table = new Hashtable(); // 名字去重
                 foreach (var line in lines)
                 {
@@ -76,7 +73,11 @@ namespace LibraryStudio.Forms
                     });
                 }
 
-
+                link.FontInfos.Add(new FontInfo
+                {
+                    FontFileName = "",
+                    FontName = "Aldhabi"   // "Arial Unicode MS",
+                });
 
                 _links.Add(link);
             }
@@ -171,7 +172,8 @@ namespace LibraryStudio.Forms
             foreach (var fontFamily in FontFamily.Families)
             {
                 var names = CultureInfo.GetCultures(CultureTypes.AllCultures)
-                    .Select(c => {
+                    .Select(c =>
+                    {
                         try { return fontFamily.GetName(c.LCID); }
                         catch { return null; }
                     })
@@ -219,17 +221,20 @@ CultureInfo.LCID
         {
             if (FontInfos == null)
                 throw new ArgumentException(".FontInfos == null");
-            var fonts = new List<Font>();
+            var fonts = new List<Font>() { refFont };
+            // TODO: 可以通过调节 fonts 中各种字体出现的先后顺序，
+            // 实现类似令英文字符先用上一个非汉字的字体的效果
             Hashtable name_table = new Hashtable();
             name_table.Add(refFont.FontFamily.GetName(0), ""); // 添加原字体的名字，避免重复
             foreach (var info in FontInfos)
             {
                 try
                 {
+                    // Debug.WriteLine(info.FontName);
                     var fontFamily = new FontFamily(info.FontName);
                     if (name_table.Contains(fontFamily.GetName(0)))
                         continue;
-                    fonts.Add(new Font(fontFamily, refFont.Size));
+                    fonts.Add(new Font(fontFamily, refFont.SizeInPoints, refFont.Style, GraphicsUnit.Point));
                     name_table.Add(fontFamily.GetName(0), "");
                 }
                 catch (ArgumentException)
@@ -238,16 +243,31 @@ CultureInfo.LCID
                 }
             }
 
+            /*
+            fonts.Sort((a, b) => {
+                // Aldhabi 放到最后
+                if (a.Name.StartsWith("Microsoft Sans Serif"))
+                    return -1;
+                if (b.Name.StartsWith("Microsoft Sans Serif"))
+                    return 1;
+                return string.CompareOrdinal(a.Name, b.Name);
+            });
+            */
             return fonts;
         }
 
-        public static void DisposeFonts(List<Font> fonts)
+        // parameters:
+        //      fonts   要释放的对象
+        //      exclude fonts 中特意不要释放的对象
+        public static void DisposeFonts(List<Font> fonts,
+            Font exclude = null)
         {
             if (fonts != null)
             {
                 foreach (var font in fonts)
                 {
-                    font.Dispose();
+                    if (font != exclude)
+                        font.Dispose();
                 }
 
                 fonts.Clear();

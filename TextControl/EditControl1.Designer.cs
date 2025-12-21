@@ -17,7 +17,11 @@
             {
                 components.Dispose();
 
-                Line.DisposeFonts();
+                // Line.DisposeFonts();
+                {
+                    _fonts?.Dispose();
+                    _fonts = null;
+                }
             }
             base.Dispose(disposing);
         }

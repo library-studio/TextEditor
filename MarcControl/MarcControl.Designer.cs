@@ -18,8 +18,8 @@ namespace LibraryStudio.Forms
             if (disposing && (components != null))
             {
                 components.Dispose();
-                Line.DisposeFonts();
             }
+            DisposeFonts();
             base.Dispose(disposing);
         }
 

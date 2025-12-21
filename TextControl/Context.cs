@@ -26,5 +26,10 @@ namespace LibraryStudio.Forms
         /// </summary>
         public GetForeColorFunc GetForeColor { get; set; }
 
+        public GetBackColorFunc GetBackColor { get; set; }
+
+        public PaintBackFunc PaintBack { get; set; }
+
+        public GetFontFunc GetFont { get; set; }
     }
 }

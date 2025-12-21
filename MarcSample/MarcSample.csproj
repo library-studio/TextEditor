@@ -44,9 +44,6 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
-    <Reference Include="TestLibrary">
-      <HintPath>..\TestLibrary\bin\Debug\TestLibrary.dll</HintPath>
-    </Reference>
     <Reference Include="Vanara.PInvoke.Gdi32">
       <HintPath>..\packages\Vanara.PInvoke.Gdi32.4.0.6\lib\net45\Vanara.PInvoke.Gdi32.dll</HintPath>
     </Reference>
@@ -64,16 +61,22 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Form1.cs">
+    <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="MainForm.Designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="Form1.resx">
-      <DependentUpon>Form1.cs</DependentUpon>
+    <Compile Include="StyleDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="StyleDialog.Designer.cs">
+      <DependentUpon>StyleDialog.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -84,6 +87,9 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <EmbeddedResource Include="StyleDialog.resx">
+      <DependentUpon>StyleDialog.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
