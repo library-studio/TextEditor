@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -44,6 +44,8 @@ namespace MarcSample
             this.marcControl1.Content = "012345678901234567890123";
             this.marcControl1.PadWhileReturning = false;
             this.marcControl1.PaddingChar = '*';
+
+            LoadMarc();
         }
 
         private void MenuItem_testSetCallback_Click(object sender, EventArgs e)
@@ -163,6 +165,39 @@ namespace MarcSample
                 this,
                 string.Join("\r\n", errors)
                 + (fix && errors.Count() > 0 ? "\r\n已经自动修复。" : ""));
+        }
+
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            SaveMarc();
+        }
+
+        private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+
+        }
+
+        void LoadMarc()
+        {
+            try
+            {
+                var path = Path.Combine(GetBinDirectory(), "marc.txt");
+                if (File.Exists(path))
+                {
+                    var content = File.ReadAllText(path);
+                    if (string.IsNullOrEmpty(content) == false)
+                        this.marcControl1.Content = content;
+                }
+            }
+            catch (FileNotFoundException)
+            {
+            }
+        }
+
+        void SaveMarc()
+        {
+            var path = Path.Combine(GetBinDirectory(), "marc.txt");
+            File.WriteAllText(path, this.marcControl1.Content);
         }
     }
 }

@@ -84,8 +84,9 @@
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Design.txt" />
-    <Content Include="TestCase.txt" />
+    <Content Include="Document\Design.txt" />
+    <Content Include="Document\Keys.txt" />
+    <Content Include="Document\TestCase.txt" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TextControl\TextControl.csproj">

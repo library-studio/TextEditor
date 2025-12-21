@@ -1,4 +1,3 @@
-// csharp Tests\UiTestHelpers.cs
 using System;
 using System.Drawing;
 using System.Threading;
@@ -8,8 +7,8 @@ namespace LibraryStudio.Forms
 {
     public static class UiTestHelpers
     {
-        // ÔÚ STA Ïß³ÌÉÏÔËĞĞÒ»¸ö action£¬²¢ÔÚ¸ÃÏß³ÌÉÏÆô¶¯Ò»¸ö¶ÌÔİµÄÏûÏ¢Ñ­»·ÒÔ±£Ö¤ WinForms ÄÜÕı³£³õÊ¼»¯¡£
-        // Èç¹û action Å×³öÒì³££¬»áÔÚµ÷ÓÃÏß³ÌÖØĞÂÅ×³öÒÔ±ã²âÊÔ¿ò¼Ü²¶»ñ¡£
+        // åœ¨ STA çº¿ç¨‹ä¸Šè¿è¡Œä¸€ä¸ª actionï¼Œå¹¶åœ¨è¯¥çº¿ç¨‹ä¸Šå¯åŠ¨ä¸€ä¸ªçŸ­æš‚çš„æ¶ˆæ¯å¾ªç¯ä»¥ä¿è¯ WinForms èƒ½æ­£å¸¸åˆå§‹åŒ–ã€‚
+        // å¦‚æœ action æŠ›å‡ºå¼‚å¸¸ï¼Œä¼šåœ¨è°ƒç”¨çº¿ç¨‹é‡æ–°æŠ›å‡ºä»¥ä¾¿æµ‹è¯•æ¡†æ¶æ•è·ã€‚
         public static void RunInSta(Action action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
@@ -19,7 +18,7 @@ namespace LibraryStudio.Forms
 
             var t = new Thread(() =>
             {
-                // ±£Ö¤ÔÚ UI Ïß³ÌÉÏ´¦ÀíÎ´²¶»ñÒì³££¬±ÜÃâµ¯³ö ThreadExceptionDialog
+                // ä¿è¯åœ¨ UI çº¿ç¨‹ä¸Šå¤„ç†æœªæ•è·å¼‚å¸¸ï¼Œé¿å…å¼¹å‡º ThreadExceptionDialog
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 Application.ThreadException += (s, e) =>
                 {
@@ -35,11 +34,11 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // ÌáÇ°ÆôÓÃ Visual Styles / ÎÄ±¾äÖÈ¾ÅäÖÃ£¨¿ÉÑ¡µ«³£ÓÃ£©
+                    // æå‰å¯ç”¨ Visual Styles / æ–‡æœ¬æ¸²æŸ“é…ç½®ï¼ˆå¯é€‰ä½†å¸¸ç”¨ï¼‰
                     try { Application.EnableVisualStyles(); } catch { }
                     try { Application.SetCompatibleTextRenderingDefault(false); } catch { }
 
-                    // ½¨Á¢Ò»¸öÒş²Ø´°¿ÚÓÃÓÚÆô¶¯ÏûÏ¢Ñ­»·£¬²¢ÔÚ Load Ê±Ö´ĞĞ action
+                    // å»ºç«‹ä¸€ä¸ªéšè—çª—å£ç”¨äºå¯åŠ¨æ¶ˆæ¯å¾ªç¯ï¼Œå¹¶åœ¨ Load æ—¶æ‰§è¡Œ action
                     using (var hidden = new Form()
                     {
                         Size = new Size(0, 0),
@@ -52,7 +51,7 @@ namespace LibraryStudio.Forms
                         {
                             try
                             {
-                                // ÔÚ UI Ïß³ÌÉÏÏÂÎÄÖ´ĞĞ²âÊÔ²Ù×÷
+                                // åœ¨ UI çº¿ç¨‹ä¸Šä¸‹æ–‡æ‰§è¡Œæµ‹è¯•æ“ä½œ
                                 action();
                             }
                             catch (Exception ex)
@@ -61,7 +60,7 @@ namespace LibraryStudio.Forms
                             }
                             finally
                             {
-                                // ½áÊøÏûÏ¢Ñ­»·
+                                // ç»“æŸæ¶ˆæ¯å¾ªç¯
                                 try { Application.ExitThread(); } catch { }
                             }
                         };
@@ -72,7 +71,7 @@ namespace LibraryStudio.Forms
                         }
                         catch (Exception ex)
                         {
-                            // ²¶»ñÔËĞĞÊ±Î´Ô¤ÆÚÒì³£
+                            // æ•è·è¿è¡Œæ—¶æœªé¢„æœŸå¼‚å¸¸
                             remoteEx = remoteEx ?? ex;
                         }
                     }
@@ -91,7 +90,7 @@ namespace LibraryStudio.Forms
             t.IsBackground = true;
             t.Start();
 
-            // µÈ´ı UI Ïß³ÌÍê³É
+            // ç­‰å¾… UI çº¿ç¨‹å®Œæˆ
             done.Wait();
 
             if (remoteEx != null)
@@ -99,8 +98,8 @@ namespace LibraryStudio.Forms
         }
 
 #if REMOVED
-        // ÔÚ STA Ïß³ÌÉÏÔËĞĞÒ»¸ö action£¬²¢ÔÚ¸ÃÏß³ÌÉÏÆô¶¯Ò»¸ö¶ÌÔİµÄÏûÏ¢Ñ­»·ÒÔ±£Ö¤ WinForms ÄÜÕı³£³õÊ¼»¯¡£
-        // Èç¹û action Å×³öÒì³££¬»áÔÚµ÷ÓÃÏß³ÌÖØĞÂÅ×³öÒÔ±ã²âÊÔ¿ò¼Ü²¶»ñ¡£
+        // åœ¨ STA çº¿ç¨‹ä¸Šè¿è¡Œä¸€ä¸ª actionï¼Œå¹¶åœ¨è¯¥çº¿ç¨‹ä¸Šå¯åŠ¨ä¸€ä¸ªçŸ­æš‚çš„æ¶ˆæ¯å¾ªç¯ä»¥ä¿è¯ WinForms èƒ½æ­£å¸¸åˆå§‹åŒ–ã€‚
+        // å¦‚æœ action æŠ›å‡ºå¼‚å¸¸ï¼Œä¼šåœ¨è°ƒç”¨çº¿ç¨‹é‡æ–°æŠ›å‡ºä»¥ä¾¿æµ‹è¯•æ¡†æ¶æ•è·ã€‚
         public static void RunInSta(Action action)
         {
             if (action == null) throw new ArgumentNullException(nameof(action));
@@ -110,10 +109,10 @@ namespace LibraryStudio.Forms
             {
                 try
                 {
-                    // ±ÜÃâÄ¬ÈÏµÄ ThreadException ¶Ô»°¿òÔÚ²âÊÔ»·¾³ÖĞ±»µ¯³ö
+                    // é¿å…é»˜è®¤çš„ ThreadException å¯¹è¯æ¡†åœ¨æµ‹è¯•ç¯å¢ƒä¸­è¢«å¼¹å‡º
                     Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-                    // ÌáÇ°ÆôÓÃ Visual Styles / ÎÄ±¾äÖÈ¾ÅäÖÃ£¨¿ÉÑ¡µ«³£ÓÃ£©
+                    // æå‰å¯ç”¨ Visual Styles / æ–‡æœ¬æ¸²æŸ“é…ç½®ï¼ˆå¯é€‰ä½†å¸¸ç”¨ï¼‰
                     try { Application.EnableVisualStyles(); } catch { }
                     try { Application.SetCompatibleTextRenderingDefault(false); } catch { }
 
@@ -123,24 +122,24 @@ namespace LibraryStudio.Forms
                         {
                             try
                             {
-                                // ÔÚ UI Ïß³ÌÉÏÏÂÎÄÖ´ĞĞ²âÊÔ²Ù×÷
+                                // åœ¨ UI çº¿ç¨‹ä¸Šä¸‹æ–‡æ‰§è¡Œæµ‹è¯•æ“ä½œ
                                 action();
                             }
                             catch (Exception ex)
                             {
                                 remoteEx = ex;
                             }
-                            // ½áÊøÏûÏ¢Ñ­»·
+                            // ç»“æŸæ¶ˆæ¯å¾ªç¯
                             hidden.BeginInvoke(new Action(() => hidden.Close()));
                         };
 
-                        // Æô¶¯ÏûÏ¢Ñ­»·£¨±£Ö¤¿Ø¼ş´´½¨¡¢×ÖÌå/Graphics ³õÊ¼»¯µÈÓĞÒ»¸öÕıÊ½µÄ UI »·¾³£©
+                        // å¯åŠ¨æ¶ˆæ¯å¾ªç¯ï¼ˆä¿è¯æ§ä»¶åˆ›å»ºã€å­—ä½“/Graphics åˆå§‹åŒ–ç­‰æœ‰ä¸€ä¸ªæ­£å¼çš„ UI ç¯å¢ƒï¼‰
                         Application.Run(hidden);
                     }
                 }
                 catch (Exception ex)
                 {
-                    // ²¶»ñ Run ÄÚ²¿²»¿ÉÔ¤¼ûÒì³£
+                    // æ•è· Run å†…éƒ¨ä¸å¯é¢„è§å¼‚å¸¸
                     remoteEx = remoteEx ?? ex;
                 }
             });
@@ -157,7 +156,7 @@ namespace LibraryStudio.Forms
 
 
 #if REMOVED
-        // ÔÚ STA Ïß³ÌÉÏÖ´ĞĞ action£¬²¶»ñ²¢×ª·¢Òì³£
+        // åœ¨ STA çº¿ç¨‹ä¸Šæ‰§è¡Œ actionï¼Œæ•è·å¹¶è½¬å‘å¼‚å¸¸
         public static void RunInSta(Action action)
         {
             Exception ex = null;
@@ -165,7 +164,7 @@ namespace LibraryStudio.Forms
             {
                 try
                 {
-                    // Îª WinForms ²Ù×÷ÉèÖÃÍ¬²½ÉÏÏÂÎÄ£¨¿ÉÑ¡£¬µ«ÓĞÓÃ£©
+                    // ä¸º WinForms æ“ä½œè®¾ç½®åŒæ­¥ä¸Šä¸‹æ–‡ï¼ˆå¯é€‰ï¼Œä½†æœ‰ç”¨ï¼‰
                     SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
                     action();
                 }

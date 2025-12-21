@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -10,6 +10,8 @@ namespace LibraryStudio.Forms
     // 字段的一些共同参数
     public class Metrics
     {
+        public GetReadOnlyFunc GetReadOnly { get; set; }
+
         public GetFieldCaptionFunc GetFieldCaption { get; set; }
 
         // 字段名称注释的像素宽度
@@ -100,9 +102,15 @@ namespace LibraryStudio.Forms
         public int TestSplitterArea(int x)
         {
             if (x < this.CaptionPixelWidth - this.SplitterPixelWidth)
+            {
                 return -2;
+            }
+
             if (x < this.CaptionPixelWidth)
+            {
                 return -1;
+            }
+
             return 0;
         }
 
@@ -155,7 +163,7 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return this.IndicatorX + this.IndicatorPixelWidth;  
+                return this.IndicatorX + this.IndicatorPixelWidth;
             }
         }
 
@@ -232,7 +240,12 @@ namespace LibraryStudio.Forms
 
         public static Color DefaultSolidColor = Color.LightGray;
 
+        public Color BorderColor { get; set; } = DefaultBorderColor;
+        public static Color DefaultBorderColor = SystemColors.ControlDark;
+
     }
 
     public delegate string GetFieldCaptionFunc(MarcField field);
+
+    public delegate bool GetReadOnlyFunc(IBox box);
 }

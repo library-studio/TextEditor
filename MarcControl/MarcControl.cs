@@ -1,24 +1,16 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Security.AccessControl;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Vanara.PInvoke;
-using static LibraryStudio.Forms.MarcRecord;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
-using static Vanara.PInvoke.Kernel32.FILE_REMOTE_PROTOCOL_INFO;
 using static Vanara.PInvoke.User32;
-using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
 {
@@ -71,6 +63,10 @@ namespace LibraryStudio.Forms
 
         public MarcControl()
         {
+            _fieldProperty = new Metrics()
+            {
+                GetReadOnly = (o) => this.ReadOnly,
+            };
             _record = new MarcRecord(this, _fieldProperty);
 
             #region 延迟刷新
@@ -90,6 +86,14 @@ namespace LibraryStudio.Forms
 
         public IContext GetDefaultContext()
         {
+            /*
+            return new Context {
+                GetFont = (o, t) =>
+                {
+                    return ContentFontGroup;
+                }
+            };
+            */
             return new Context
             {
                 SplitRange = (o, content) =>
@@ -137,56 +141,7 @@ namespace LibraryStudio.Forms
                     var backColor = _fieldProperty?.BackColor ?? SystemColors.Window;
                     return backColor;
                 },
-                PaintBack = (o, hdc, rect, clipRect) =>
-                {
-                    var field = o as MarcField;
-                    if (o == null)
-                        return;
-                    rect.Width = this.AutoScrollMinSize.Width;
-                    using (var g = (Graphics.FromHdc((IntPtr)(HDC)hdc)))
-                    using (var brush = new SolidBrush(_fieldProperty.SolidColor))
-                    {
-                        /*
-                        var line_height = field.IsHeader ? 0 : Line.GetLineHeight();
-                        var solid_height = rect.Height - line_height;
-                        if (solid_height > 0)
-                        {
-                            var solid_rect = new Rectangle(
-                            rect.X,
-                            rect.Y + line_height,
-                            _fieldProperty.NameBorderX + _fieldProperty.NamePixelWidth + _fieldProperty.IndicatorPixelWidth,
-                            solid_height);
-                            if (clipRect.IntersectsWith(solid_rect))
-                                g.FillRectangle(brush, solid_rect);
-                        }
-                        */
-
-                        field.PaintBackAndBorder(g, rect.X, rect.Y);
-
-                        /*
-                        if (field.IsHeader == false)
-                        {
-                            PaintBackAndBorder(g,
-                                rect.X + _fieldProperty.NameBorderX,
-                                rect.Y,
-                                _fieldProperty.NamePixelWidth,
-                                Line.GetLineHeight());
-                            if (field.IsControlField == false)
-                                PaintBackAndBorder(g,
-            rect.X + _fieldProperty.IndicatorBorderX,
-            rect.Y,
-            _fieldProperty.IndicatorPixelWidth,
-            Line.GetLineHeight());
-                        }
-                        */
-                    }
-                    /*
-                        MarcField.PaintBack(hdc,
-                            rect,
-                            clipRect,
-                            Color.Yellow);
-                    */
-                },
+                PaintBack = _paintBackfunc,
                 GetFont = (o, t) =>
                 {
                     if (t is MarcField.Tag tag
@@ -212,6 +167,18 @@ namespace LibraryStudio.Forms
                     return ContentFontGroup;
                 }
             };
+        }
+
+        void _paintBackfunc(object o,
+            SafeHDC hdc,
+            Rectangle rect,
+            Rectangle clipRect)
+        {
+            var field = o as MarcField;
+            if (o == null)
+                return;
+            rect.Width = this.AutoScrollMinSize.Width;
+            field.PaintBackAndBorder(hdc, rect.X, rect.Y, clipRect);
         }
 
         FontContext _contentFonts = null;
@@ -446,6 +413,9 @@ namespace LibraryStudio.Forms
                 _readonly = value;
                 if (value != old_value)
                 {
+                    // 清除 DOM 结构中的所有 ColorCache，迫使重新获取颜色显示
+                    this._record.ClearCache();
+
                     this.Invalidate();
                 }
             }
@@ -506,13 +476,12 @@ namespace LibraryStudio.Forms
                     }
                 }
 
-                /*
-                // Solid 区左侧 border + sep 竖线
+                // Solid 区
                 {
                     var left_rect = new Rectangle(
-        x + _fieldProperty.SolidX,
+        x + _fieldProperty.CaptionPixelWidth,
         y,
-        _fieldProperty.BorderThickness + _fieldProperty.GapThickness,
+        _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
         this.AutoScrollMinSize.Height);
                     if (clipRect.IntersectsWith(left_rect))
                     {
@@ -523,7 +492,6 @@ namespace LibraryStudio.Forms
                     }
 
                 }
-                */
 
                 // 右侧全高的一根立体竖线
                 {
@@ -1925,6 +1893,82 @@ out long left_width);
                         }
                     }
                     break;
+                case Keys.Home:
+                case Keys.End:
+                    {
+                        DetectBlockChange1(_blockOffs1, _blockOffs2);
+
+                        HitInfo info = null;
+                        int ret = 0;
+                        if (HasBlock() && _shiftPressed == false)
+                        {
+                            int offs;
+                            if (e.KeyCode == Keys.Left)
+                                offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                            else
+                                offs = Math.Max(_blockOffs1, _blockOffs2);
+
+                            _blockOffs1 = offs;
+                            _blockOffs2 = offs;
+                            SetGlobalOffs(offs);
+
+                            ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Home ? 1 : -1),
+                                e.KeyCode == Keys.Home ? -1 : 1,
+                                out info);
+                        }
+                        else
+                        {
+                            if (_controlPressed)
+                            {
+                                ret = _record.MoveByOffs(e.KeyCode == Keys.Home ? 0 : this._record.TextLength,
+    0,
+    out info);
+                            }
+                            else
+                            {
+                                var field_index = _caretInfo.ChildIndex;
+                                if (this._record.GetFieldOffsRange(field_index, out int field_start, out int field_end) == true)
+                                {
+                                    int start = field_start;
+                                    // 如果已经在字段名第一字符
+                                    if (e.KeyCode == Keys.Home
+                                        && _global_offs == field_start)
+                                    {
+                                        if (this._record.GetField(field_index)?.IsControlField ?? false)
+                                            start = Math.Min(field_end, field_start + 3);
+                                        else
+                                            start = Math.Min(field_end, field_start + 5);
+                                    }
+                                    ret = _record.MoveByOffs(e.KeyCode == Keys.Home ? start : Math.Max(field_end - 1, field_start),
+                                        0,
+                                        out info);
+                                }
+                                else
+                                {
+                                    ret = -1;
+                                }
+                            }
+                        }
+
+                        if (ret != 0)
+                            break;
+
+                        SetGlobalOffs(info.Offs);
+                        MoveCaret(info);
+
+                        if (_shiftPressed)
+                            _blockOffs2 = _global_offs;
+                        else
+                        {
+                            _blockOffs1 = _global_offs;
+                            _blockOffs2 = _global_offs;
+                        }
+                        _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+
+                        InvalidateBlockRegion();
+                    }
+                    break;
+
                 case Keys.ShiftKey:
                     _shiftPressed = true;
                     break;
@@ -1967,7 +2011,7 @@ out long left_width);
                                 if (replace)
                                     ReplaceText(old_offs,
                                         info.Offs,
-                                        new string(' ', info.Offs - old_offs),
+                                        new string(PaddingChar, info.Offs - old_offs),
                                         delay_update: delay,
                                         false);
                                 else
@@ -2502,7 +2546,7 @@ out long left_width);
 
             ReplaceText(start,
                 start + length,
-                MarcRecord.CompressMaskText(mask_text),
+                MarcRecord.CompressMaskText(mask_text, PaddingChar),
                 delay_update: false,
                 false);
 

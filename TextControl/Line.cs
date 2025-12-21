@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -7,7 +7,6 @@ using System.Text;
 
 using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
-using static Vanara.PInvoke.Kernel32;
 using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
@@ -31,6 +30,9 @@ namespace LibraryStudio.Forms
 
         // Line 内的文字整体水平对齐方式
         public TextAlign TextAlign { get; set; }
+
+        public ColorCache ColorCache = new ColorCache();
+
 
         public Line(IBox parent)
         {
@@ -806,7 +808,7 @@ namespace LibraryStudio.Forms
                 return result;
             }
 
-            var contents = context?.SplitRange?.Invoke(this,content)
+            var contents = context?.SplitRange?.Invoke(this, content)
                 ?? new Segment[] {
                     new Segment
                     {
@@ -882,7 +884,7 @@ namespace LibraryStudio.Forms
             {
                 LayoutLine(this);
                 max_pixel_width = RefreshLine(
-                    (p,o) =>
+                    (p, o) =>
                     {
                         return context?.GetFont?.Invoke(this, this.Tag);
                     },
@@ -1035,7 +1037,7 @@ IContext context)
             {
                 LayoutLine(this);
                 max_pixel_width = RefreshLine(
-                    (p,o) =>
+                    (p, o) =>
                     {
                         return context?.GetFont?.Invoke(this, this.Tag);
                     },
@@ -1058,6 +1060,7 @@ IContext context)
             piVisualToLogical = new int[0];
             piLogicalToVisual = new int[0];
             Tag = null;
+            ColorCache?.Clear();
         }
 
         // 即将废止。用 AppendRanges() 代替
@@ -1438,7 +1441,11 @@ ref Font used_font)
                 // 绘制普通背景色
                 // 如果 .GetBackColor() 返回 Color.Transparent 则不进行绘制，保持背景透明
                 {
-                    var bk_color = context.GetBackColor?.Invoke(range, false) ?? Color.Transparent;
+                    // var bk_color = context.GetBackColor?.Invoke(range, false) ?? Color.Transparent;
+                    var bk_color = range.ColorCache
+                        .GetBackColor(context.GetBackColor,
+                        range,
+                        false);
                     if (bk_color != Color.Transparent)
                     {
                         var rect = GetBlockRect(range,
@@ -1515,7 +1522,11 @@ range.Text.Length);
 
                         if (clipRect.IntersectsWith(larger))
                         {
-                            var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
+                            // var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
+                            var back_color = range.ColorCache
+                                .GetBackColor(context?.GetBackColor,
+                                range,
+                                true);
 
                             DrawSolidRectangle(hdc,
                             block_rect.left,
@@ -1556,7 +1567,12 @@ range.Text.Length);
                         var larger = ((Rectangle)(block_rect)).Larger();
                         if (clipRect.IntersectsWith(larger))
                         {
-                            var back_color = context?.GetBackColor?.Invoke(null, true) ?? SystemColors.Highlight;
+                            // var back_color = context?.GetBackColor?.Invoke(null, true) ?? SystemColors.Highlight;
+                            var back_color = line.ColorCache
+                                .GetBackColor(
+                                context?.GetBackColor,
+                                null,
+                                true);
 
                             DrawSolidRectangle(hdc,
                                     block_rect.left,
@@ -1646,7 +1662,13 @@ range.Text.Length);
                         if ((full_block == false || block_rect == null)
                             && clipRect.IntersectsWith((Rectangle)(item_rect)))
                         {
-                            var text_color = context?.GetForeColor?.Invoke(range, false) ?? SystemColors.WindowText;
+                            // var text_color = context?.GetForeColor?.Invoke(range, false) ?? SystemColors.WindowText;
+                            var text_color = range.ColorCache
+                                .GetForeColor(
+                                context?.GetForeColor,
+                                range,
+                                false);
+
                             var old_color = Gdi32.SetTextColor(hdc, new COLORREF(text_color)); // 设置文本颜色为黑色
 
                             try
@@ -1677,8 +1699,14 @@ range.Text.Length);
                         if (block_rect != null
                             && clipRect.IntersectsWith((Rectangle)(block_rect)))
                         {
-                            var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                            // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                            var highlight_text_color = range.ColorCache
+                                .GetForeColor(
+                                context?.GetForeColor,
+                                range,
+                                true);
                             var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+
                             //var old_bk_color = Gdi32.SetBkColor(hdc, new COLORREF((uint)SystemColors.Highlight.ToArgb())); // 设置文本颜色为黑色
                             try
                             {
@@ -1730,7 +1758,12 @@ range.Text.Length);
                 range.GetPixelHeight());
             if (clipRect.IntersectsWith(block_rect))
             {
-                var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
+                // var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
+                var back_color = range.ColorCache
+                    .GetBackColor(
+                    context?.GetBackColor,
+                    range,
+                    true);
 
                 DrawSolidRectangle(hdc,
                 block_rect.Left,
@@ -1777,6 +1810,7 @@ range.Text.Length);
                     Gdi32.SelectObject(hdc, oldBrush);
                     Gdi32.SelectObject(hdc, hOldPen);
                     Gdi32.DeleteObject(hBrush);
+                    Gdi32.DeleteObject(hPen);   // 2025/12/21
                 }
 
                 // 恢复剪裁（可选）
@@ -2166,6 +2200,17 @@ range.Text.Length);
         }
 
         #endregion
+
+        public void ClearCache()
+        {
+            if (this.Ranges == null)
+                return;
+            this.ColorCache?.Clear();
+            foreach(var range in this.Ranges)
+            {
+                range.ClearCache();
+            }
+        }
     }
 
     [Flags]
@@ -2181,11 +2226,16 @@ range.Text.Length);
         OverflowMask = OverflowLeft | OverflowCenter | OverflowRight,
     }
 
+    /// <summary>
+    /// 对 Range 包装了位置和缓存信息的类
+    /// </summary>
     public class RangeWrapper : Range
     {
         public int Left; // 左边界 x 坐标
 
         public int Y; // 该 Range 的左上角 y 坐标
+
+        public ColorCache ColorCache = new ColorCache();
 
         public RangeWrapper()
         {
@@ -2201,6 +2251,13 @@ range.Text.Length);
             base.Clear();
             Left = 0;
             Y = 0;
+            ColorCache?.Clear();
+        }
+
+        public override void ClearCache()
+        {
+            this.ColorCache?.Clear();
+            base.ClearCache();
         }
 
         public override Region GetRegion(int start_offs = 0,
@@ -2225,6 +2282,53 @@ range.Text.Length);
             // 调整位置
             rect.Offset(Left, Y);
             return rect;
+        }
+    }
+
+    // 缓存的各种颜色
+    public class ColorCache
+    {
+        Color? _highlightForeColor = null;
+        Color? _highlightBackColor = null;
+        Color? _foreColor = null;
+        Color? _backColor = null;
+
+        public void Clear()
+        {
+            _highlightForeColor = null;
+            _highlightBackColor = null;
+            _foreColor = null;
+            _backColor = null;
+        }
+
+        public Color GetForeColor(GetForeColorFunc func,
+            IBox box,
+            bool highlight)
+        {
+            if (highlight)
+            {
+                if (_highlightForeColor == null)
+                    _highlightForeColor = func?.Invoke(box, highlight) ?? SystemColors.HighlightText;
+                return (Color)_highlightForeColor;
+            }
+            if (_foreColor == null)
+                _foreColor = func?.Invoke(box, highlight) ?? SystemColors.WindowText;
+            return (Color)_foreColor;
+        }
+
+        public Color GetBackColor(GetBackColorFunc func,
+    IBox box,
+    bool highlight)
+        {
+            if (highlight)
+            {
+                if (_highlightBackColor == null)
+                    _highlightBackColor = func?.Invoke(box, highlight) ?? SystemColors.Highlight;
+                return (Color)_highlightBackColor;
+            }
+            if (_backColor == null)
+                _backColor = func?.Invoke(box, highlight) ?? Color.Transparent;
+            return (Color)_backColor;
         }
     }
 }

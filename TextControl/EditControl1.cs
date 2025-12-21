@@ -1,25 +1,15 @@
-﻿// #define CONTENT_STRING
+// #define CONTENT_STRING
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
-using Vanara;
-using Vanara.Extensions.Reflection;
 using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Windows.Forms.LinkLabel;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Rebar;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
-using static Vanara.PInvoke.Kernel32;
-using static Vanara.PInvoke.LANGID;
 using static Vanara.PInvoke.User32;
-using static Vanara.PInvoke.User32.RAWINPUT;
 using static Vanara.PInvoke.Usp10;
 
 

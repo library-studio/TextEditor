@@ -1,4 +1,4 @@
-﻿namespace MarcSample
+namespace MarcSample
 {
     partial class MainForm
     {
@@ -31,6 +31,7 @@
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
             this.MenuItem_file = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_dumpHistory = new System.Windows.Forms.ToolStripMenuItem();
+            this.MenuItem_verifyCharCount = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_exit = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_apperance = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_testCallback = new System.Windows.Forms.ToolStripMenuItem();
@@ -40,7 +41,6 @@
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.marcControl1 = new LibraryStudio.Forms.MarcControl();
-            this.MenuItem_verifyCharCount = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -53,7 +53,7 @@
             this.MenuItem_apperance});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1309, 61);
+            this.menuStrip1.Size = new System.Drawing.Size(1309, 54);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -64,20 +64,27 @@
             this.MenuItem_verifyCharCount,
             this.MenuItem_exit});
             this.MenuItem_file.Name = "MenuItem_file";
-            this.MenuItem_file.Size = new System.Drawing.Size(107, 57);
+            this.MenuItem_file.Size = new System.Drawing.Size(107, 50);
             this.MenuItem_file.Text = "&File";
             // 
             // MenuItem_dumpHistory
             // 
             this.MenuItem_dumpHistory.Name = "MenuItem_dumpHistory";
-            this.MenuItem_dumpHistory.Size = new System.Drawing.Size(538, 66);
+            this.MenuItem_dumpHistory.Size = new System.Drawing.Size(497, 66);
             this.MenuItem_dumpHistory.Text = "Dump History ...";
             this.MenuItem_dumpHistory.Click += new System.EventHandler(this.MenuItem_dumpHistory_Click);
+            // 
+            // MenuItem_verifyCharCount
+            // 
+            this.MenuItem_verifyCharCount.Name = "MenuItem_verifyCharCount";
+            this.MenuItem_verifyCharCount.Size = new System.Drawing.Size(497, 66);
+            this.MenuItem_verifyCharCount.Text = "检查字符不足 ...";
+            this.MenuItem_verifyCharCount.Click += new System.EventHandler(this.MenuItem_verifyCharCount_Click);
             // 
             // MenuItem_exit
             // 
             this.MenuItem_exit.Name = "MenuItem_exit";
-            this.MenuItem_exit.Size = new System.Drawing.Size(538, 66);
+            this.MenuItem_exit.Size = new System.Drawing.Size(497, 66);
             this.MenuItem_exit.Text = "Exit";
             // 
             // MenuItem_apperance
@@ -88,7 +95,7 @@
             this.MenuItem_readonly,
             this.MenuItem_setFont});
             this.MenuItem_apperance.Name = "MenuItem_apperance";
-            this.MenuItem_apperance.Size = new System.Drawing.Size(233, 57);
+            this.MenuItem_apperance.Size = new System.Drawing.Size(233, 50);
             this.MenuItem_apperance.Text = "&Apperance";
             this.MenuItem_apperance.DropDownOpening += new System.EventHandler(this.MenuItem_apperance_DropDownOpening);
             // 
@@ -132,7 +139,7 @@
             // toolStrip1
             // 
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
-            this.toolStrip1.Location = new System.Drawing.Point(0, 61);
+            this.toolStrip1.Location = new System.Drawing.Point(0, 54);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Size = new System.Drawing.Size(1309, 25);
             this.toolStrip1.TabIndex = 2;
@@ -150,18 +157,11 @@
             this.marcControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.marcControl1.FixedSizeFont = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Bold);
             this.marcControl1.Font = new System.Drawing.Font("宋体", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.marcControl1.Location = new System.Drawing.Point(0, 86);
+            this.marcControl1.Location = new System.Drawing.Point(0, 79);
             this.marcControl1.Name = "marcControl1";
             this.marcControl1.ReadOnly = false;
-            this.marcControl1.Size = new System.Drawing.Size(1309, 663);
+            this.marcControl1.Size = new System.Drawing.Size(1309, 670);
             this.marcControl1.TabIndex = 3;
-            // 
-            // MenuItem_verifyCharCount
-            // 
-            this.MenuItem_verifyCharCount.Name = "MenuItem_verifyCharCount";
-            this.MenuItem_verifyCharCount.Size = new System.Drawing.Size(538, 66);
-            this.MenuItem_verifyCharCount.Text = "检查字符不足 ...";
-            this.MenuItem_verifyCharCount.Click += new System.EventHandler(this.MenuItem_verifyCharCount_Click);
             // 
             // MainForm
             // 
@@ -175,6 +175,8 @@
             this.Margin = new System.Windows.Forms.Padding(5);
             this.Name = "MainForm";
             this.Text = "MarcSample";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.MainForm_FormClosed);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();

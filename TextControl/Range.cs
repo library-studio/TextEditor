@@ -1,13 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
-using Vanara.PInvoke;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Usp10;
 
@@ -589,6 +584,11 @@ namespace LibraryStudio.Forms
             this.Ascent = up_height;
             this.Spacing = spacing_height;
             this.Descent = below_height;
+        }
+
+        public virtual void ClearCache()
+        {
+            
         }
 
         public float BaseLine

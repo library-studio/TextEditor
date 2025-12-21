@@ -6,8 +6,8 @@ using System.Diagnostics;
 namespace LibraryStudio.Forms
 {
     /// <summary>
-    /// ¼à²âÓÃ»§»÷¼üËÙÂÊ£¨keys/sec£©¡£»ùÓÚ»¬¶¯Ê±¼ä´°¿Ú¡£
-    /// Ê¹ÓÃ£ºÔÚÃ¿´Î°´¼üÊ±µ÷ÓÃ RecordKey()¡£¶©ÔÄ ThresholdExceeded/ThresholdCleared ÊÂ¼ş¡£
+    /// ç›‘æµ‹ç”¨æˆ·å‡»é”®é€Ÿç‡ï¼ˆkeys/secï¼‰ã€‚åŸºäºæ»‘åŠ¨æ—¶é—´çª—å£ã€‚
+    /// ä½¿ç”¨ï¼šåœ¨æ¯æ¬¡æŒ‰é”®æ—¶è°ƒç”¨ RecordKey()ã€‚è®¢é˜… ThresholdExceeded/ThresholdCleared äº‹ä»¶ã€‚
     /// </summary>
     public class KeystrokeSpeedDetector
     {
@@ -18,19 +18,19 @@ namespace LibraryStudio.Forms
         private bool _isAbove;
 
         /// <summary>
-        /// µ±ËÙÂÊ³¬¹ıãĞÖµÊ±´¥·¢£¨Ê×´Î³¬¹ıÊ±´¥·¢Ò»´Î£©
+        /// å½“é€Ÿç‡è¶…è¿‡é˜ˆå€¼æ—¶è§¦å‘ï¼ˆé¦–æ¬¡è¶…è¿‡æ—¶è§¦å‘ä¸€æ¬¡ï¼‰
         /// </summary>
         public event EventHandler ThresholdExceeded;
 
         /// <summary>
-        /// µ±ËÙÂÊ´Ó³¬ãĞÖµ»ØÂäµ½ãĞÖµÒÔÏÂÊ±´¥·¢£¨Ê×´Î»ØÂäÊ±´¥·¢Ò»´Î£©
+        /// å½“é€Ÿç‡ä»è¶…é˜ˆå€¼å›è½åˆ°é˜ˆå€¼ä»¥ä¸‹æ—¶è§¦å‘ï¼ˆé¦–æ¬¡å›è½æ—¶è§¦å‘ä¸€æ¬¡ï¼‰
         /// </summary>
         public event EventHandler ThresholdCleared;
 
         /// <summary>
-        /// ¹¹Ôì¡£
-        /// thresholdKeysPerSecond: ÅĞ¶¨Îª¡°¿ìËÙÊäÈë¡±µÄãĞÖµ£¨¼ü/Ãë£©
-        /// window: ¼ÆËã´°¿Ú³¤¶È£¬¶Ì´°¿ÚÏìÓ¦¿ì£¬³¤´°¿Ú¸üÆ½»¬¡£È±Ê¡ 1 Ãë¡£
+        /// æ„é€ ã€‚
+        /// thresholdKeysPerSecond: åˆ¤å®šä¸ºâ€œå¿«é€Ÿè¾“å…¥â€çš„é˜ˆå€¼ï¼ˆé”®/ç§’ï¼‰
+        /// window: è®¡ç®—çª—å£é•¿åº¦ï¼ŒçŸ­çª—å£å“åº”å¿«ï¼Œé•¿çª—å£æ›´å¹³æ»‘ã€‚ç¼ºçœ 1 ç§’ã€‚
         /// </summary>
         public KeystrokeSpeedDetector(double thresholdKeysPerSecond = 8.0, TimeSpan? window = null)
         {
@@ -41,7 +41,7 @@ namespace LibraryStudio.Forms
         }
 
         /// <summary>
-        /// ÔÚÃ¿´Î°´¼ü£¨¿ÉÔÚ UI Ïß³Ì£©´¦µ÷ÓÃ¡£´Ë·½·¨»á¸üĞÂÄÚ²¿×´Ì¬²¢ÔÚ±ØÒªÊ±´¥·¢ÊÂ¼ş¡£
+        /// åœ¨æ¯æ¬¡æŒ‰é”®ï¼ˆå¯åœ¨ UI çº¿ç¨‹ï¼‰å¤„è°ƒç”¨ã€‚æ­¤æ–¹æ³•ä¼šæ›´æ–°å†…éƒ¨çŠ¶æ€å¹¶åœ¨å¿…è¦æ—¶è§¦å‘äº‹ä»¶ã€‚
         /// </summary>
         public void RecordKey()
         {
@@ -51,13 +51,13 @@ namespace LibraryStudio.Forms
 
             lock (_lock)
             {
-                // ÇåÀí¾ÉÊ±¼ä´Á
+                // æ¸…ç†æ—§æ—¶é—´æˆ³
                 while (_timestamps.Count > 0 && now - _timestamps.Peek() > _window)
                     _timestamps.Dequeue();
 
                 _timestamps.Enqueue(now);
 
-                // ¼ÆËãµ±Ç°ËÙÂÊ
+                // è®¡ç®—å½“å‰é€Ÿç‡
                 double currentRate = _timestamps.Count / Math.Max(1.0, _window.TotalSeconds);
 
                 if (!_isAbove && currentRate > _thresholdKeysPerSecond)
@@ -81,7 +81,7 @@ namespace LibraryStudio.Forms
         }
 
         /// <summary>
-        /// µ±Ç°´°¿ÚÄÚ¹À¼ÆµÄ»÷¼üËÙÂÊ£¨keys/sec£©¡£
+        /// å½“å‰çª—å£å†…ä¼°è®¡çš„å‡»é”®é€Ÿç‡ï¼ˆkeys/secï¼‰ã€‚
         /// </summary>
         public double CurrentRate
         {
@@ -98,14 +98,14 @@ namespace LibraryStudio.Forms
         }
 
         /// <summary>
-        /// ÊÇ·ñµ±Ç°´¦ÓÚ¡°³¬¹ıãĞÖµ¡±×´Ì¬¡£
+        /// æ˜¯å¦å½“å‰å¤„äºâ€œè¶…è¿‡é˜ˆå€¼â€çŠ¶æ€ã€‚
         /// </summary>
         public bool IsAboveThreshold
         {
             get { lock (_lock) { return _isAbove; } }
         }
 
-        // Í¬Ê±Ì½²âÊÇ·ñ³¬¹ıãĞÖµºÍ¼ÇÂ¼»÷¼ü
+        // åŒæ—¶æ¢æµ‹æ˜¯å¦è¶…è¿‡é˜ˆå€¼å’Œè®°å½•å‡»é”®
         public bool Detect()
         {
             var ret = IsAboveThreshold;
@@ -114,7 +114,7 @@ namespace LibraryStudio.Forms
         }
 
         /// <summary>
-        /// Çå³ıÄÚ²¿×´Ì¬
+        /// æ¸…é™¤å†…éƒ¨çŠ¶æ€
         /// </summary>
         public void Reset()
         {

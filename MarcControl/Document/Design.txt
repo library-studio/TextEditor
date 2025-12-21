@@ -1,4 +1,4 @@
-﻿
+
 增加右鼠标键上下文菜单。提供基本的 copy paste cut selectAll 命令
 
 ~~~
@@ -313,3 +313,61 @@ PopupMenu 中有菜单命令可以改变 PadWhileInserting
 
 ~~~
 TestDOM 中测试 ReplaceText() 的案例还要充实才行。这是最重要的功能了。
+
+~~~
+在字段名中定义一个文字块，然后用键盘输入一个字符，这个字符会替代文字块，可能会造成
+被替换部分长度变短，把后面的内容拉进来。
+输入字符处理的代码应该改为用 SoftlyRemoveBlock()。但是不是所有情况都这样做，还需要调查一下
+
+
+~~~
+                PaintBack = (o, hdc, rect, clipRect) =>
+                {
+                    var field = o as MarcField;
+                    if (o == null)
+                        return;
+                    rect.Width = this.AutoScrollMinSize.Width;
+                    using (var g = (Graphics.FromHdc((IntPtr)(HDC)hdc)))
+                    using (var brush = new SolidBrush(_fieldProperty.SolidColor))
+                    {
+                        /*
+                        var line_height = field.IsHeader ? 0 : Line.GetLineHeight();
+                        var solid_height = rect.Height - line_height;
+                        if (solid_height > 0)
+                        {
+                            var solid_rect = new Rectangle(
+                            rect.X,
+                            rect.Y + line_height,
+                            _fieldProperty.NameBorderX + _fieldProperty.NamePixelWidth + _fieldProperty.IndicatorPixelWidth,
+                            solid_height);
+                            if (clipRect.IntersectsWith(solid_rect))
+                                g.FillRectangle(brush, solid_rect);
+                        }
+                        */
+
+                        field.PaintBackAndBorder(g, rect.X, rect.Y);
+
+                        /*
+                        if (field.IsHeader == false)
+                        {
+                            PaintBackAndBorder(g,
+                                rect.X + _fieldProperty.NameBorderX,
+                                rect.Y,
+                                _fieldProperty.NamePixelWidth,
+                                Line.GetLineHeight());
+                            if (field.IsControlField == false)
+                                PaintBackAndBorder(g,
+            rect.X + _fieldProperty.IndicatorBorderX,
+            rect.Y,
+            _fieldProperty.IndicatorPixelWidth,
+            Line.GetLineHeight());
+                        }
+                        */
+                    }
+                    /*
+                        MarcField.PaintBack(hdc,
+                            rect,
+                            clipRect,
+                            Color.Yellow);
+                    */
+                },

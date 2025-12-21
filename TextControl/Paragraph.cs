@@ -1,17 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 
-using Vanara.Extensions.Reflection;
 using Vanara.PInvoke;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static Vanara.PInvoke.Gdi32;
-using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
@@ -33,6 +28,8 @@ namespace LibraryStudio.Forms
         static internal SCRIPT_DIGITSUBSTITUTE sub;
         static internal SCRIPT_CONTROL sc;
         static internal SCRIPT_STATE ss;
+
+        public ColorCache ColorCache = new ColorCache();
 
         public Paragraph(IBox parent)
         {
@@ -68,16 +65,28 @@ namespace LibraryStudio.Forms
                     // 要么绘制结束符，要么清除结束符
                     Color back_color;
                     if (Utility.InRange(0, blockOffs1, blockOffs2))
-                        back_color = context?.GetBackColor?.Invoke(this, true) ?? SystemColors.Highlight;
+                    {
+                        // back_color = context?.GetBackColor?.Invoke(this, true) ?? SystemColors.Highlight;
+                        back_color = this.ColorCache
+                            .GetBackColor(context?.GetBackColor,
+                            this,
+                            true);
+                    }
                     else
-                        back_color = context?.GetBackColor?.Invoke(this, false) ?? Color.Transparent;
+                    {
+                        // back_color = context?.GetBackColor?.Invoke(this, false) ?? Color.Transparent;
+                        back_color = this.ColorCache
+                            .GetBackColor(context?.GetBackColor,
+                            this,
+                            false);
+                    }
                     Line.DrawSolidRectangle(dc,
-                        rect.Left,
-                        rect.Top,
-                        rect.Right,
-                        rect.Bottom,
-                        back_color,
-                        clipRect);
+                    rect.Left,
+                    rect.Top,
+                    rect.Right,
+                    rect.Bottom,
+                    back_color,
+                    clipRect);
                 }
                 return;
             }
@@ -1141,6 +1150,7 @@ ref used_font);
         public void Clear()
         {
             _lines.Clear();
+            ColorCache?.Clear();
         }
 
         // 根据单行行高计算出 Paragraph 总的像素高度
@@ -1696,6 +1706,17 @@ ref used_font);
             }
 
             return builder.ToString();
+        }
+
+        public void ClearCache()
+        {
+            if (_lines == null)
+                return;
+            this.ColorCache?.Clear();
+            foreach(var line in _lines)
+            {
+                line.ClearCache();
+            }
         }
 
         public int TextLength

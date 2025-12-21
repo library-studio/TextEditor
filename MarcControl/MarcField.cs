@@ -1,15 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Runtime.Remoting.Messaging;
 using System.Text;
 using System.Threading.Tasks;
-
+using System.Windows.Forms;
 using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -570,10 +570,16 @@ namespace LibraryStudio.Forms
             if (this.IsHeader)
                 content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
 
+            start -= content_text?.Length ?? 0;
+            end -= content_text?.Length ?? 0;
+
+            var terminator = "";
+            if (Utility.InRange(0, start, end))
+                terminator = new string(Metrics.FieldEndCharDefault, 1);
             return (name_text ?? "")
                 + (indicator_text ?? "")
                 + (content_text ?? "")
-                + (this.IsHeader ? "" : new string(Metrics.FieldEndCharDefault, 1));
+                + (this.IsHeader ? "" : terminator);
 
             // parameters:
             //      start_char  text 文本处在 Region 中的起始偏移位置
@@ -806,24 +812,208 @@ namespace LibraryStudio.Forms
             return right_most;
         }
 
+        #region 绘制字段名区域背景
+
         public static void PaintBack(SafeHDC hdc,
     Rectangle rect,
     Rectangle clipRect,
     Color color)
         {
-            PRECT rect_back = new PRECT(rect.X,
-                rect.Y,
-                rect.Width,
-                rect.Height);
-            Line.DrawSolidRectangle(hdc,
-rect_back.left,
-rect_back.top,
-rect_back.right,
-rect_back.bottom,
-new COLORREF(color),
-clipRect);
+            if (rect.IntersectsWith(clipRect))
+            {
+                DrawSolidRectangle(hdc,
+    rect.Left,
+    rect.Top,
+    rect.Right,
+    rect.Bottom,
+    new COLORREF(color));
+            }
         }
 
+        // 绘制输入框的边框和背景
+        public static void PaintEdit(SafeHDC hdc,
+Rectangle rect,
+Rectangle clipRect,
+Color back_color,
+int border_thickness,
+Color border_color)
+        {
+            if (rect.IntersectsWith(clipRect))
+            {
+                DrawRectangle(hdc,
+    rect.Left,
+    rect.Top,
+    rect.Right,
+    rect.Bottom,
+    (COLORREF)back_color,
+    border_thickness,
+    (COLORREF)border_color);
+            }
+        }
+
+        public static void DrawRectangle(SafeHDC hdc,
+int left,
+int top,
+int right,
+int bottom,
+COLORREF back_color,
+int border_thickness,
+COLORREF border_color)
+        {
+            // 创建实心画刷
+            var hBrush = Gdi32.CreateSolidBrush(back_color);
+            var oldBrush = Gdi32.SelectObject(hdc, hBrush);
+
+            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_SOLID,
+                border_thickness, border_color);
+            var hOldPen = Gdi32.SelectObject(hdc, hPen);
+
+            try
+            {
+                Gdi32.Rectangle(hdc,
+                    left,
+                    top,
+                    right,
+                    bottom);
+            }
+            finally
+            {
+                // 恢复原画刷并释放资源
+                Gdi32.SelectObject(hdc, oldBrush);
+                Gdi32.SelectObject(hdc, hOldPen);
+                Gdi32.DeleteObject(hBrush);
+                Gdi32.DeleteObject(hPen);
+            }
+        }
+
+        public static void DrawSolidRectangle(SafeHDC hdc,
+    int left,
+    int top,
+    int right,
+    int bottom,
+    COLORREF color)
+        {
+            // 创建实心画刷
+            var hBrush = Gdi32.CreateSolidBrush(color);
+            var oldBrush = Gdi32.SelectObject(hdc, hBrush);
+
+            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL, 1, color);
+            var hOldPen = Gdi32.SelectObject(hdc, hPen);
+
+            // 绘制实心矩形
+            Gdi32.Rectangle(hdc,
+                left,
+                top,
+                right + 1,
+                bottom + 1);    // +1 的原因是想要让上下相邻的 rect 看起来连续。但要注意 GetRegion() 接口中得到的区域要向右下也扩大一个像素，避免刷新时漏掉一些线
+
+            // 恢复原画刷并释放资源
+            Gdi32.SelectObject(hdc, oldBrush);
+            Gdi32.SelectObject(hdc, hOldPen);
+            Gdi32.DeleteObject(hBrush);
+            Gdi32.DeleteObject(hPen);
+        }
+
+
+        public void PaintBackAndBorder(SafeHDC hdc,
+int x,
+int y,
+Rectangle clipRect)
+        {
+            // 调用前已经用可编辑背景色清除好了
+
+            // 头标区，下部绘制全宽背景
+            // 001 等控制字段，上部右侧，和下部绘制背景
+            // 其余字段，下部绘制背景
+
+            var sep = _fieldProperty.GapThickness;
+
+            var name_rect = GetNameBorderRect(x, y);
+            name_rect.Width -= sep;
+
+            var solid_x = _fieldProperty.SolidX + _fieldProperty.BorderThickness;
+
+            var indicator_rect = GetIndicatorBorderRect(x, y);
+            indicator_rect.Width -= sep;
+
+            //var first_line_height = Math.Max(name_rect.Bottom - y, indicator_rect.Bottom - y);
+            //var first_line_width = _fieldProperty.SolidPixelWidth - _fieldProperty.BorderThickness * 2;
+
+            // 控制字段
+            if (this.IsControlField)
+            {
+                PaintRegion(name_rect);
+            }
+            else if (this.IsHeader == true)
+            {
+                // 头标区
+                return;
+            }
+            else if (this.IsHeader == false)
+            {
+                PaintRegion(name_rect);
+                PaintRegion(indicator_rect);
+            }
+
+
+            void PaintRegion(Rectangle rect0)
+            {
+                PaintWindow(rect0);
+                /*
+                PaintBorder(hdc,
+                    rect0.X,
+                    rect0.Y,
+                    rect0.Width,
+                    rect0.Height,
+                    _fieldProperty.BorderThickness);
+                */
+            }
+
+            void PaintSolid(int x0, int y0, int width0, int height0)
+            {
+                var rect = new Rectangle(x0, y0, width0, height0);
+                PaintBack(hdc,
+                    rect,
+                    clipRect,
+                    _fieldProperty?.SolidColor ?? SystemColors.Control);
+                /*
+                if (height0 > 0 && width0 > 0)
+                {
+                    using (var brush = new SolidBrush(_fieldProperty?.SolidColor ?? SystemColors.Control))
+                    {
+                        g.FillRectangle(brush, x0, y0, width0, height0);
+                    }
+                }
+                */
+            }
+
+            void PaintWindow(Rectangle rect00)
+            {
+                bool isReadOnly = _fieldProperty.GetReadOnly?.Invoke(null) ?? false;
+                // 如果控件为 Readonly 状态
+                Color back_color;
+                if (isReadOnly)
+                    back_color = _fieldProperty?.ReadOnlyBackColor ?? SystemColors.Control;
+                else
+                    back_color = _fieldProperty?.BackColor ?? SystemColors.Window;
+                    PaintEdit(hdc,
+    rect00,
+    clipRect,
+    back_color,
+    _fieldProperty.BorderThickness,
+    _fieldProperty?.BorderColor ?? SystemColors.ControlDark);
+                /*
+                PaintBack(hdc,
+                    rect00,
+                    clipRect,
+                    _fieldProperty?.BackColor ?? SystemColors.Window
+                    );
+                */
+            }
+        }
+
+#if OLD
+        // 以前版本
         public void PaintBackAndBorder(Graphics g,
 int x,
 int y)
@@ -978,6 +1168,11 @@ int y)
             }
         }
 
+#endif
+
+
+#if OLD
+        // 以前的版本
         static void PaintBorder(Graphics g,
     int x,
     int y,
@@ -988,7 +1183,7 @@ int y)
             // 四边边框
             {
                 Rectangle temp_rect = new Rectangle(x, y, width, height);
-                System.Windows.Forms.ControlPaint.DrawBorder(g,
+                ControlPaint.DrawBorder(g,
                     temp_rect,
                     SystemColors.Control, thickness, System.Windows.Forms.ButtonBorderStyle.Inset,
                     SystemColors.Control, thickness, System.Windows.Forms.ButtonBorderStyle.Inset,
@@ -996,6 +1191,90 @@ int y)
                     SystemColors.Control, thickness, System.Windows.Forms.ButtonBorderStyle.Inset);
             }
         }
+#endif
+        // 以前的版本
+        static void PaintBorder(SafeHDC hdc,
+    int x,
+    int y,
+    int width,
+    int height,
+    int thickness)
+        {
+            // 四边边框
+            {
+                Rectangle temp_rect = new Rectangle(x, y, width, height);
+                DrawBorder(hdc,
+                    temp_rect,
+                    SystemColors.ButtonShadow, thickness,
+                    SystemColors.ButtonShadow, thickness,
+                    SystemColors.ButtonHighlight, thickness,
+                    SystemColors.ButtonHighlight, thickness);
+            }
+        }
+
+        public static void DrawBorder(SafeHDC hdc,
+            Rectangle bounds,
+            Color leftColor,
+            int leftWidth,
+            Color topColor,
+            int topWidth,
+            Color rightColor,
+            int rightWidth,
+            Color bottomColor,
+            int bottomWidth)
+        {
+            // 计算每一侧对应的填充矩形（使用文档坐标）
+            // 注意：使用 Rectangle API 时右、下参数为坐标而不是宽高的结束值
+
+            // top
+            if (topWidth > 0)
+            {
+                int tx = bounds.X;
+                int ty = bounds.Y;
+                int tw = bounds.Width;
+                int th = topWidth;
+                DrawSolidRectangle(hdc, tx, ty, tx + tw, ty + th, topColor);
+            }
+
+            // bottom
+            if (bottomWidth > 0)
+            {
+                int bx = bounds.X;
+                int by = bounds.Y + bounds.Height - bottomWidth;
+                int bw = bounds.Width;
+                int bh = bottomWidth;
+
+                DrawSolidRectangle(hdc, bx, by, bx + bw, by + bh, bottomColor);
+            }
+
+            // left
+            if (leftWidth > 0)
+            {
+                int lx = bounds.X;
+                int ly = bounds.Y + topWidth;
+                int lw = leftWidth;
+                int lh = Math.Max(0, bounds.Height - topWidth - bottomWidth);
+                if (lh > 0)
+                {
+                    DrawSolidRectangle(hdc, lx, ly, lx + lw, ly + lh, leftColor);
+                }
+            }
+
+            // right
+            if (rightWidth > 0)
+            {
+                int rx = bounds.X + bounds.Width - rightWidth;
+                int ry = bounds.Y + topWidth;
+                int rw = rightWidth;
+                int rh = Math.Max(0, bounds.Height - topWidth - bottomWidth);
+                if (rh > 0)
+                {
+                    DrawSolidRectangle(hdc, rx, ry, rx + rw, ry + rh, rightColor);
+                }
+            }
+
+        }
+
 
         public static void PaintLeftRightBorder(Graphics g,
 int x,
@@ -1037,6 +1316,8 @@ rect_back.bottom,
 new COLORREF(color),
 clipRect);
         }
+
+        #endregion
 
         // 获得 Name 外围边框区域的 Rectangle
         Rectangle GetNameBorderRect(int x = 0, int y = 0)
@@ -2225,5 +2506,11 @@ clipRect);
             }
         }
 
+        public void ClearCache()
+        {
+            _name?.ClearCache();
+            _indicator?.ClearCache();
+            _content?.ClearCache();
+        }
     }
 }

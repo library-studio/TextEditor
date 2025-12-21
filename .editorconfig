@@ -1,0 +1,45 @@
+root = true
+
+# Global settings
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# Ensure common project files are UTF-8
+[*.{cs,csproj,sln,xml,json,config,txt,md}]
+charset = utf-8
+
+# C# specific rules
+[*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
+charset = utf-8
+
+# Prefer explicit types for built-in types by default, but allow var when obvious
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:none
+
+# Qualification
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# Braces and formatting
+csharp_prefer_braces = true:warning
+
+# Organize usings
+dotnet_sort_system_directives_first = true
+
+# Misc
+# Avoid EditorConfig file headers
+file_header_template = ""
+
+# End of file

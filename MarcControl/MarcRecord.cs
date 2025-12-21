@@ -1,17 +1,12 @@
-﻿using LibraryStudio.Forms;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
-using System.Threading.Tasks;
-using Vanara.PInvoke;
+
 using static Vanara.PInvoke.Gdi32;
-using static Vanara.PInvoke.Kernel32.DEBUG_EVENT;
 
 namespace LibraryStudio.Forms
 {
@@ -346,7 +341,8 @@ namespace LibraryStudio.Forms
         // 把字符串中的 mask char 有条件保留替换，删除其余字符。
         // 遇到字段结束符的时候，要把之前的完整的 5 字符(或者 3 字符)的 mask 也丢弃
         // mask char 规则: 0x01~0x03 表示字段名位置, 0x04~0x05 表示指示符位置, 0x06 表示头标区位置(最多 24 个字符都是这个值)
-        public static string CompressMaskText(string text)
+        public static string CompressMaskText(string text,
+            char padding_char = ' ')
         {
             // 从头标区最后一个字符，看出当前是头标区的下一个字段开头
             char prev_char = (char)0;
@@ -360,15 +356,21 @@ namespace LibraryStudio.Forms
                 {
                     // TryRemoveTailNormal(result);
                     if (result.Length >= 5 && Last(result) == 5)
+                    {
                         TryRemoveTailMask(result, 5);
+                    }
                     else if (result.Length >= 3 && Last(result) == 3)
+                    {
                         TryRemoveTailMask(result, 3);
+                    }
 
                     // 字段结束符第一阶段要追加进去，用来阻挡 TryRemoveTail() 向左越过当前字段范围
                     result.Append(ch);
                 }
                 else if (ch >= (char)0x01 && ch <= (char)0x05)
+                {
                     result.Append(ch);
+                }
 
                 prev_char = ch;
             }
@@ -400,7 +402,10 @@ namespace LibraryStudio.Forms
             void TryRemoveTailMask(StringBuilder b, int len)
             {
                 if (b.Length < len)
+                {
                     return;
+                }
+
                 int s = b.Length - len;
                 int e = b.Length - 1;
                 char value = (char)len;
@@ -408,7 +413,10 @@ namespace LibraryStudio.Forms
                 for (int i = e; i >= s; i--)
                 {
                     if (b[i] != value)
+                    {
                         return; // 出现不连续的
+                    }
+
                     value--;
                 }
                 b.Remove(s, b.Length - s);
@@ -424,16 +432,22 @@ namespace LibraryStudio.Forms
                     if (ch >= 0x01 && ch <= 0x06)
                     {
                         if (debug)
+                        {
                             b.Append((char)((int)'A' + (int)ch - 1));
+                        }
                         else
-                            b.Append(' ');
+                        {
+                            b.Append(padding_char);
+                        }
                     }
                     else if (ch == Metrics.FieldEndCharDefault)
                     {
 
                     }
                     else
+                    {
                         b.Append(ch);
+                    }
                 }
                 return b.ToString();
             }
@@ -1838,7 +1852,7 @@ out int max_pixel_width)
                 {
                     // 在头标区内回车，补足空格
                     fill_char_count = 24 - info.TextIndex;
-                    fill_content = new string('_', fill_char_count);
+                    fill_content = new string(padding_char, fill_char_count);
                     info.ChildIndex++;
                     info.TextIndex = 0;
                     replace = true;
@@ -2223,6 +2237,16 @@ out int count)
                     value += "\u001e";
             }
             return value;
+        }
+
+        public void ClearCache()
+        {
+            if (_fields == null)
+                return;
+            foreach(var field in _fields)
+            {
+                field.ClearCache();
+            }
         }
     }
 }

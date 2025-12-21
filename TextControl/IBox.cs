@@ -1,10 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Vanara.PInvoke;
+
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -135,6 +132,8 @@ namespace LibraryStudio.Forms
             int blockOffs1,
             int blockOffs2,
             int virtual_tail_length);
+
+        void ClearCache();
 
         /*
         // 安放位置

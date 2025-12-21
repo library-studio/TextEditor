@@ -1,4 +1,3 @@
-// csharp Tests\MarcControlTests_NUnit.cs
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -20,13 +19,13 @@ namespace LibraryStudio.Forms
                 ctl.Size = new Size(600, 300);
                 form.Controls.Add(ctl);
 
-                // È·±£´´½¨¾ä±ú£¨²»±ØÏÔÊ¾´°¿Ú£©
-                form.CreateControl();     // ´´½¨ form µÄ¾ä±ú²¢µİ¹é´´½¨×Ó¿Ø¼şµÄ¾ä±ú
+                // ç¡®ä¿åˆ›å»ºå¥æŸ„ï¼ˆä¸å¿…æ˜¾ç¤ºçª—å£ï¼‰
+                form.CreateControl();     // åˆ›å»º form çš„å¥æŸ„å¹¶é€’å½’åˆ›å»ºå­æ§ä»¶çš„å¥æŸ„
                 Assert.IsTrue(ctl.IsHandleCreated);
 
-                // ÉèÖÃÄÚÈİ£¨Relayout/»æÖÆ¿ÉÄÜ»áµ÷ÓÃ CreateGraphics£©
-                ctl.Content = "²âÊÔ×Ö¶Î\u001eµÚ¶ş×Ö¶Î\r";
-                // ÊÓ¾ßÌå²âÊÔ³¡¾°£¬¿ÉÄÜĞèÒª Application.DoEvents() ÈÃÏûÏ¢Ñ­»·´¦Àí£¨Timers µÈ£©
+                // è®¾ç½®å†…å®¹ï¼ˆRelayout/ç»˜åˆ¶å¯èƒ½ä¼šè°ƒç”¨ CreateGraphicsï¼‰
+                ctl.Content = "æµ‹è¯•å­—æ®µ\u001eç¬¬äºŒå­—æ®µ\r";
+                // è§†å…·ä½“æµ‹è¯•åœºæ™¯ï¼Œå¯èƒ½éœ€è¦ Application.DoEvents() è®©æ¶ˆæ¯å¾ªç¯å¤„ç†ï¼ˆTimers ç­‰ï¼‰
                 Application.DoEvents();
 
                 Assert.IsNotNull(ctl.Content);

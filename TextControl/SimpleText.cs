@@ -1,14 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Schema;
-using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
+
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -1157,6 +1154,15 @@ namespace LibraryStudio.Forms
             }
         }
 
+        public void ClearCache()
+        {
+            if (_paragraphs == null)
+                return;
+            foreach (var line in _paragraphs)
+            {
+                line.ClearCache();
+            }
+        }
         public int LineCount
         {
             get
