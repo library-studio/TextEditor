@@ -26,6 +26,13 @@ namespace MarcSample
                     return $"头标区";
                 return $"获得 '{field.FieldName}' 的值";
             };
+            this.marcControl1.CaretMoved += (s, e) => {
+                toolStripStatusLabel_caretOffs.Text = $"Caret:{this.marcControl1.CaretOffset}";
+                toolStripStatusLabel_caretFieldRegion.Text = "FieldRegion:" + this.marcControl1.CaretFieldRegion.ToString();
+            };
+            this.marcControl1.BlockChanged += (s, e) => {
+                toolStripStatusLabel_blockRange.Text = $"Block:{this.marcControl1.BlockStartOffset}-{this.marcControl1.BlockEndOffset}";
+            };
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -41,9 +48,11 @@ namespace MarcSample
             // this.marcControl1.Content = "ش12345678901234567890123";
             // this.marcControl1.Content = "012345678901234567890123";
             // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB شلاؤيث ฟิแกำดเ 中文 english\u001e100  \u001fatest333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333";
-            this.marcControl1.Content = "012345678901234567890123";
-            this.marcControl1.PadWhileReturning = false;
-            this.marcControl1.PaddingChar = '*';
+            this.marcControl1.Content = "01234567890123456789";
+            this.marcControl1.PadWhileEditing = true;
+            // this.marcControl1.PaddingChar = '*';
+
+            this.marcControl1.HighlightBlankChar = '·';  // '◌'; // '▪';// '▫'; // '□'; // '⸗';
 
             LoadMarc();
         }
@@ -179,6 +188,7 @@ namespace MarcSample
 
         void LoadMarc()
         {
+            //return;
             try
             {
                 var path = Path.Combine(GetBinDirectory(), "marc.txt");
@@ -196,6 +206,7 @@ namespace MarcSample
 
         void SaveMarc()
         {
+            //return;
             var path = Path.Combine(GetBinDirectory(), "marc.txt");
             File.WriteAllText(path, this.marcControl1.Content);
         }

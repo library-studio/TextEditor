@@ -1,0 +1,131 @@
+可以的 — 可以把 Line.cs 中与复杂文本 shaping / 布局 / 测量与绘制相关的关键逻辑逐步迁移到 DirectWrite。建议采用渐进式迁移策略：先用 DirectWrite 做 shaping/测量（以获得更准确的度量与基线），再逐步用 DirectWrite 绘制替换掉现有的 Uniscribe/GDI 绘制（ScriptTextOut）。下面给出要点、迁移步骤与一个最小可用的 DirectWrite 帮助类示例（基于 SharpDX），你可以按需把 Line.RefreshLine / ShapeAndPlace / Paint 中的部分替换为 DirectWrite 路径。
+
+要点（简短）
+- DirectWrite 自带 shaping、OpenType feature、文字度量、基线信息，适合复杂脚本（阿拉伯、印地文、合字等）。
+- 推荐逐步迁移：
+  1. 用 DirectWrite 创建 TextLayout 来测量宽度、abc（baseline/ascent/descent），把 Range 的 PixelWidth/Ascent/Descent/Spacing 等填充好（替代 ShapeAndPlace 的测量部分）。
+  2. 在 Paint 阶段暂时保留 ScriptTextOut/GDI 绘制，直到测量没问题，再切换到 DirectWrite 的绘制（DrawTextLayout）。
+- 在 WinForms 中混用 GDI+/GDI/Direct2D/DirectWrite 时要留意：ClearType 与像素格式（alpha/DIB）可能影响渲染质量。最稳妥方式：
+  - 如果使用 DirectWrite + Direct2D 绘制到屏幕 HDC，最好使用 DCRenderTarget（或创建与屏幕兼容的内存 DC 然后 BitBlt），避免把带 alpha 的 GDI+ bitmap 用作目标后破坏子像素抗锯齿。
+- 依赖：示例使用 SharpDX（在 .NET Framework 4.7.2 下工作）。需要在项目引用或 NuGet 中添加：
+  - SharpDX
+  - SharpDX.DirectWrite
+  - SharpDX.Direct2D1
+  - SharpDX.Mathematics (或 SharpDX.Mathematics.Interop)
+  - （可选）SharpDX.WIC / DXGI 如果要渲染到位图再 BitBlt
+
+迁移步骤（建议）
+1. 安装 SharpDX NuGet 包（或其他 DirectWrite 托管库）。
+2. 添加一个 DirectWriteHelper（参见示例），实现：
+   - CreateTextFormat / CreateTextLayout
+   - MeasureTextLayout（返回宽高、基线、高度）
+   - RenderTextLayoutToHdc(hdc, TextLayout, x,y,color) — 使用 D2D DCRenderTarget 绘制到 HDC。
+3. 修改 Line.ShapeAndPlace / RefreshLine：
+   - 用 DirectWriteHelper.MeasureTextLayout 替换 ScriptShape/ScriptPlace 得到的 pABC 与 advances（你只需要像素宽、ascent/descent、baseline、glyph-count 可选）。
+   - 把结果写入 range.Ascent/Descent/PixelWidth/Y 等成员（可能需要在 RangeWrapper 中新增字段来保存 DirectWrite 的 TextLayout 引用或度量）。
+4. 修改 Line.Paint：
+   - 当 range 已有 DirectWrite 布局数据时，调用 DirectWriteHelper.RenderTextLayoutToHdc 把文字直接绘到 hdc（或先绘到内存 DC 再 BitBlt）。
+   - 直到全部迁移完成前可以混合使用：测量使用 DirectWrite，绘制仍用 ScriptTextOut（比较与回退更容易）。
+
+示例：DirectWriteHelper（最小示例，基于 SharpDX）
+```csharp
+csharp TextControl\DirectWriteHelper.cs
+using System;
+using System.Drawing;
+using SharpDX;
+using SharpDX.Direct2D1;
+using SharpDX.DirectWrite;
+using SharpDX.Mathematics.Interop;
+using FactoryD2D = SharpDX.Direct2D1.Factory;
+using FactoryDW = SharpDX.DirectWrite.Factory;
+
+namespace LibraryStudio.Forms
+{
+    // 简单的 DirectWrite 帮助类（使用 SharpDX）
+    // 说明：在使用前需通过 NuGet 添加 SharpDX.* 包
+    public static class DirectWriteHelper
+    {
+        static FactoryDW dwFactory;
+        static FactoryD2D d2Factory;
+
+        static DirectWriteHelper()
+        {
+            dwFactory = new FactoryDW();
+            d2Factory = new FactoryD2D();
+        }
+
+        // 创建 TextFormat（可以缓存以避免频繁创建）
+        public static TextFormat CreateTextFormat(string familyName, float fontSize, FontWeight weight = FontWeight.Normal, FontStyle style = FontStyle.Normal, FontStretch stretch = FontStretch.Normal)
+        {
+            return new TextFormat(dwFactory, familyName, weight, style, stretch, fontSize, "en-us");
+        }
+
+        // 创建 TextLayout 并返回。caller 负责 Dispose(layout)。
+        public static TextLayout CreateTextLayout(string text, TextFormat tf, float maxWidth = float.PositiveInfinity, float maxHeight = float.PositiveInfinity)
+        {
+            return new TextLayout(dwFactory, text ?? string.Empty, tf, maxWidth, maxHeight);
+        }
+
+        // 获取 TextLayout 的度量（宽、高、基线/行高等）
+        public static void MeasureTextLayout(TextLayout layout, out float width, out float height, out float baseline)
+        {
+            var metrics = layout.Metrics;
+            width = metrics.Width;
+            height = metrics.Height;
+            baseline = metrics.LayoutBounds.Top + layout.Metrics.DrawBounds.Top; // 保守的 baseline 估算
+            // 更可靠的 baseline 可从字体设计度量计算，但 TextLayout 已经包含行度量
+        }
+
+        // 将 TextLayout 绘制到指定 HDC（使用 D2D 的 DCRenderTarget）
+        // 注意：在 GetHdc/ReleaseHdc 的情况下不要使用 e.Graphics 的其它 GDI+ 方法
+        public static void DrawTextLayoutToHdc(IntPtr hdc, TextLayout layout, TextFormat format, float x, float y, System.Drawing.Color color, SharpDX.Direct2D1.RenderTargetProperties? props = null)
+        {
+            // 创建 DCRenderTarget（每次创建/销毁比较重，建议缓存 RenderTarget 若可能）
+            var renderProps = props ?? new RenderTargetProperties(new PixelFormat(SharpDX.DXGI.Format.B8G8R8A8_UNorm, SharpDX.Direct2D1.AlphaMode.Premultiplied));
+            using (var dcProps = new HwndRenderTargetProperties()) // placeholder (not used by CreateDCRenderTarget)
+            {
+                var dcRenderProps = new DCRenderTargetProperties();
+                using (var rt = new DCRenderTarget(d2Factory, renderProps, dcRenderProps))
+                {
+                    // 将 HDC 绑定到 DCRenderTarget
+                    rt.BindDC(hdc, new RawRectangle(0, 0, 0, 0)); // origin/default clip
+                    rt.BeginDraw();
+                    var brush = new SolidColorBrush(rt, new RawColor4(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f));
+                    try
+                    {
+                        // DrawTextLayout 使用 (x,y) 相对于绘制目标
+                        rt.DrawTextLayout(new RawVector2(x, y), layout, brush, DrawTextOptions.EnableColorFont);
+                        rt.EndDraw();
+                    }
+                    finally
+                    {
+                        brush.Dispose();
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+如何在你的代码中逐步替换（示例说明）
+- 在 `RefreshLine` 中，替换调用 `ShapeAndPlace` 的部分：
+  - 用 `DirectWriteHelper.CreateTextFormat(...)` 创建 `TextFormat`（family/size 可从 Range.Font 推断）。
+  - 用 `DirectWriteHelper.CreateTextLayout(range.DisplayText, textFormat, maxWidth)` 获得 `TextLayout`。
+  - 用 `DirectWriteHelper.MeasureTextLayout` 获得宽度/高度/基线；把这些写回 `range.PixelWidth`、`range.Ascent`、`range.Descent`、`range.Y` 等。
+  - 可把 `TextLayout` 存到 `range`（例如新增 `range.DWriteLayout` 字段）以便后续绘制重用。
+- 在 `Paint` 中：
+  - 在准备好 `hdc`（目标 GDI HDC）后，若 range 有 `DWriteLayout`，调用 `DirectWriteHelper.DrawTextLayoutToHdc(hdc, layout, textFormat, x + range.Left, y + range.Y, color)` 来绘制 DirectWrite 文本。
+  - 若没有 DirectWrite 布局，则继续使用原来的 `ScriptTextOut` 作为回退。
+
+注意与限制（简短）
+- SharpDX 包现在处于维护/归档状态，但在 .NET Framework 4.x 下仍可使用。也可以选择其他 DirectWrite 托管绑定（例如 DWriteNet、WindowsAPICodePack 的扩展或自己 P/Invoke DWrite COM 接口）。
+- 性能：创建 / 销毁 RenderTarget 很重，建议缓存 TextFormat / TextLayout / RenderTarget（注意线程与 HDC 的生命周期）。如果你用的是在 OnPaint 里直接把 D2D 绘制到 e.Graphics.GetHdc()，要注意 GetHdc/ReleaseHdc 的边界，或采用先绘到内存 DC 再 BitBlt 的做法以保证兼容性与质量。
+- 子像素抗锯齿（ClearType）在 DirectWrite + D2D 上通常能很好工作，但若你最终把渲染到带 alpha 的 GDI+ 位图再 DrawImage，会破坏 ClearType；建议直接用 DCRenderTarget 或把 Direct2D 输出到与屏幕兼容的位图再 BitBlt。
+
+我可以帮你做三件事（你选其一或组合）：
+- A. 给出一个可补丁（patch），把 `Line.ShapeAndPlace` / `RefreshLine` 的测量部分替换为 DirectWrite 的实现（只负责测量并填充 range.PixelWidth / Ascent / Descent / 基线），并在 RangeWrapper 中新增缓存字段以保存 TextLayout（不修改绘制逻辑）。
+- B. 给出把 `Line.Paint` 的绘制路径切换到 DirectWrite 的完整补丁（会替换 ScriptTextOut 绘制为 DrawTextLayout）。
+- C. 提供更小的实验性示例（修改一个测试单元 TestLine），演示如何只用 DirectWrite 测量并绘制到一个内存 DC，再 BitBlt 回屏幕，便于评估质量与性能。
+
+你希望我先生成哪个补丁？（建议先选 A：只替换测量/布局，风险最低，便于验证度量结果）

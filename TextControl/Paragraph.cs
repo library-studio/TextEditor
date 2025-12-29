@@ -80,13 +80,16 @@ namespace LibraryStudio.Forms
                             this,
                             false);
                     }
-                    Line.DrawSolidRectangle(dc,
-                    rect.Left,
-                    rect.Top,
-                    rect.Right,
-                    rect.Bottom,
-                    back_color,
-                    clipRect);
+                    if (back_color != Color.Transparent)
+                    {
+                        Line.DrawSolidRectangle(dc,
+                        rect.Left,
+                        rect.Top,
+                        rect.Right,
+                        rect.Bottom,
+                        back_color,
+                        clipRect);
+                    }
                 }
                 return;
             }
@@ -122,7 +125,7 @@ namespace LibraryStudio.Forms
                         block_end - current_start_offs,
                         is_tail ? virtual_tail_length : 0);
                 }
-                y += line.GetPixelHeight();
+                y += line_height;
                 current_start_offs += line.TextLength;
                 i++;
             }
@@ -1196,8 +1199,7 @@ ref used_font);
         // parameters:
         //      int x   注意这是 Paragraph 内文档坐标
         public HitInfo HitTest(int x,
-            int y/*,
-            int _line_height*/)
+            int y)
         {
             // 2025/12/3
             if (y < 0)
@@ -1214,34 +1216,19 @@ ref used_font);
                     break;
                 if (y >= current_y && (y < current_y + line.GetPixelHeight() || isLastLine))
                 {
-#if REMOVED
-                    var ret = line.HitTest(x,
-                        out int hit_offs,
-                        out int hit_x_in_range);
-                    return new HitInfo
-                    {
-                        X = hit_x_in_range,
-                        Y = current_y,
-                        ChildIndex = i,
-                        // RangeIndex = hit_range_index,
-                        Area = y < current_y + _line_height ? Area.Text : Area.BottomBlank,
-                        TextIndex = hit_offs,
-                        Offs = offs + hit_offs,
-                        LineHeight = _line_height,
-                    };
-#endif
-                    var result_info = line.HitTest(x,
+                    var sub_info = line.HitTest(x,
     current_y);
                     return new HitInfo
                     {
-                        X = result_info.X,
-                        Y = current_y + result_info.Y,
+                        X = sub_info.X,
+                        Y = current_y + sub_info.Y,
                         ChildIndex = i,
                         // RangeIndex = hit_range_index,
-                        TextIndex = result_info.Offs,
-                        Offs = offs + result_info.Offs,
-                        LineHeight = result_info.LineHeight,
+                        TextIndex = sub_info.Offs,
+                        Offs = offs + sub_info.Offs,
+                        LineHeight = sub_info.LineHeight,
                         Area = y < current_y + line.GetPixelHeight() ? Area.Text : Area.BottomBlank,
+                        InnerHitInfo = sub_info,
                     };
                 }
 
@@ -1483,6 +1470,7 @@ ref used_font);
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
+                            InnerHitInfo = hit_info,
                         };
 
                         if (direction >= 0)

@@ -16,15 +16,15 @@ namespace LibraryStudio.Forms
         {
             UseControl((ctl) =>
             {
-                // Ö±½Óµ÷ÓÃ API
+                // ç›´æ¥è°ƒç”¨ API
                 ctl.ReplaceText(0, 0, "abc", delay_update: false);
 
-                Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                 Assert.AreEqual("abc", ctl.Content);
             });
         }
 
-        // Í·±êÇøÖĞËõ¼õ×Ö·ûÊı£¬»á×Ô¶¯²¹ÉÏ
+        // å¤´æ ‡åŒºä¸­ç¼©å‡å­—ç¬¦æ•°ï¼Œä¼šè‡ªåŠ¨è¡¥ä¸Š
         [TestMethod]
         public void replaceText_02()
         {
@@ -32,7 +32,7 @@ namespace LibraryStudio.Forms
             {
                 ctl.Content = BuildContent(@"012345678901234567890123
 001ABCDE");
-                // É¾³ıµôÍ·±êÇøÒ»¸ö×Ö·û
+                // åˆ é™¤æ‰å¤´æ ‡åŒºä¸€ä¸ªå­—ç¬¦
                 ctl.ReplaceText(0, 1, "", delay_update: false);
 
                 Assert.AreEqual(2, ctl.GetDomRecord().FieldCount);
@@ -41,7 +41,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // Í·±êÇøÖĞ²åÈë×Ö·ûÊı£¬»á×Ô¶¯¼·×ß×îºóµÄ
+        // å¤´æ ‡åŒºä¸­æ’å…¥å­—ç¬¦æ•°ï¼Œä¼šè‡ªåŠ¨æŒ¤èµ°æœ€åçš„
         [TestMethod]
         public void replaceText_03()
         {
@@ -49,7 +49,7 @@ namespace LibraryStudio.Forms
             {
                 ctl.Content = BuildContent(@"012345678901234567890123
 001ABCDE");
-                // É¾³ıµôÍ·±êÇøÒ»¸ö×Ö·û
+                // å¤´æ ‡åŒºå¼€å¤´æ’å…¥ä¸€ä¸ªå­—ç¬¦ï¼Œå°†åŸæ¥å¤´æ ‡åŒºæœ€åä¸€ä¸ªå­—ç¬¦æŒ¤åˆ° 001
                 ctl.ReplaceText(0, 0, "-", delay_update: false);
 
                 Assert.AreEqual(2, ctl.GetDomRecord().FieldCount);
@@ -64,7 +64,7 @@ namespace LibraryStudio.Forms
             UseControl((ctl) =>
             {
                 ctl.Content = BuildContent(@"01234567890123456789012");
-                // Í·±êÇøÎ²²¿²åÈëÒ»¸ö×Ö·û
+                // å¤´æ ‡åŒºå°¾éƒ¨æ’å…¥ä¸€ä¸ªå­—ç¬¦
                 ctl.ReplaceText(23, 23, "-", delay_update: false);
 
                 Assert.AreEqual(1, ctl.GetDomRecord().FieldCount);
@@ -72,52 +72,68 @@ namespace LibraryStudio.Forms
             });
         }
 
+        [TestMethod]
+        public void replaceText_05()
+        {
+            UseControl((ctl) =>
+            {
+                ctl.Content = BuildContent(@"012345678901234567890123
+001
+ABCDEF");
+                // 001 æœ«å°¾åˆ é™¤ç»“æŸç¬¦
+                ctl.ReplaceText(27, 28, "", delay_update: false);
 
-        // ¿ÕÄÚÈİÖĞ²åÈëÒ»¸öÍ·±êÇø
+                Assert.AreEqual(2, ctl.GetDomRecord().FieldCount);
+                Assert.AreEqual(BuildContent(@"012345678901234567890123
+001ABCDEF"), ctl.Content);
+            });
+        }
+
+        // ç©ºå†…å®¹ä¸­æ’å…¥ä¸€ä¸ªå¤´æ ‡åŒº
         [TestMethod]
         public void domRecord_01()
         {
             UseDomRecord((record) =>
             {
-                // ²åÈë×Ö¶ÎÇ°ÄÚÈİÎª¿Õ
+                // æ’å…¥å­—æ®µå‰å†…å®¹ä¸ºç©º
                 Assert.AreEqual("", record.GetControl().Content);
 
-                // ²åÈëÒ»¸öÍ·±êÇø
+                // æ’å…¥ä¸€ä¸ªå¤´æ ‡åŒº
                 record.InsertField(0, "", "", "012345678901234567890123");
 
-                Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                 Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
             });
         }
 
-        // ÒÑÓĞÍ·±êÇø£¬ÔÙÔÚËüÖ®Ç°²åÈëÍ·±êÇø
+        // å·²æœ‰å¤´æ ‡åŒºï¼Œå†åœ¨å®ƒä¹‹å‰æ’å…¥å¤´æ ‡åŒº
         [TestMethod]
         public void domRecord_02()
         {
             UseDomRecord((record) =>
             {
-                // ²åÈë×Ö¶ÎÇ°ÄÚÈİÎª¿Õ
+                // æ’å…¥å­—æ®µå‰å†…å®¹ä¸ºç©º
                 Assert.AreEqual("", record.GetControl().Content);
 
-                // ²åÈëÒ»¸öÍ·±êÇø
+                // æ’å…¥ä¸€ä¸ªå¤´æ ‡åŒº
                 record.InsertField(0, "", "", "012345678901234567890123");
 
                 try
                 {
-                    // ÔÙ´Î²åÈëÒ»¸öÍ·±êÇø
+                    // å†æ¬¡æ’å…¥ä¸€ä¸ªå¤´æ ‡åŒº
                     record.InsertField(0, "", "", "012345678901234567890123");
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
-        // ĞŞ¸ÄÍ·±êÇøµÄ Name
+        // ä¿®æ”¹å¤´æ ‡åŒºçš„ Name
         [TestMethod]
         public void domRecord_03()
         {
@@ -127,20 +143,20 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // ĞŞ¸ÄÍ·±êÇø Name
+                    // ä¿®æ”¹å¤´æ ‡åŒº Name
                     record.GetField(0).Name = "200";
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (InvalidOperationException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
-        // ĞŞ¸ÄÍ·±êÇøµÄ Indicator
+        // ä¿®æ”¹å¤´æ ‡åŒºçš„ Indicator
         [TestMethod]
         public void domRecord_04()
         {
@@ -150,21 +166,21 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // ĞŞ¸ÄÍ·±êÇø Name
+                    // ä¿®æ”¹å¤´æ ‡åŒº Name
                     record.GetField(0).Indicator = "11";
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (InvalidOperationException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
 
-        // ĞŞ¸ÄÍ·±êÇøµÄ Content£¬²¢ÇÒ³¤¶È²»×ã
+        // ä¿®æ”¹å¤´æ ‡åŒºçš„ Contentï¼Œå¹¶ä¸”é•¿åº¦ä¸è¶³
         [TestMethod]
         public void domRecord_05()
         {
@@ -174,20 +190,20 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // ĞŞ¸ÄÍ·±êÇø Content
+                    // ä¿®æ”¹å¤´æ ‡åŒº Content
                     record.GetField(0).Content = "11";
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
-        // ĞŞ¸ÄÍ·±êÇøµÄ Content£¬²¢ÇÒ³¤¶È³¬¹ı 24
+        // ä¿®æ”¹å¤´æ ‡åŒºçš„ Contentï¼Œå¹¶ä¸”é•¿åº¦è¶…è¿‡ 24
         [TestMethod]
         public void domRecord_06()
         {
@@ -197,20 +213,20 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // ĞŞ¸ÄÍ·±êÇø Content
+                    // ä¿®æ”¹å¤´æ ‡åŒº Content
                     record.GetField(0).Content = "012345678901234567890123A";
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
-        // ĞŞ¸ÄÍ·±êÇøµÄ Content£¬²¢ÇÒ³¤¶ÈÕıºÃ 24
+        // ä¿®æ”¹å¤´æ ‡åŒºçš„ Contentï¼Œå¹¶ä¸”é•¿åº¦æ­£å¥½ 24
         [TestMethod]
         public void domRecord_07()
         {
@@ -218,15 +234,15 @@ namespace LibraryStudio.Forms
             {
                 record.GetControl().Content = "012345678901234567890123";
 
-                // ĞŞ¸ÄÍ·±êÇø Content
+                // ä¿®æ”¹å¤´æ ‡åŒº Content
                 record.GetField(0).Content = "321098765432109876543210";
 
-                Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                 Assert.AreEqual("321098765432109876543210", record.GetControl().Content);
             });
         }
 
-        // É¾³ıÍ·±êÇø
+        // åˆ é™¤å¤´æ ‡åŒº
         [TestMethod]
         public void domRecord_08()
         {
@@ -234,10 +250,10 @@ namespace LibraryStudio.Forms
             {
                 record.GetControl().Content = "012345678901234567890123";
 
-                // É¾³ıÍ·±êÇø
+                // åˆ é™¤å¤´æ ‡åŒº
                 record.DeleteField(0);
 
-                Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                 Assert.AreEqual("", record.GetControl().Content);
             });
         }
@@ -251,20 +267,20 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // É¾³ı²»´æÔÚµÄ×Ö¶Î
+                    // åˆ é™¤ä¸å­˜åœ¨çš„å­—æ®µ
                     record.DeleteField(1);
-                    Assert.Fail($"Î´Å×³öÆÚÍûµÄÒì³£");
+                    Assert.Fail($"æœªæŠ›å‡ºæœŸæœ›çš„å¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123", record.GetControl().Content);
                 }
             });
         }
 
-        // °´ÕÕ index É¾³ıÒ²»á×Ô¶¯¸üĞÂ DomField ¶ÔÏó×´Ì¬
+        // æŒ‰ç…§ index åˆ é™¤ä¹Ÿä¼šè‡ªåŠ¨æ›´æ–° DomField å¯¹è±¡çŠ¶æ€
         [TestMethod]
         public void domRecord_08_b()
         {
@@ -273,18 +289,18 @@ namespace LibraryStudio.Forms
                 record.GetControl().Content = "012345678901234567890123";
 
                 var header = record.GetField(0);
-                // É¾³ıÍ·±êÇø
+                // åˆ é™¤å¤´æ ‡åŒº
                 record.DeleteField(0);
 
                 Assert.AreEqual(true, header.IsDeleted);
 
-                Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                 Assert.AreEqual("", record.GetControl().Content);
             });
         }
 
 
-        // É¾³ıÍ·±êÇø¡£É¾³ıÇ°´æÔÚÒ»¹²Á½¸ö×Ö¶Î
+        // åˆ é™¤å¤´æ ‡åŒºã€‚åˆ é™¤å‰å­˜åœ¨ä¸€å…±ä¸¤ä¸ªå­—æ®µ
         [TestMethod]
         public void domRecord_09()
         {
@@ -296,21 +312,21 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    // É¾³ıÍ·±êÇø
+                    // åˆ é™¤å¤´æ ‡åŒº
                     record.DeleteField(0);
 
-                    Assert.Fail("Î´ÈçÆÚ´ıµÄÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…çš„æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.AreEqual("012345678901234567890123ABC12\u001e", record.GetControl().Content);
                 }
             });
         }
 
-        // ×·×Ù×Ö¶Î²åÈëÉ¾³ı
+        // è¿½è¸ªå­—æ®µæ’å…¥åˆ é™¤
         [TestMethod]
         public void traceChange_01()
         {
@@ -332,7 +348,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // using °æ±¾
+        // using ç‰ˆæœ¬
         [TestMethod]
         public void traceChange_02()
         {
@@ -357,7 +373,7 @@ namespace LibraryStudio.Forms
         }
 
 
-        #region É¾³ı×Ö¶Î
+        #region åˆ é™¤å­—æ®µ
 
         [TestMethod]
         public void deleteField_01()
@@ -432,7 +448,7 @@ namespace LibraryStudio.Forms
                     try
                     {
                         Assert.AreEqual("001ABCD", field_001.Text);
-                        Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                        Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -455,7 +471,7 @@ namespace LibraryStudio.Forms
                     try
                     {
                         Assert.AreEqual("001ABCD", field_001.Text);
-                        Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                        Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -465,7 +481,7 @@ namespace LibraryStudio.Forms
                     try
                     {
                         Assert.AreEqual("200  1234", field_200.Text);
-                        Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                        Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -483,7 +499,7 @@ namespace LibraryStudio.Forms
                     try
                     {
                         Assert.AreEqual("012345678901234567890123", header.Text);
-                        Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                        Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -493,7 +509,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // É¾³ıÒ»¸ö·¶Î§µÄ×Ö¶Î
+        // åˆ é™¤ä¸€ä¸ªèŒƒå›´çš„å­—æ®µ
         [TestMethod]
         public void deleteField_03()
         {
@@ -516,7 +532,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // É¾³ıÊ±Ô½¹ı·¶Î§
+        // åˆ é™¤æ—¶è¶Šè¿‡èŒƒå›´
         [TestMethod]
         public void deleteField_04()
         {
@@ -531,8 +547,8 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    record.DeleteField(1, 3);   // Ô½¹ı×î´ó·¶Î§
-                    Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                    record.DeleteField(1, 3);   // è¶Šè¿‡æœ€å¤§èŒƒå›´
+                    Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
@@ -551,7 +567,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // É¾³ıÊ±Ô½¹ı·¶Î§
+        // åˆ é™¤æ—¶è¶Šè¿‡èŒƒå›´
         [TestMethod]
         public void deleteField_05()
         {
@@ -566,8 +582,8 @@ namespace LibraryStudio.Forms
 
                 try
                 {
-                    record.DeleteField(0, 4);   // Ô½¹ı×î´ó·¶Î§
-                    Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                    record.DeleteField(0, 4);   // è¶Šè¿‡æœ€å¤§èŒƒå›´
+                    Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
@@ -586,7 +602,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // ÔÚ³ıÁËÍ·±êÇøÒÔÍâ»¹ÓĞÆäËü×Ö¶ÎµÄÇé¿öÏÂ£¬É¾³ıÍ·±êÇø¡°×Ö¶Î¡±
+        // åœ¨é™¤äº†å¤´æ ‡åŒºä»¥å¤–è¿˜æœ‰å…¶å®ƒå­—æ®µçš„æƒ…å†µä¸‹ï¼Œåˆ é™¤å¤´æ ‡åŒºâ€œå­—æ®µâ€
         [TestMethod]
         public void deleteField_06()
         {
@@ -602,7 +618,7 @@ namespace LibraryStudio.Forms
                 try
                 {
                     record.DeleteField(0, 1);
-                    Assert.Fail("Î´ÈçÆÚ´ıµØÅ×³öÒì³£");
+                    Assert.Fail("æœªå¦‚æœŸå¾…åœ°æŠ›å‡ºå¼‚å¸¸");
                 }
                 catch (ArgumentException ex)
                 {
@@ -621,7 +637,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // É¾³ıÈ«²¿×Ö¶Î
+        // åˆ é™¤å…¨éƒ¨å­—æ®µ
         [TestMethod]
         public void deleteField_07()
         {
@@ -645,7 +661,7 @@ namespace LibraryStudio.Forms
             });
         }
 
-        // Çå³ıÈ«²¿×Ö¶Î
+        // æ¸…é™¤å…¨éƒ¨å­—æ®µ
         [TestMethod]
         public void deleteField_08()
         {
@@ -701,7 +717,7 @@ namespace LibraryStudio.Forms
                 Assert.AreEqual("001ABCD", field_001.Text);
                 Assert.AreEqual("200  1234", field_200.Text);
 
-                // ²åÈë
+                // æ’å…¥
                 record.InsertField(1,
                     "009", "", "999");
                 Assert.AreEqual(4, record.FieldCount);
@@ -760,10 +776,10 @@ namespace LibraryStudio.Forms
                     action(ctl);
 
                     /*
-                    // Ö±½Óµ÷ÓÃ API
+                    // ç›´æ¥è°ƒç”¨ API
                     ctl.ReplaceText(0, 0, "abc", delay_update: false);
 
-                    Application.DoEvents(); // ÈôĞèÒª´¦Àí Timer »òÖØ»æ
+                    Application.DoEvents(); // è‹¥éœ€è¦å¤„ç† Timer æˆ–é‡ç»˜
                     Assert.IsTrue(ctl.Content.Contains("abc"));
                     */
                 }

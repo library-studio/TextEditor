@@ -84,6 +84,7 @@ namespace LibraryStudio.Forms
                 + averageCharWidth * 2
                 + BlankUnit + this.BorderThickness
                 + this.GapThickness;
+            // 字段内容最小宽度为 5 个平均字符宽度
             MinFieldContentWidth = averageCharWidth * 5;
             CaptionPixelWidth = averageCharWidth * 12;
             /*
@@ -232,8 +233,8 @@ namespace LibraryStudio.Forms
         public static Color DefaultCaptionBackColor = SystemColors.Info;
         public static Color DefaultCaptionForeColor = SystemColors.InfoText;
 
-        public static Color DefaultDelimeterForeColor = Color.DarkRed;
-        public static Color DefaultDelimeterBackColor = Color.LightGray;
+        public static Color DefaultDelimeterForeColor = Color.DarkGreen;    // Color.DarkRed;
+        public static Color DefaultDelimeterBackColor = Color.WhiteSmoke; //  Color.LightYellow;
 
         // 不可编辑区域的背景色
         public Color SolidColor { get; set; } = DefaultSolidColor;
@@ -243,6 +244,11 @@ namespace LibraryStudio.Forms
         public Color BorderColor { get; set; } = DefaultBorderColor;
         public static Color DefaultBorderColor = SystemColors.ControlDark;
 
+        public Color FocuseColor { get; set; } = DefaultFocuseColor;
+        public static Color DefaultFocuseColor = SystemColors.MenuHighlight;
+
+        public Color BlankCharForeColor { get; set; } = DefaultBlankCharForeColor;
+        public static Color DefaultBlankCharForeColor = Color.Blue;
     }
 
     public delegate string GetFieldCaptionFunc(MarcField field);

@@ -266,10 +266,15 @@ namespace LibraryStudio.Forms
         }
 
         // 根据元素下标得到一个 DomField 对象
-        public DomField GetField(int index)
+        public DomField GetField(int index,
+            bool throw_exception = true)
         {
             if (index < 0 || index >= _marcRecord.FieldCount)
-                throw new ArgumentException($"index 值 {index} 越界");
+            {
+                if (throw_exception)
+                    throw new ArgumentException($"index 值 {index} 越界");
+                return null;
+            }
 
             var f = new DomField(_marcRecord, index);
             RegisterDomField(f);

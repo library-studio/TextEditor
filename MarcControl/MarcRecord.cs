@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-
+using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -167,6 +167,10 @@ namespace LibraryStudio.Forms
             // 当前正在最后一个字段以下位置。要移动到最后一个字段的 name 区第一字符位置
             if (index == _fields.Count)
             {
+                int y0 = SumHeight(_fields, _fields.Count);
+                info = this.HitTest(x, y0 - 1);
+                return true;
+                /*
                 // 获得倒数第一个字段的 start offs
                 this.GetContiguousFieldOffsRange(_fields.Count - 1,
                     1,
@@ -174,6 +178,7 @@ namespace LibraryStudio.Forms
                     out _);
                 MoveByOffs(start_offs, 0, out info);
                 return true;
+                */
             }
             if (index < 0 || index >= _fields.Count)
             {
@@ -238,52 +243,35 @@ namespace LibraryStudio.Forms
             _fields.Clear();
         }
 
+        int _blankLineHeigh = 0;
+
+        public int BlankLineHeight
+        {
+            get
+            {
+                return _blankLineHeigh;
+            }
+        }
+
+        // 加上 FontContext.DefaultFontHeight 是为了让最后一行的 caret 可见
         public int GetPixelHeight()
         {
-            if (_fields == null)
-                return 0;
-            if (_fields.Count == 0)
-                return 0/*Line.GetLineHeight()*/;
-            return _fields.Sum(field => field.GetPixelHeight());
+            _blankLineHeigh = FontContext.DefaultFontHeight;
+            if (_fields == null
+                || _fields.Count == 0)
+                return _blankLineHeigh;
+            return _fields.Sum(field => field.GetPixelHeight())
+                + _blankLineHeigh;
         }
 
         public HitInfo HitTest(int x, int y)
         {
-#if REMOVED
-            // 点击到了左边 Caption 区域
-            if (x < _fieldProperty.CaptionPixelWidth - MarcField.SplitterPixelWidth)
-            {
-                return new HitInfo
-                {
-                    X = x,
-                    Y = y,
-                    ChildIndex = -2, // -2 表示 caption 文字区域
-                    TextIndex = 0,
-                    Offs = 0,
-                    LineHeight = Line.GetLineHeight(),
-                    Area = Area.LeftBlank,
-                };
-            }
-
-            // 点击到了 Caption 区域和 Name 区域的缝隙位置
-            if (x < _fieldProperty.CaptionPixelWidth)
-            {
-                return new HitInfo
-                {
-                    X = x,
-                    Y = y,
-                    ChildIndex = -1, // -1 表示 caption 和 name 之间的缝隙
-                    TextIndex = 0,
-                    Offs = 0,
-                    LineHeight = Line.GetLineHeight(),
-                    Area = Area.LeftBlank,
-                };
-            }
-#endif
-
             // 把小于 0 的 y 位置调整为 0，这样当作是点击在第一行的顶部
             if (y < 0)
+            {
                 y = 0;
+            }
+
             var result = new HitInfo();
             int current_y = 0;
             int offs = 0;
@@ -318,6 +306,7 @@ namespace LibraryStudio.Forms
                         Offs = offs + result_info.Offs,
                         LineHeight = result_info.LineHeight,
                         Area = area,    // y < current_y + height ? Area.Text : Area.BottomBlank,
+                        InnerHitInfo = result_info,
                     };
                 }
 
@@ -616,6 +605,7 @@ namespace LibraryStudio.Forms
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
+                            InnerHitInfo = hit_info,
                         };
 
                         if (direction >= 0)
@@ -667,6 +657,7 @@ namespace LibraryStudio.Forms
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
+                            InnerHitInfo = hit_info,
                         };
                         info = temp_info;
                         return 0;
@@ -684,6 +675,7 @@ namespace LibraryStudio.Forms
                         TextIndex = 0,
                         Offs = offs,
                         LineHeight = FontContext.DefaultFontHeight,
+                        InnerHitInfo = null,
                     };
                     return 0;
                 }
@@ -803,7 +795,7 @@ namespace LibraryStudio.Forms
                         block_end - current_start_offs,
                         i == 0 ? 0 : 1);
                 }
-                y += field.GetPixelHeight();
+                y += paragraph_height;
                 // TODO: 改为使用 .FullTextLength
                 current_start_offs += field.PureTextLength + (i == 0 ? 0 : 1);
                 i++;
@@ -847,12 +839,13 @@ namespace LibraryStudio.Forms
             // 观察被替换的范围 start - end，跨越了多少个 Paragraph
             // 对 text 进行 \r 字符切分。把这些 Paragraph 替换为由切割后的 text 构造的零到多个新 Paragraph
 
-            var old_fields = FindFields(
+            var old_fields = FindFieldsV2(
                 // _fields,
                 start,
                 out string left_text,
                 end,
                 out string right_text,
+                text == null ? "" : text,
                 out int first_paragraph_index,
                 out string replaced);
 
@@ -862,6 +855,7 @@ namespace LibraryStudio.Forms
                 // fields.Clear();
             }
 
+#if OLD
             // parameters:
             //      delta   整体变化多少。因为 start~end 之间和 replaced_text 可能长度不等，要精确计算需要本参数
             //              负数表示变少
@@ -911,6 +905,8 @@ namespace LibraryStudio.Forms
                     }
                 }
             }
+
+#endif
 
             result.ReplacedText = replaced;
             result.NewText = text;
@@ -1086,9 +1082,11 @@ namespace LibraryStudio.Forms
 
             // 用被删除的原有对象的宽度进行推动
             // 不应在这里额外增加 return 符号宽度，会让自动根据窗口宽度折行总是有点水平卷滚
-            int max = old_fields.Count == 0 ? 0 : old_fields.Max(p => p.GetPixelWidth());
-            if (max > max_pixel_width)
-                max_pixel_width = max;
+
+            // 注: 这里统计 GetPixelWidth() 有问题。这是按照变化后的 _fieldProperty.ContentX 来进行的，无法得到以前的 max_pixel
+            int old_max = old_fields.Count == 0 ? 0 : old_fields.Max(p => p.GetPixelWidth());
+            if (old_max > max_update_width)
+                max_update_width = old_max;
 
             new_h = new_fields.Sum(p => p.GetPixelHeight());
 
@@ -1243,6 +1241,8 @@ namespace LibraryStudio.Forms
             return lines.ToArray();
         }
 
+        // 旧版本函数。有缺陷，不能识别 24 offs 以后的字段被删除结束符的情况(这时间应当把后一个字段连带返回)
+        // 另外，借用了 LocateFields() 函数，并不能满足功能需要，但又不方便改变 LocateFields() 函数
         public List<MarcField> FindFields(
     // List<IBox> fields,
     int start,
@@ -1302,6 +1302,144 @@ namespace LibraryStudio.Forms
 
         }
 
+        // 新版本函数。
+        // 能识别 24 offs 以前的字符数减少情况，把后面的足够凑够 24 字符的若干字段拉上返回
+        // 能识别 24 offs 以后的字段被删除结束符的情况，把后一个字段拉上返回
+
+        public List<MarcField> FindFieldsV2(
+            int start,
+            out string left_text,
+            int end,
+            out string right_text,
+            string new_text,
+            out int first_paragraph_index,
+            out string replaced)
+        {
+            if (start < 0 || end < -1)
+                throw new ArgumentException($"start ({start}) 或 end ({end}) 不合法");
+
+            // 确保 start 是较小的一个
+            if (end != -1 && start > end)
+            {
+                int temp = start;
+                start = end;
+                end = temp;
+            }
+
+            if (end == -1)
+                end = Int32.MaxValue;
+
+            // 新的相对于旧的变化了多少。负数表示变短
+            int delta = new_text.Length - (end - start);
+
+            first_paragraph_index = -1;
+
+            var results = new List<MarcField>();
+            int offs = 0;
+            int i = 0;
+            StringBuilder left = new StringBuilder();
+            StringBuilder middle = new StringBuilder();
+            StringBuilder right = new StringBuilder();
+            bool complete = false;
+            foreach (MarcField field in _fields)
+            {
+                var length = field.FullTextLength;
+                var compare_length = length;
+                if (i == 0)
+                    compare_length = Math.Max(24, length);
+                if (Utility.Cross(start, end,
+                    offs, offs + compare_length)
+                    )
+                {
+                    var start_length = Math.Max(start - offs, 0);   // 防止负数
+                    var end_length = Math.Max((offs + length) - end, 0);
+                    if (start_length > 0)
+                        left.Append(field.MergeFullText(0, start_length));
+                    middle.Append(field.MergeFullText(start_length, length - end_length));
+                    if (end_length > 0)
+                        right.Append(field.MergeFullText(length - end_length, length));
+
+                    results.Add(field);
+                    if (results.Count == 1)
+                        first_paragraph_index = i;
+
+                    if (right.Length > 0)
+                    {
+                        complete = true;
+                        goto CONTINUE;
+                    }
+                }
+                else if (offs >= end)
+                    complete = true;
+
+                if (complete == true)
+                {
+                    // 在头标区范围内，变短，拉上后面的若干字段
+                    if (end + delta < 24 && delta < 0)
+                    {
+                        if (SumTextLength() + delta < 24)
+                        {
+                            right.Append(field.MergeFullText());
+                            results.Add(field);
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    // 在头标区范围内，变长，拉上后面的一个字段
+                    if (end + delta < 24 && delta > 0)
+                    {
+                        right.Append(field.MergeFullText());
+                        results.Add(field);
+                        break;
+                    }
+
+                    if (end + delta >= 24)
+                    {
+                        if (IsRemoved())
+                        {
+                            right.Append(field.MergeFullText());
+                            results.Add(field);
+                            break;  // 只多添加一个字段到 results 中便结束
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+            CONTINUE:
+                offs += length;
+                i++;
+            }
+
+            if (first_paragraph_index == -1)
+                first_paragraph_index = i;
+            left_text = left.ToString();
+            replaced = middle.ToString();
+            right_text = right.ToString();
+            return results;
+
+            // 判断旧的内容被新内容替换后，是否最后一个位置的结束符被换掉了
+            bool IsRemoved()
+            {
+                char middle_tail = middle.Length == 0 ? (char)0 : middle[middle.Length - 1];
+                char new_tail = new_text.Length == 0 ? (char)0 : new_text[new_text.Length - 1];
+                if (middle_tail == Metrics.FieldEndCharDefault
+                    && new_tail != Metrics.FieldEndCharDefault)
+                    return true;
+                return false;
+            }
+
+            int SumTextLength()
+            {
+                if (results.Count == 0)
+                    return 0;
+                return results.Sum(r => r.FullTextLength);
+            }
+        }
 #if OLD
         // 根据 offs 范围获得相关的 IBox 列表
         // parameters:
@@ -1445,6 +1583,136 @@ namespace LibraryStudio.Forms
             }
         }
 #endif
+        public int GetFieldY(int index)
+        {
+            if (index == 0)
+                return 0;
+            return SumHeight(_fields, index);
+        }
+
+        public void PaintBack(
+            IContext context,
+            SafeHDC hdc,
+            int x,
+            int y,
+            Rectangle clipRect,
+            int caret_field_index = -1)
+        {
+            // 绘制背景色
+            {
+                {
+                    var backColor = context?.GetBackColor?.Invoke(null, false) ?? SystemColors.Window;
+                    MarcField.DrawSolidRectangle(hdc, clipRect, backColor);
+                }
+
+                // var height = this.AutoScrollMinSize.Height - FontContext.DefaultFontHeight;
+                var height = this.GetPixelHeight() - this._blankLineHeigh;
+
+                // 绘制提示文字区的底色
+                {
+                    var left_rect = new Rectangle(
+                            x,
+                            y,
+                            _fieldProperty.CaptionPixelWidth,
+                            height);
+                    MarcField.PaintBack(hdc, left_rect, clipRect, _fieldProperty?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor);
+                }
+
+                // Solid 区
+                {
+                    var left_rect = new Rectangle(
+                        x + _fieldProperty.CaptionPixelWidth,
+                        y,
+                        _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
+                        height);
+                    MarcField.PaintBack(hdc, left_rect, clipRect, _fieldProperty?.SolidColor ?? Metrics.DefaultSolidColor);
+                }
+
+                /*
+                // 右侧全高的一根立体竖线
+                {
+                    MarcField.PaintLeftRightBorder(g,
+                        x + _fieldProperty.SolidX,
+                        y + 0,
+                        _fieldProperty.SolidPixelWidth,
+                        height,
+                        _fieldProperty.BorderThickness);
+                }
+                */
+                {
+                    /*
+                    var rect = new Rectangle(x + _fieldProperty.SolidX + _fieldProperty.SolidPixelWidth - 1,
+                            y + 0,
+                            _fieldProperty.BorderThickness,
+                            height);
+                    MarcField.DrawSolidRectangle(hdc, rect, backColor);
+                    */
+                    var backColor = _fieldProperty.BorderColor;
+                    var x0 = x + _fieldProperty.SolidX + _fieldProperty.SolidPixelWidth;
+                    var line_rect = new Rectangle(x0, y, _fieldProperty.BorderThickness, height);
+                    if (line_rect.IntersectsWith(clipRect))
+                    {
+                        MarcField.DrawVertLine(hdc,
+    line_rect,
+    (COLORREF)backColor);
+                    }
+                }
+            }
+
+            this.PaintSolidArea(hdc,
+                x,
+                y,
+                clipRect,
+                caret_field_index);
+        }
+
+
+        public void PaintSolidArea(SafeHDC hdc,
+            int x,
+            int y,
+            Rectangle clipRect,
+            int caret_field_index = -1)
+        {
+            int i = 0;
+            foreach (var field in _fields)
+            {
+                if (y >= clipRect.Bottom)
+                    break;
+                field.PaintBackAndBorder(hdc,
+x,
+y,
+clipRect,
+i == caret_field_index);
+                y += field.GetPixelHeight();
+                i++;
+            }
+        }
+
+        public Rectangle[] GetFocusedRect(
+            int x,
+            int y,
+            int[] caret_field_indices)
+        {
+            if (caret_field_indices == null
+                || caret_field_indices.Length == 0)
+                return new Rectangle[0];
+            List<Rectangle> results = new List<Rectangle>();
+            int current_y = y;
+            int i = 0;
+            foreach (var field in _fields)
+            {
+                if (Array.IndexOf(caret_field_indices, i) != -1)
+                {
+                    results.Add(field.GetFocusedRect(x, current_y));
+                    if (results.Count >= caret_field_indices.Length)
+                        return results.ToArray();
+                }
+                current_y += field.GetPixelHeight();
+                i++;
+            }
+
+            return results.ToArray();
+        }
 
         static int SumHeight(IEnumerable<MarcField> lines, int count)
         {
@@ -1739,6 +2007,195 @@ out int max_pixel_width)
             return _fields.Count == 0 ? 0 : _fields.Max(l => l.GetPixelWidth());
         }
 
+        public class InputInfo
+        {
+            public string Text { get; set; }
+            public int Start { get; set; }
+            public int End { get; set; }
+
+            public int Caret { get; set; } = -1;
+        }
+
+        // 获得输入一个普通字符的操作信息
+        // 注意字段名和字段指示符区域，是覆盖输入效果；内容区是插入字符效果
+        // 本函数还可以根据要求，观察输入所在的区域，如果字符数不足规则要求，自动填充足量的字符
+        public InputInfo GetInputInfo(HitInfo info,
+            char ch,
+            char padding_char = (char)0)
+        {
+            var index = info.ChildIndex;
+
+            // 在最后一个字段以后
+            if (index >= _fields.Count)
+            {
+                var text_length = this.TextLength;
+                if (padding_char != 0)
+                {
+                    // 如果头标区字符数不足，当前 index 正好位于头标区的下一个字段
+                    if (index == 1 && _fields[0].FullTextLength < 24)
+                    {
+                        var header = _fields[0];
+                        var header_length = header.FullTextLength;
+
+                        var content = header.MergeFullText() + new string(padding_char, 24 - header_length) + ch + new string(padding_char, 4);
+
+                        return new InputInfo
+                        {
+                            Text = content.Substring(info.Offs),
+                            Start = info.Offs,
+                            End = header_length,
+                            Caret = 24,
+                        };
+                    }
+                    return new InputInfo
+                    {
+                        Text = (new string(ch, 1)) + (new string(padding_char, 4)),
+                        Start = text_length,
+                        End = text_length
+                    };
+                }
+
+                return new InputInfo
+                {
+                    Text = new string(ch, 1),
+                    Start = text_length,
+                    End = text_length
+                };
+            }
+
+            Debug.Assert(index < _fields.Count);
+            var field = _fields[index];
+
+            if (this.GetFieldOffsRange(index, out int start, out int end) == false)
+                return null;
+
+            var caret_offs_in_field = info.Offs - start;
+            // 头标区
+            if (index == 0)
+            {
+                // 需要填充足够字符，让头标区达到 24 字符
+                if (padding_char != 0
+                    && end < 24)
+                {
+                    return Build24();
+                    /*
+                    var content = field.MergeFullText() + new string(padding_char, 24 - end);
+                    // 输入一个字符以后的全部文字
+                    content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
+                    return new InputInfo
+                    {
+                        Text = content.Substring(caret_offs_in_field, 24 - caret_offs_in_field),
+                        Start = caret_offs_in_field,
+                        End = end,
+                    };
+                    */
+                }
+                // 实际上在下一个字段的第一字符进行替换或插入
+                if (end == caret_offs_in_field)
+                {
+                    if (_fields.Count == 1
+                        || _fields[1].TextLength <= 1)
+                    {
+                        index = 1;  // 调整到头标区后第一个字段，重做
+                        var temp = info.Clone();
+                        temp.ChildIndex = 1;
+                        return GetInputInfo(temp,
+            ch,
+            padding_char);
+                        /*
+                        return new InputInfo
+                        {
+                            Text = new string(ch, 1),
+                            Start = end,
+                            End = end
+                        };
+                        */
+                    }
+                }
+                else
+                {
+                    // 普通替换
+                    return new InputInfo
+                    {
+                        Text = new string(ch, 1),
+                        Start = caret_offs_in_field,
+                        End = caret_offs_in_field + 1
+                    };
+                }
+            }
+
+            InputInfo Build24()
+            {
+                var content = field.MergeFullText() + new string(padding_char, 24 - end);
+                // 输入一个字符以后的全部文字
+                content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
+                return new InputInfo
+                {
+                    Text = content.Substring(caret_offs_in_field, 24 - caret_offs_in_field),
+                    Start = caret_offs_in_field,
+                    End = end,
+                };
+            }
+
+            // 将填充部分和需要输入的 ch 结合起来构造一个 replaceText() 动作
+            // 比如字符数不足，但输入的位置不一定在字段末尾(指结束符之前的位置)，就是典型情况。输入和位置和要填充的一段有点距离，是断开的
+            // parameters:
+            //      length  试图要达到的字段长度。包括结束符
+            InputInfo Build(int length)
+            {
+                // 字段结束符左边的位置
+                var pure_end = end - 1;
+                // 填充后要达到的全部文字，注意排除了结束符。因为结束符本来就具备，替换和插入均不影响到它
+                var content = field.MergePureText() + new string(padding_char, (start + length) - pure_end);
+                // 再输入一个字符后要达到的全部文字，注意排除了结束符
+                content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
+                return new InputInfo
+                {
+                    Text = content.Substring(caret_offs_in_field, (pure_end - start) - caret_offs_in_field),
+                    Start = start + caret_offs_in_field,
+                    End = pure_end, // 在结束符左边位置
+                };
+            }
+
+            // 填充，控制字段和普通字段
+            if (padding_char != 0)
+            {
+                if (field.IsControlField)
+                {
+                    if (end < 3 + 1)
+                    {
+                        return Build(3 + 1);
+                    }
+                }
+                else
+                {
+                    if (end < 5 + 1)
+                    {
+                        return Build(5+1);
+                    }
+                }
+            }
+
+            // 在字段结束符以右，或者以左，都只能是插入
+            if (end - 1 <= start + caret_offs_in_field)
+                return new InputInfo
+                {
+                    Text = new string(ch, 1),
+                    Start = end - 1,
+                    End = end - 1
+                };
+            else
+            {
+                // 其余位置替换
+                return new InputInfo
+                {
+                    Text = new string(ch, 1),
+                    Start = start + caret_offs_in_field,
+                    End = start + caret_offs_in_field + 1
+                };
+            }
+        }
+
         // 输入一个字符。根据当前位置，执行替换或者插入
         // parameters:
         //      action  输入的动作。
@@ -1805,7 +2262,7 @@ out int max_pixel_width)
             }
             else if (action == "backspace")
             {
-                // 如果头标区后一字段的开头，则调整为头标区末尾。效果为抹去末尾这个字符为空
+                // 如果在头标区后一字段的开头，则调整为头标区末尾。效果为抹去末尾这个字符为空
                 if (info.TextIndex == 0 && info.ChildIndex == 1)
                 {
                     return true;
@@ -1842,6 +2299,8 @@ out int max_pixel_width)
             }
             else if (action == "return")
             {
+                Debug.Assert(false, "不应这样调用本函数。功能已经由另一函数取代");
+
                 // 如果在头标区的末尾，则调整为下一字符开头
                 if (info.ChildIndex == 0 && info.TextIndex >= 24/*_fields[0].TextLength*/)
                 {
@@ -2243,10 +2702,59 @@ out int count)
         {
             if (_fields == null)
                 return;
-            foreach(var field in _fields)
+            foreach (var field in _fields)
             {
                 field.ClearCache();
             }
+        }
+
+        // return:
+        //      false   没有完成校验。
+        //      true    完成校验。
+        public bool VerifyIndexAndLength(int index, int length,
+            bool throw_exception = true)
+        {
+            if (index < 0)
+            {
+                if (throw_exception)
+                    throw new ArgumentException($"index ({index}) 不应小于 0");
+                return false;
+            }
+            if (index + length > this.FieldCount)
+            {
+                if (throw_exception)
+                    throw new ArgumentException($"index ({index}) length ({length}) 越过字段总数 ({this.FieldCount})");
+                return false;
+            }
+            return true;
+        }
+
+        public int GetFieldIndex(MarcField field)
+        {
+            return _fields.IndexOf(field);
+        }
+
+        // 按照字段名对所有字段重新排序
+        public bool SortFields()
+        {
+            if (_fields.Count < 2)
+            {
+                return false;
+            }
+            // 头标区除外
+            var header = _fields[0];
+            var list = _fields.GetRange(1, _fields.Count - 1)
+                .Select(o => new Tuple<string, MarcField>(o.FieldName, o))
+                .ToList();
+            list.Sort((a, b) =>
+            {
+                return string.CompareOrdinal(a.Item1, b.Item1);
+            });
+            var temp = new List<MarcField>();
+            temp.Add(header);
+            temp.AddRange(list.Select(o => o.Item2));
+            _fields = temp;
+            return true;
         }
     }
 }

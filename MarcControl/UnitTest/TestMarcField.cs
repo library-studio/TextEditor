@@ -329,12 +329,12 @@ namespace LibraryStudio.Forms
             var text = "200abCD$eEFG$hHIJ";
             var is_header = false;
             var offs = 0;
-            var corrent_bounds = new SubfieldBound {
+            var correct_bounds = new SubfieldBound {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -343,7 +343,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "a",
                 StartOffs = 5,
@@ -354,7 +354,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -363,7 +363,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 6;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "a",
                 StartOffs = 5,
@@ -374,7 +374,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -383,7 +383,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 7;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "a",
                 StartOffs = 5,
@@ -394,7 +394,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -403,7 +403,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 8;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "a",
                 StartOffs = 5,
@@ -414,7 +414,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -423,7 +423,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 9;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "a",
                 StartOffs = 5,
@@ -434,7 +434,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -443,7 +443,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 10;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "h",
                 StartOffs = 10,
@@ -454,7 +454,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         [TestMethod]
@@ -463,7 +463,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 14;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "h",
                 StartOffs = 10,
@@ -474,7 +474,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 插入符在末尾。right_most == false
@@ -484,13 +484,13 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 15;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 插入符在末尾。right_most == true
@@ -500,7 +500,7 @@ namespace LibraryStudio.Forms
             var text = "2001 $aAAA$hHHH";
             var is_header = false;
             var offs = 15;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Name = "h",
                 StartOffs = 10,
@@ -511,7 +511,7 @@ namespace LibraryStudio.Forms
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, true);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 插入符在末尾。并且没有字段内容
@@ -521,13 +521,13 @@ namespace LibraryStudio.Forms
             var text = "2001 ";
             var is_header = false;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 插入符在末尾。并且没有字段内容
@@ -537,13 +537,13 @@ namespace LibraryStudio.Forms
             var text = "2001 ";
             var is_header = false;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, true);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 字段名中出现子字段符号
@@ -553,13 +553,13 @@ namespace LibraryStudio.Forms
             var text = "20$1 ";
             var is_header = false;
             var offs = 2;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 指示符少一位，$ 字符进入了指示符范围
@@ -569,13 +569,13 @@ namespace LibraryStudio.Forms
             var text = "2001$a";
             var is_header = false;
             var offs = 4;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 字段内容前部出现一段不在任何子字段中的内容
@@ -585,13 +585,13 @@ namespace LibraryStudio.Forms
             var text = "2001 KK$aAAA";
             var is_header = false;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 字段内容前部出现一段不在任何子字段中的内容
@@ -601,13 +601,13 @@ namespace LibraryStudio.Forms
             var text = "2001 KK$aAAA";
             var is_header = false;
             var offs = 6;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 头标区
@@ -617,13 +617,13 @@ namespace LibraryStudio.Forms
             var text = "012345678901234567890123";
             var is_header = true;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 头标区。有一个子字段符号
@@ -633,13 +633,13 @@ namespace LibraryStudio.Forms
             var text = "012345678901$34567890123";
             var is_header = true;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 001 字段。有子字段符号
@@ -647,15 +647,15 @@ namespace LibraryStudio.Forms
         public void GetSubfieldBounds_22()
         {
             var text = "001$aAAA$bBBB";
-            var is_header = true;
+            var is_header = false;
             var offs = 5;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
         // 001 字段。有子字段符号
@@ -663,18 +663,18 @@ namespace LibraryStudio.Forms
         public void GetSubfieldBounds_23()
         {
             var text = "001$aAAA$bBBB";
-            var is_header = true;
+            var is_header = false;
             var offs = 10;
-            var corrent_bounds = new SubfieldBound
+            var correct_bounds = new SubfieldBound
             {
                 Found = false
             };
             var field = BuildField(text, is_header);
             var ret = field.GetSubfieldBounds(offs, false);
-            Assert.AreEqual(corrent_bounds.ToString(), ret.ToString());
+            Assert.AreEqual(correct_bounds.ToString(), ret.ToString());
         }
 
-        static MarcField BuildField(string text, bool isHeader = false)
+        public static MarcField BuildField(string text, bool isHeader = false)
         {
             text = text.Replace("$", new string(Metrics.SubfieldCharDefault, 1));
             var property = new Metrics();

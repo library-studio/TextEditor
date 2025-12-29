@@ -71,6 +71,7 @@
   <ItemGroup>
     <Content Include="Design.txt" />
     <Content Include="FontFamily.xml" />
+    <Content Include="refactor.txt" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="EditControl1.resx">

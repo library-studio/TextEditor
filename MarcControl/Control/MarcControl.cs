@@ -3,14 +3,18 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Vanara.PInvoke;
+using static LibraryStudio.Forms.MarcRecord;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
 using static Vanara.PInvoke.User32;
+using static Vanara.PInvoke.User32.RAWINPUT;
 
 namespace LibraryStudio.Forms
 {
@@ -63,6 +67,12 @@ namespace LibraryStudio.Forms
 
         public MarcControl()
         {
+            /*
+            this.SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            this.UpdateStyles();
+            this.DoubleBuffered = true; // 备份保证
+            */
+
             _fieldProperty = new Metrics()
             {
                 GetReadOnly = (o) => this.ReadOnly,
@@ -82,91 +92,6 @@ namespace LibraryStudio.Forms
             _dpiXY = DpiUtil.GetDpiXY(this);
 
             _context = GetDefaultContext();
-        }
-
-        public IContext GetDefaultContext()
-        {
-            /*
-            return new Context {
-                GetFont = (o, t) =>
-                {
-                    return ContentFontGroup;
-                }
-            };
-            */
-            return new Context
-            {
-                SplitRange = (o, content) =>
-                {
-                    // return SimpleText.SegmentSubfields(content, '\x001f', true); // 只能让子字段符号一个字符显示为特殊颜色
-                    // return SimpleText.SegmentSubfields2(content, '\x001f', 2, true);
-                    return MarcField.SegmentSubfields(content, '\x001f', 2);
-                },
-                ConvertText = (text) =>
-                {
-                    // ꞏ▼▒■☻ⱡ⸗ꜜꜤꞁꞏסּ⁞
-
-                    // TODO: 可以考虑把英文空格和中文空格显示为易于辨识的特殊字符
-                    return text.Replace("\x001f", "▼").Replace("\x001e", "ꜜ");
-                },
-                GetForeColor = (o, highlight) =>
-                {
-                    if (highlight)
-                        return _fieldProperty?.HightlightForeColor ?? SystemColors.HighlightText;
-                    var range = o as Range;
-                    if (range != null
-                        && range.Tag is MarcField.Tag tag
-                        && tag.Delimeter)
-                        return _fieldProperty?.DelimeterForeColor ?? Metrics.DefaultDelimeterForeColor; // 子字段名文本为红色
-                    if (this._readonly)
-                        return _fieldProperty?.ReadOnlyForeColor ?? SystemColors.ControlText;
-                    return _fieldProperty?.ForeColor ?? SystemColors.WindowText;
-                },
-                GetBackColor = (o, highlight) =>
-                {
-                    if (highlight)
-                        return _fieldProperty?.HighlightBackColor ?? SystemColors.Highlight;
-                    var range = o as Range;
-                    if (range != null
-                        && range.Tag is MarcField.Tag tag
-                        && tag.Delimeter)
-                        return _fieldProperty?.DelimeterBackColor ?? Metrics.DefaultDelimeterBackColor; // 子字段名文本为红色
-                    if (range != null)
-                        return Color.Transparent;
-                    if (this._readonly)
-                    {
-                        return _fieldProperty?.ReadOnlyBackColor ?? SystemColors.Control;
-                        // backColor = ControlPaint.Dark(backColor, 0.01F);
-                    }
-                    var backColor = _fieldProperty?.BackColor ?? SystemColors.Window;
-                    return backColor;
-                },
-                PaintBack = _paintBackfunc,
-                GetFont = (o, t) =>
-                {
-                    if (t is MarcField.Tag tag
-                        && tag.Delimeter)
-                        return FixedFontGroup;
-
-                    if (o is IBox)
-                    {
-                        var line = o as IBox;
-                        if (line.Name == "name" || line.Name == "indicator")
-                            return FixedFontGroup;
-                        else if (line.Name == "caption")
-                            return CaptionFontGroup;
-                        else if (line.Name == "content")
-                        {
-                            var field = line.Parent as MarcField;
-                            if (field.IsHeader)
-                                return FixedFontGroup;
-                            else
-                                return ContentFontGroup;
-                        }
-                    }
-                    return ContentFontGroup;
-                }
-            };
         }
 
         void _paintBackfunc(object o,
@@ -344,7 +269,7 @@ namespace LibraryStudio.Forms
         void EnsureCaptionFont(Font ref_font)
         {
             float size = ref_font?.SizeInPoints ?? 9f;
-            string familyName = "楷体";
+            string familyName = this.Font.FontFamily.Name;  //  "宋体";
             bool found = System.Drawing.FontFamily.Families.Any(f => string.Equals(f.Name, familyName, StringComparison.OrdinalIgnoreCase));
             try
             {
@@ -387,6 +312,9 @@ namespace LibraryStudio.Forms
 
         bool _changed = false;
 
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public bool Changed
         {
             get { return _changed; }
@@ -415,7 +343,6 @@ namespace LibraryStudio.Forms
                 {
                     // 清除 DOM 结构中的所有 ColorCache，迫使重新获取颜色显示
                     this._record.ClearCache();
-
                     this.Invalidate();
                 }
             }
@@ -445,12 +372,16 @@ namespace LibraryStudio.Forms
 
         #endregion
 
+
         protected override void OnPaint(PaintEventArgs e)
         {
             int x = -this.HorizontalScroll.Value;
             int y = -this.VerticalScroll.Value;
 
             var clipRect = e.ClipRectangle;
+
+
+#if REMOVED
             // 绘制背景色
             {
 
@@ -460,13 +391,14 @@ namespace LibraryStudio.Forms
                     e.Graphics.FillRectangle(brush, clipRect);
                 }
 
+                var height = this.AutoScrollMinSize.Height - FontContext.DefaultFontHeight;
                 // 绘制提示文字区的底色
                 {
                     var left_rect = new Rectangle(
                             x,
                             y,
                             _fieldProperty.CaptionPixelWidth,
-                            this.AutoScrollMinSize.Height);
+                            height);
                     if (clipRect.IntersectsWith(left_rect))
                     {
                         using (var brush = new SolidBrush(_fieldProperty?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor))
@@ -482,7 +414,7 @@ namespace LibraryStudio.Forms
         x + _fieldProperty.CaptionPixelWidth,
         y,
         _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
-        this.AutoScrollMinSize.Height);
+        height);
                     if (clipRect.IntersectsWith(left_rect))
                     {
                         using (var brush = new SolidBrush(_fieldProperty?.SolidColor ?? Metrics.DefaultSolidColor))
@@ -499,27 +431,26 @@ namespace LibraryStudio.Forms
         x + _fieldProperty.SolidX,
         y + 0,
         _fieldProperty.SolidPixelWidth,
-        this.AutoScrollMinSize.Height,
+        height,
         _fieldProperty.BorderThickness);
                 }
             }
+#endif
 
             var handle = e.Graphics.GetHdc();
             var dc = new SafeHDC(handle);
             // var families = System.Drawing.FontFamily.Families;
 
-            var old_mode = Gdi32.SetBkMode(dc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+            this._record.PaintBack(
+                _context,
+                dc,
+                x,
+                y,
+                clipRect,
+                _caretInfo.ChildIndex);
 
-            // var dc = CreateCompatibleDC(handle);
-            /*
-            var fnt = CreateFont(20, 
-                iQuality: OutputQuality.PROOF_QUALITY,
-                iPitchAndFamily: PitchAndFamily.DEFAULT_PITCH | PitchAndFamily.FF_ROMAN, 
-                pszFaceName: "Times New Roman");
-            //var brush = CreateSolidBrush(new COLORREF(0,0,0));
-            */
-            //dc.SelectObject(this.Font.ToHfont());
-            //SelectBrush(dc, brush);
+            // var old_mode = Gdi32.SetBkMode(dc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+
             try
             {
                 /*
@@ -531,8 +462,6 @@ namespace LibraryStudio.Forms
                 */
                 Debug.Assert(_initialized == true);
 
-                // Gdi32.GetViewportOrgEx(this.Handle, out POINT p);
-
                 _record.Paint(
                     _context,
                     dc,
@@ -542,6 +471,7 @@ namespace LibraryStudio.Forms
                     _blockOffs1,
                     _blockOffs2,
                     0);
+
             }
             finally
             {
@@ -552,6 +482,23 @@ namespace LibraryStudio.Forms
 
             // base.OnPaint(e);
             // Custom painting code can go here
+        }
+
+        Rectangle GetFocusRect()
+        {
+            if (_caretInfo.ChildIndex >= this._record.FieldCount)
+            {
+                var index = this._record.FieldCount;
+                return new Rectangle(_fieldProperty.NameBorderX,
+                this._record.GetFieldY(index),
+    AutoScrollMinSize.Width - _fieldProperty.NameBorderX,
+    FontContext.DefaultFontHeight);
+            }
+            var field = this._record.GetField(_caretInfo.ChildIndex);
+            return new Rectangle(_fieldProperty.NameBorderX,
+                this._record.GetFieldY(_caretInfo.ChildIndex),
+                AutoScrollMinSize.Width - _fieldProperty.NameBorderX,
+                field.GetPixelHeight());
         }
 
 
@@ -578,7 +525,7 @@ namespace LibraryStudio.Forms
 #endif
 
                 // _initialized = false;
-                Relayout(value);
+                Relayout(value, true);
 
                 // _caretInfo = new HitInfo();
                 MoveCaret(HitByGlobalOffs(_global_offs + 1, -1));
@@ -587,55 +534,6 @@ namespace LibraryStudio.Forms
             }
         }
 
-        //SCRIPT_PROPERTIES[] sp = null;
-        //SCRIPT_DIGITSUBSTITUTE sub;
-        //SCRIPT_CONTROL sc;
-        //SCRIPT_STATE ss;
-
-        //SafeSCRIPT_CACHE _cache = null;
-
-        // int _line_height = 20;
-
-        HitInfo _caretInfo = new HitInfo();
-
-        public HitInfo CaretInfo
-        {
-            get
-            {
-                return _caretInfo?.Clone() ?? new HitInfo();
-            }
-        }
-
-        // 当前插入符所在的字段 index。如果为 -1 表示不在任何字段上(可能是当前 MARC 内容为空)
-        public int CaretFieldIndex
-        {
-            get
-            {
-                return _caretInfo?.ChildIndex ?? -1;
-            }
-        }
-
-#if REMOVED
-        void InitializeEnvironment()
-        {
-            var result = ScriptGetProperties(out sp);
-            result.ThrowIfFailed();
-
-            result = ScriptRecordDigitSubstitution(LCID.LOCALE_CUSTOM_DEFAULT,
-                out sub);
-            result.ThrowIfFailed();
-
-            result = ScriptApplyDigitSubstitution(sub,
-                out sc,
-                out ss);
-            result.ThrowIfFailed();
-
-            _cache = new SafeSCRIPT_CACHE();
-
-        }
-#endif
-
-        Metrics _fieldProperty = new Metrics();
 
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -647,23 +545,31 @@ namespace LibraryStudio.Forms
             {
                 Rectangle update_rect = System.Drawing.Rectangle.Empty;
                 _fieldProperty.GetFieldCaption = value;
-                using (var g = this.CreateGraphics())
+                if (_disableUpdate == 0)
                 {
-                    var handle = g.GetHdc();
-                    using (var dc = new SafeHDC(handle))
+                    using (var g = this.CreateGraphics())
                     {
-                        _record.UpdateAllCaption(
-                            _context,
-                            dc,
-                            out update_rect);
+                        var handle = g.GetHdc();
+                        using (var dc = new SafeHDC(handle))
+                        {
+                            _record.UpdateAllCaption(
+                                _context,
+                                dc,
+                                out update_rect);
+                        }
+                        int x = -this.HorizontalScroll.Value;
+                        int y = -this.VerticalScroll.Value;
+                        if (update_rect != System.Drawing.Rectangle.Empty)
+                        {
+                            update_rect.Offset(x, y);
+                            this.Invalidate(update_rect);
+                        }
                     }
+
                 }
-                int x = -this.HorizontalScroll.Value;
-                int y = -this.VerticalScroll.Value;
-                if (update_rect != System.Drawing.Rectangle.Empty)
+                else
                 {
-                    update_rect.Offset(x, y);
-                    this.Invalidate(update_rect);
+                    _invalidateCount++;
                 }
             }
         }
@@ -671,7 +577,6 @@ namespace LibraryStudio.Forms
         // List<Line> _lines = new List<Line>();
         MarcRecord _record = null;  // new MarcRecord(_fieldProperty);
 
-        IContext _context = null;
 
 
         void InitializeContent(SafeHDC dc,
@@ -783,6 +688,7 @@ namespace LibraryStudio.Forms
             {
                 Utility.Offset(ref scroll_rect, x, y);
                 if (scroll_rect.IsEmpty == false)
+                {
                     User32.ScrollWindowEx(this.Handle,
                         0,
                         scroll_distance,
@@ -791,6 +697,8 @@ namespace LibraryStudio.Forms
                         HRGN.NULL,
                         out _,
                         ScrollWindowFlags.SW_INVALIDATE);
+                    _invalidateCount++;
+                }
             }
             Utility.Offset(ref update_rect, x, y);
             if (update_rect.IsEmpty == false)
@@ -826,6 +734,8 @@ namespace LibraryStudio.Forms
                 this.SetAutoSizeMode(AutoSizeMode.GrowAndShrink);
                 if (_clientBoundsWidth == -1)
                     max_pixel_width = Math.Max(this.AutoScrollMinSize.Width, max_pixel_width);
+
+                // .Height 设置后，可能会改变垂直卷滚条是否出现的状态，改变 AutoScrollMinSize.Width，会再次触发(OnResize() 中的) Relayout()
                 this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
             }
         }
@@ -1029,30 +939,24 @@ out long left_width);
 
             // 重新创建一次 Caret，改变 caret 高度
             RecreateCaret();
+            // TODO: 根据 _global_offs 重新定位一次 Caret。但遗憾的是 _lastX 应该改变，但尚无方法
         }
 
-        void RecreateCaret()
-        {
-            // 重新创建一次 Caret，改变 caret 高度
-            if (_caretCreated)
-            {
-                User32.DestroyCaret();
-                User32.CreateCaret(this.Handle, new HBITMAP(IntPtr.Zero), 2/*_line_height / 5*/, _caretInfo.LineHeight == 0 ? this.Font.Height : _caretInfo.LineHeight);
-                if (this.Focused)
-                    User32.ShowCaret();
-            }
-        }
+        // 大于 0 则表示禁止响应 OnResize()
+        // 可以用于中途禁止响应 OnResize()，等一切确定以后再专门 Relayout() 一次
+        int _disableResize = 0;
 
         int _lastWidth = 0;
 
         protected override void OnResize(EventArgs e)
         {
-            if (_clientBoundsWidth == 0)
+            if (_clientBoundsWidth == 0
+                && _disableResize == 0)
             {
                 var current_width = this.ClientSize.Width;
                 if (current_width != _lastWidth)    // 减少大量无谓的调用
                 {
-                    Relayout();
+                    Relayout(this._record.MergeText(), false);
                     _lastWidth = this.ClientSize.Width;
                 }
             }
@@ -1060,6 +964,7 @@ out long left_width);
             base.OnResize(e);
         }
 
+        /*
         public void Relayout()
         {
             // 迫使重新布局 Layout
@@ -1069,10 +974,13 @@ out long left_width);
 
             this.Invalidate();
         }
+        */
 
+        // 重新布局。
+        // 注意本函数默认不会自动调整 Caret 和 Block Start End 数值
         void Relayout(
             string text,
-            bool auto_adjust_global_offs = true)
+            bool auto_adjust_global_offs = false)
         {
             // if (_initialized == false)
             {
@@ -1130,6 +1038,7 @@ out long left_width);
             {
                 Utility.Offset(ref scroll_rect, x, y);
                 if (scroll_rect.IsEmpty == false)
+                {
                     User32.ScrollWindowEx(this.Handle,
                         0,
                         scroll_distance,
@@ -1138,6 +1047,8 @@ out long left_width);
                         HRGN.NULL,
                         out _,
                         ScrollWindowFlags.SW_INVALIDATE);
+                    _invalidateCount++;
+                }
             }
 
             if (text == null)
@@ -1179,18 +1090,29 @@ out long left_width);
             this.SetAutoSizeMode(AutoSizeMode.GrowAndShrink);
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
             */
-            ChangeDocumentSize(max_pixel_width);
 
             // 自动调整 _global_offs 的范围
             if (auto_adjust_global_offs)
             {
-                int delta = text.Length - (end - start);
-                if (_global_offs >= start)
-                    _global_offs += delta;
-                if (_blockOffs1 >= start)
-                    _blockOffs1 += delta;
-                if (_blockOffs2 >= start)
-                    _blockOffs2 += delta;
+                int e = start + replaced_text.Length;
+                int delta = text.Length - (replaced_text.Length/*end - start*/);
+                SetGlobalOffs(Adjust(_global_offs, start, e, delta));
+                _blockOffs1 = Adjust(_blockOffs1, start, e, delta);
+                _blockOffs2 = Adjust(_blockOffs2, start, e, delta);
+            }
+
+            // 会改变 _blockOffs2 的 bug 已经解决。临时禁用了 OnResize()
+            ChangeDocumentSize(max_pixel_width);
+
+
+            int Adjust(int v, int s, int e, int delta)
+            {
+                if (v >= e)
+                    v += delta;  // 插入符在块尾部以右的，向左移动
+                else if (v >= s)
+                    v = s;   // 插入符在块中间的，归为块首
+                Debug.Assert(v >= 0 && v <= _content_length);
+                return v;
             }
 
             if (this.Focused)
@@ -1216,23 +1138,29 @@ out long left_width);
             return ret;
         }
 
-        bool _caretCreated = false;
 
         protected override void OnGotFocus(EventArgs e)
         {
             if (_caretCreated == false)
             {
+#if REMOVED
                 // Create a solid black caret. 
                 User32.CreateCaret(this.Handle, new HBITMAP(IntPtr.Zero), 2/*_line_height / 5*/, _caretInfo.LineHeight == 0 ? this.Font.Height : _caretInfo.LineHeight);
+#endif
+                CreateCaret();
                 _caretCreated = true;
             }
 
             // Display the caret. 
             User32.ShowCaret(this.Handle);
 
+            /*
             // Adjust the caret position, in client coordinates. 
             User32.SetCaretPos(-this.HorizontalScroll.Value + _caretInfo.X,
                 -this.VerticalScroll.Value + _caretInfo.Y);
+            */
+            OnFocusedIndexChanged();
+            RefreshCaret();
 
             SetCompositionWindowPos();
 
@@ -1247,156 +1175,13 @@ out long left_width);
                 User32.DestroyCaret();
                 _caretCreated = false;
             }
+            OnFocusedIndexChanged();
             base.OnLostFocus(e);
         }
 
         bool _isMouseDown = false;
-        int _blockOffs1 = 0;    // -1;   // 选中范围开始的偏移量
-        int _blockOffs2 = 0;    // -1;   // 选中范围的结束的偏移量
 
-        // 文字块的起始偏移量
-        public int BlockStartOffset
-        {
-            get { return _blockOffs1; }
-            //get { return Math.Min(_blockOffs1, _blockOffs2); }
-        }
 
-        // 文字块的结束偏移量
-        public int BlockEndOffset
-        {
-            get { return _blockOffs2; }
-            //get { return Math.Max(_blockOffs1, _blockOffs2); }
-        }
-
-        private int _global_offs = 0; // Caret 全局偏移量。
-
-        // 插入符全局偏移量
-        public int CaretOffset
-        {
-            get { return _global_offs; }
-        }
-
-        void SetGlobalOffs(int offs)
-        {
-            if (_global_offs != offs)
-            {
-                _global_offs = offs;
-                //if (trigger_event)
-                //    this.CaretMoved?.Invoke(this, new EventArgs());
-            }
-        }
-
-        void AdjustGlobalOffs(int delta)
-        {
-            if (delta != 0)
-            {
-                _global_offs += delta;
-                // this.CaretMoved?.Invoke(this, new EventArgs());
-            }
-        }
-
-        // 检测分割条和 Caption 区域
-        // return:
-        //      -2  Caption 区域
-        //      -1  Splitter 区域
-        //      0   其它区域(包括 name indicator 和 content 区域)
-        int TestSplitterArea(int x)
-        {
-            x += this.HorizontalScroll.Value;   // 窗口坐标变换为内容坐标
-            return _fieldProperty.TestSplitterArea(x);
-        }
-
-        #region 选择多个字段
-
-        // 开始选择完整字段的开始 index (字段下标)
-        // TODO: start 要永久记忆，MouseUp 之后也要记忆。另外用一个 bool 变量表示是否正在拖动之中
-        bool _selecting_field = false;   // 是否正在选择字段过程中? 
-        int _select_field_start = -1;
-        int _select_field_end = -1;
-
-        bool InSelectingField()
-        {
-            return _selecting_field;
-        }
-
-        void BeginFieldSelect(int index)
-        {
-            // 如果是按住 Ctrl 键进入本函数，则要汇总当前已有的 offs range 对应的 field index start end range，以便开始在此基础上修改选择
-            if (_shiftPressed || _controlPressed)
-            {
-                // Ctrl 键被按下的时候，观察 _select_field_start 是否有以前
-                // 残留的值，如果有则说明刚点选过(完整)字段，可以直接利用
-
-                if (_select_field_start == -1)
-                    _select_field_start = index;
-                _select_field_end = index;  // 尾部则用最新 index 充当
-                // Debug.WriteLine($"start={_select_field_start} end={_select_field_end}");
-            }
-            else
-            {
-                _select_field_start = index;
-                _select_field_end = index;
-            }
-
-            _selecting_field = true;
-            UpdateFieldSelection();
-        }
-
-        void AdjustFieldSelect(int index)
-        {
-            if (_selecting_field == false)
-                return;
-
-            if (_select_field_end == index)
-                return; // 没有变化
-
-            if (index < 0 || index > this._record.FieldCount)
-                return;
-
-            _select_field_end = index;
-
-            UpdateFieldSelection();
-        }
-
-        // 更新 field offs range 和显示
-        void UpdateFieldSelection()
-        {
-            int start_index = Math.Min(_select_field_start, _select_field_end);
-            int end_index = Math.Max(_select_field_start, _select_field_end);
-            int count = end_index - start_index + 1;
-
-            if (start_index + count > _record.FieldCount)
-                count = _record.FieldCount - start_index;
-
-            if (count == 0)
-                return;
-
-            var ret = _record.GetContiguousFieldOffsRange(start_index,
-                count,
-                out int start_offs,
-                out int end_offs);
-            if (ret == true)
-            {
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-                _blockOffs1 = start_offs;
-                _blockOffs2 = end_offs;
-                InvalidateBlockRegion();
-            }
-        }
-
-        void EndFieldSelect()
-        {
-            if (_shiftPressed || _controlPressed)
-            {
-                // 中途不改变 _selecting_field
-            }
-            else
-            {
-                _selecting_field = false;
-            }
-        }
-
-        #endregion
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
@@ -1440,159 +1225,67 @@ out long left_width);
                     return;
                 }
 
-#if DEBUG
-                // Debug.Assert(result.Offs == _record.GetGlobalOffs(result));
-#endif
+                if (splitter_test >= 0
+                    && IsCursorInBlockRegion(e))
+                {
+                    BeginDragBlock(1);
+                    base.OnMouseDown(e);
+                    return;
+                }
+
+                SetCaret(result, reset_selection: true);
+#if REMOVED
                 SetGlobalOffs(result.Offs);
 
-#if DEBUG
                 Debug.Assert(_global_offs <= _content_length);
-#endif
 
-                /*
-                var save_offs1 = _blockOffs1;
-                var save_offs2 = _blockOffs2;
-                */
                 DetectBlockChange1(_blockOffs1, _blockOffs2);
 
                 _blockOffs1 = _global_offs;
                 _blockOffs2 = _global_offs;
 
-                // 块定义发生了变化，刷新显示
-                /*
-                if (save_offs1 != _blockOffs1
-                    || save_offs2 != _blockOffs2)
-                {
-                    // this.Invalidate();
-                    InvalidateBlock(save_offs1, _blockOffs1);
-                    InvalidateBlock(save_offs2, _blockOffs2);
-                }
-                */
                 InvalidateBlockRegion();
 
                 MoveCaret(result);
+#endif
             }
             base.OnMouseDown(e);
         }
 
-        // 分割条拖动过程中的 x 位置
-        int _splitterX = 0;
-        int _splitterStartX = 0;
-        bool _splitting = false;
+        #region 当前焦点所在的字段，显示一种醒目的视觉状态
 
-        void StartSplitting(int x)
+        int _lastFocusedFieldIndex = -1;
+
+        // 当焦点 field index 变化时，失效需要刷新的标志区域
+        void OnFocusedIndexChanged()
         {
-            _splitterX = x;
-            _splitterStartX = x;
-
-            _splitting = true;
-
-            DrawTraker();
-        }
-
-        void MoveSplitting(int x)
-        {
-            Cursor = Cursors.SizeWE;
-
-            // 消上次残余的一根
-            DrawTraker();
-
-            _splitterX = x;
-
-            // 绘制本次的一根
-            DrawTraker();
-        }
-
-        bool FinishSplitting(int x)
-        {
-            // 消最后残余的一根
-            DrawTraker();
-
-            // 计算差额
-            var delta = _splitterX - _splitterStartX;
-
-            var changed = _fieldProperty.DeltaCaptionWidth(delta);
-            /*
-            _fieldProperty.CaptionPixelWidth += delta;
-            _fieldProperty.CaptionPixelWidth = Math.Max(_fieldProperty.SplitterPixelWidth, _fieldProperty.CaptionPixelWidth);
-            */
-
-            _splitting = false;
-            _splitterStartX = 0;
-            _splitterX = 0;
-            if (changed)
+            var current_index = _caretInfo.ChildIndex;
+            if (_caretCreated == false)
+                current_index = -1; // 表示需要消除 focued 标志显示
+            else if (current_index != _lastFocusedFieldIndex)
             {
-                Relayout();
-                return true;
+                int x = -this.HorizontalScroll.Value;
+                int y = -this.VerticalScroll.Value;
+
+                var values = new List<int>();
+                if (current_index >= 0)
+                    values.Add(current_index);
+                if (_lastFocusedFieldIndex >= 0)
+                    values.Add(_lastFocusedFieldIndex);
+                var rects = this._record.GetFocusedRect(
+            x,
+            y,
+            values.ToArray());
+                foreach (var rect in rects)
+                {
+                    if (rect != System.Drawing.Rectangle.Empty)
+                        this.Invalidate(rect);
+                }
+                _lastFocusedFieldIndex = current_index;
             }
-            return false;
         }
 
-        void DrawTraker()
-        {
-            // Debug.WriteLine($"_splitterX={_splitterX}");
-
-            Point p1 = new Point(_splitterX, 0);
-            p1 = this.PointToScreen(p1);
-
-            Point p2 = new Point(_splitterX, this.ClientSize.Height);
-            p2 = this.PointToScreen(p2);
-
-            /*
-            // 获取当前屏幕的 DPI 缩放因子
-            // float dpiScale = this.DeviceDpi / 96f;
-            // 逻辑坐标转为物理像素
-            p1 = this.PointToScreen(DpiUtil.Get96ScalingPoint(_dpiXY, p1));
-            p2 = this.PointToScreen(DpiUtil.Get96ScalingPoint(_dpiXY, p2));
-            */
-
-            // 注意，必须用当前屏幕的实际 DPI 来绘制
-            ControlPaint.DrawReversibleLine(p1,
-                p2,
-                SystemColors.Control);
-        }
-
-        // parameters:
-        //      conditional_trigger   是否有条件地触发事件
-        //                          所谓条件就是，和前一次的 global_offs 要有不同才会触发事件。常用于 OnMouseUp() 时，因为 OnMouseDown() 已经触发一次事件了
-        void MoveCaret(HitInfo result,
-            bool ensure_caret_visible = true,
-            bool conditional_trigger = false)
-        {
-            var old_offs = _caretInfo?.Offs ?? 0;
-            /*
-            if (result.LineHeight == 0)
-                return;
-            Debug.Assert(result.LineHeight != 0);
-            */
-            var old_caret_height = _caretInfo?.LineHeight ?? 0;
-            _caretInfo = result;
-
-            if (ensure_caret_visible)
-                EnsureCaretVisible();
-
-            if (old_caret_height != _caretInfo?.LineHeight)
-            {
-                RecreateCaret();
-            }
-
-            if (_caretCreated)
-            {
-                User32.HideCaret(this.Handle);
-                User32.SetCaretPos(-this.HorizontalScroll.Value + _caretInfo.X,
-                    -this.VerticalScroll.Value + _caretInfo.Y);
-                User32.ShowCaret(this.Handle);
-            }
-
-            SetCompositionWindowPos();
-
-            if (conditional_trigger && old_offs == (_caretInfo?.Offs ?? 0))
-            {
-
-            }
-            else
-                this.CaretMoved?.Invoke(this, EventArgs.Empty);
-        }
+        #endregion
 
         protected override void OnMouseUp(MouseEventArgs e)
         {
@@ -1613,6 +1306,14 @@ out long left_width);
                 return;
             }
 
+            // 结束拖动文字块过程
+            if (InDraggingBlock() == 2)
+            {
+                CompleteDragBlock();
+                base.OnMouseUp(e);
+                return;
+            }
+
             if (InSelectingField())
             {
                 EndFieldSelect();
@@ -1621,35 +1322,59 @@ out long left_width);
                 return;
             }
 
-            // 选中范围结束
             {
                 var result = _record.HitTest(
                     e.X + this.HorizontalScroll.Value,
                     e.Y + this.VerticalScroll.Value);
 
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-                var old_offs = _global_offs;
-
-                if (old_offs != result.Offs)
-                    SetGlobalOffs(result.Offs); // _record.GetGlobalOffs(result);
+                // 曾进入拖拽阶段 1，但直到 MouseUp 也没有经历过 MouseMove
+                // 延迟兑现鼠标点击的功能
+                if (InDraggingBlock() == 1)
+                {
+                    CompleteDragBlock();
+                    SetCaret(result, reset_selection: true);
+                    base.OnMouseUp(e);
+                    return;
+                }
 
                 {
-                    _blockOffs2 = _global_offs;
+                    // 选中范围结束
+                    DetectBlockChange1(_blockOffs1, _blockOffs2);
+                    var old_offs = _global_offs;
 
-                    var changed = DetectBlockChange2(_blockOffs1, _blockOffs2);
+                    if (old_offs != result.Offs)
+                        SetGlobalOffs(result.Offs); // _record.GetGlobalOffs(result);
 
-                    MoveCaret(result, true, true/*有条件地触发事件*/);
-
-                    _lastX = _caretInfo.X; // 记录最后一次点击鼠标 x 坐标
-
-                    if (changed)
                     {
-                        //this.BlockChanged?.Invoke(this, new EventArgs());
+                        MoveCaret(result, true, true/*有条件地触发事件*/);
+                        _lastX = _caretInfo.X; // 记录最后一次点击鼠标 x 坐标
 
-                        // TODO: 可以改进为只失效影响到的 Line
-                        // this.Invalidate(); // 重绘
-                        InvalidateBlockRegion();
+                        ChangeSelection(() =>
+                        {
+                            _blockOffs2 = _global_offs;
+                        });
                     }
+#if OLD
+                    {
+                        _blockOffs2 = _global_offs;
+
+                        var changed = DetectBlockChange2(_blockOffs1, _blockOffs2);
+
+                        MoveCaret(result, true, true/*有条件地触发事件*/);
+
+                        _lastX = _caretInfo.X; // 记录最后一次点击鼠标 x 坐标
+
+                        if (changed)
+                        {
+                            //this.BlockChanged?.Invoke(this, new EventArgs());
+
+                            // TODO: 可以改进为只失效影响到的 Line
+                            // this.Invalidate(); // 重绘
+                            InvalidateBlockRegion();
+                        }
+                    }
+#endif
+
                 }
             }
             base.OnMouseUp(e);
@@ -1664,12 +1389,12 @@ out long left_width);
                 return;
             }
 
-            var result = _record.HitTest(
-    e.X + this.HorizontalScroll.Value,
-    e.Y + this.VerticalScroll.Value);
-
             if (_isMouseDown)
             {
+                var result = _record.HitTest(
+e.X + this.HorizontalScroll.Value,
+e.Y + this.VerticalScroll.Value);
+
                 // 鼠标选择字段时拖动进入这里。而如果是按住 Ctrl 或 Shift 点选，则不应进入这里
                 if (InSelectingField())
                 {
@@ -1677,36 +1402,66 @@ out long left_width);
                     {
                         AdjustFieldSelect(result.ChildIndex);
                     }
+
+                    SetGlobalOffs(result.Offs);
+                    MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
                 }
 
+                var splitter_test = TestSplitterArea(e.X);
+
+                // 如果光标是首次进入块范围
+                if (splitter_test >= 0
+                    && InDraggingBlock() == 1
+                    && IsCursorInBlockRegion(e))
+                {
+                    BeginDragBlock(2);
+                    SetGlobalOffs(result.Offs);
+                    MoveCaret(result);
+                    base.OnMouseMove(e);
+                    return;
+                }
+
+                // 正在拖动文字块中途
+                if (InDraggingBlock() == 2)
+                {
+                    // 拖入块范围内，显示表示禁止的光标形状
+                    if (IsCursorInBlockRegion(e))
+                    {
+                        Cursor = Cursors.No;
+                    }
+                    else
+                    {
+                        Cursor = Cursors.Arrow;
+                        // Cursor = GetMoveCursor();
+                    }
+
+                    SetGlobalOffs(result.Offs);
+                    MoveCaret(result);
+                    base.OnMouseMove(e);
+                    return;
+                }
+
+                // 按下鼠标左键，拖动定义文字块
                 SetGlobalOffs(result.Offs);
 
                 if (_blockOffs2 != _global_offs)
                 {
-                    /*
-                    var save_offs1 = _blockOffs1;
-                    var save_offs2 = _blockOffs2;
-                    */
-                    DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                    _blockOffs2 = _global_offs;
-                    /*
-                    _caretInfo = result;
-
-                    User32.HideCaret(this.Handle);
-                    User32.SetCaretPos(_caretInfo.X, _caretInfo.Y);
-                    User32.ShowCaret(this.Handle);
-                    */
                     SetGlobalOffs(result.Offs);
                     MoveCaret(result);
 
-                    //this.BlockChanged?.Invoke(this, new EventArgs());
+                    ChangeSelection(() =>
+                    {
+                        _blockOffs2 = _global_offs;
+                    });
+                    /*
+                    DetectBlockChange1(_blockOffs1, _blockOffs2);
 
-                    // TODO: 可以改进为只失效影响到的 Line
-                    // this.Invalidate(); // 重绘
+                    _blockOffs2 = _global_offs;
+
                     InvalidateBlockRegion();
+                    */
                 }
             }
             else
@@ -1716,18 +1471,61 @@ out long left_width);
                 if (splitter_test == -1)
                     Cursor = Cursors.SizeWE;
                 else if (splitter_test >= 0)
-                    Cursor = Cursors.IBeam;
+                {
+                    // 判断光标是否在 block region 范围内
+                    if (IsCursorInBlockRegion(e))
+                    {
+                        // 箭头光标形状，暗示文字块可以被拖动。
+                        // TODO: 或者改用更贴合这个意思的带有可移动按时的某种箭头光标形状
+                        Cursor = Cursors.Arrow;
+                    }
+                    else
+                    {
+                        Cursor = Cursors.IBeam;
+                    }
+                }
                 else
+                {
                     Cursor = Cursors.Arrow;
+                }
             }
 
             base.OnMouseMove(e);
         }
 
-        bool _shiftPressed = false; // Shift 键是否按下
-        bool _controlPressed = false;
 
-        int _lastX = 0;  // 最后一次左右移动，点击设置插入符的位置信息。用于确定上下移动的初始 x 值
+
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            // 因为会受到 OnMouseUp() 的影响(会在鼠标抬起时被修改块定义)，所以放到稍后来执行
+            Task.Run(() =>
+            {
+                this.Invoke((Action)new Action(() =>
+                {
+                    SelectCaretSubfield();
+                }));
+            });
+            base.OnMouseDoubleClick(e);
+        }
+
+        //bool _shiftPressed = false; // Shift 键是否按下
+        //bool _controlPressed = false;
+        bool _shiftPressed
+        {
+            get
+            {
+                return (Control.ModifierKeys & Keys.Shift) != 0;
+            }
+        }
+
+        bool _controlPressed
+        {
+            get
+            {
+                return (Control.ModifierKeys & Keys.Control) != 0;
+            }
+        }
+
 
         // 第一次上下左右键，设置 _blockOffs1
         // 后继的上下左右键，设置 _blockOffs2
@@ -1739,62 +1537,99 @@ out long left_width);
                 case Keys.Left:
                 case Keys.Right:
                     {
-
-                        DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                        HitInfo info = null;
-                        int ret = 0;
-                        if (HasBlock() && _shiftPressed == false)
+                        if (_controlPressed)
                         {
+                            // 如果是向左，并且 caret 正好在块头部，需要先向左移动一个字符
+                            if (
+                                HasBlock()
+                                && _global_offs == _blockOffs1 || _global_offs == _blockOffs2)
+                            {
+                                var ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+    e.KeyCode == Keys.Left ? -2 : 2,
+    out HitInfo info);
+                                SetGlobalOffs(info.Offs);
+                                MoveCaret(info);
+                            }
+
+                            SelectCaretSubfield(false);
+
                             int offs;
                             if (e.KeyCode == Keys.Left)
+                            {
                                 offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                            }
                             else
+                            {
                                 offs = Math.Max(_blockOffs1, _blockOffs2);
+                            }
 
-                            _blockOffs1 = offs;
-                            _blockOffs2 = offs;
                             SetGlobalOffs(offs);
-
-                            ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+                            MoveCaret(HitByGlobalOffs(offs, 0));
+                            /*
+                            var ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
                                 e.KeyCode == Keys.Left ? -1 : 1,
                                 out info);
+                            */
+                            break;
                         }
-                        else
+
                         {
-                            // 向右移动，且在头标区内，需要特殊处理
-                            if (_shiftPressed == false && e.KeyCode == Keys.Right
-                                && _caretInfo.ChildIndex == 0)
+                            DetectBlockChange1(_blockOffs1, _blockOffs2);
+
+                            HitInfo info = null;
+                            int ret = 0;
+                            if (HasBlock() && _shiftPressed == false)
                             {
-                                // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
-                                // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
-                                ret = _record.MoveByOffs(_global_offs + 2,
-                                    -1,
+                                int offs;
+                                if (e.KeyCode == Keys.Left)
+                                    offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                                else
+                                    offs = Math.Max(_blockOffs1, _blockOffs2);
+
+                                _blockOffs1 = offs;
+                                _blockOffs2 = offs;
+                                SetGlobalOffs(offs);
+
+                                ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+                                    e.KeyCode == Keys.Left ? -1 : 1,
                                     out info);
                             }
                             else
-                                ret = _record.MoveByOffs(_global_offs,
-                                    e.KeyCode == Keys.Left ? -1 : 1,
-                                    out info);
+                            {
+                                // 向右移动，且在头标区内，需要特殊处理
+                                if (_shiftPressed == false && e.KeyCode == Keys.Right
+                                    && _caretInfo.ChildIndex == 0)
+                                {
+                                    // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
+                                    // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
+                                    ret = _record.MoveByOffs(_global_offs + 2,
+                                        -1,
+                                        out info);
+                                }
+                                else
+                                    ret = _record.MoveByOffs(_global_offs,
+                                        e.KeyCode == Keys.Left ? -1 : 1,
+                                        out info);
+                            }
+
+                            if (ret != 0)
+                                break;
+
+                            SetGlobalOffs(info.Offs);
+                            MoveCaret(info);
+
+                            if (_shiftPressed)
+                                _blockOffs2 = _global_offs;
+                            else
+                            {
+                                _blockOffs1 = _global_offs;
+                                _blockOffs2 = _global_offs;
+                            }
+                            _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+
+                            // this.Invalidate();  // TODO: 优化为失效具体的行。失效范围可以根据 offs1 -- offs2 整数可以设法直接提供给 Paint() 函数，用以替代 Rectangle
+                            InvalidateBlockRegion();
                         }
-
-                        if (ret != 0)
-                            break;
-
-                        SetGlobalOffs(info.Offs);
-                        MoveCaret(info);
-
-                        if (_shiftPressed)
-                            _blockOffs2 = _global_offs;
-                        else
-                        {
-                            _blockOffs1 = _global_offs;
-                            _blockOffs2 = _global_offs;
-                        }
-                        _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
-
-                        // this.Invalidate();  // TODO: 优化为失效具体的行。失效范围可以根据 offs1 -- offs2 整数可以设法直接提供给 Paint() 函数，用以替代 Rectangle
-                        InvalidateBlockRegion();
                     }
                     break;
                 case Keys.Up:
@@ -1822,6 +1657,10 @@ out long left_width);
 
                         break;
                     }
+                    else
+                    {
+                        ResetFieldSelect();
+                    }
 
                     // 向上移动一个行
                     {
@@ -1830,10 +1669,21 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            DetectBlockChange1(_blockOffs1, _blockOffs2);
-
                             SetGlobalOffs(temp_info.Offs);
                             MoveCaret(temp_info);
+
+                            ChangeSelection(() =>
+                            {
+                                if (_shiftPressed)
+                                    _blockOffs2 = _global_offs;
+                                else
+                                {
+                                    _blockOffs1 = _global_offs;
+                                    _blockOffs2 = _global_offs;
+                                }
+                            });
+                            /*
+                            DetectBlockChange1(_blockOffs1, _blockOffs2);
                             if (_shiftPressed)
                                 _blockOffs2 = _global_offs;
                             else
@@ -1843,6 +1693,7 @@ out long left_width);
                             }
                             // this.Invalidate();
                             InvalidateBlockRegion();
+                            */
                         }
                     }
                     break;
@@ -1869,6 +1720,10 @@ out long left_width);
 
                         break;
                     }
+                    else
+                    {
+                        ResetFieldSelect();
+                    }
 
                     // 向下移动一个行
                     {
@@ -1877,10 +1732,21 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            DetectBlockChange1(_blockOffs1, _blockOffs2);
-
                             SetGlobalOffs(temp_info.Offs);
                             MoveCaret(temp_info);
+
+                            ChangeSelection(() =>
+                            {
+                                if (_shiftPressed)
+                                    _blockOffs2 = _global_offs;
+                                else
+                                {
+                                    _blockOffs1 = _global_offs;
+                                    _blockOffs2 = _global_offs;
+                                }
+                            });
+                            /*
+                            DetectBlockChange1(_blockOffs1, _blockOffs2);
                             if (_shiftPressed)
                                 _blockOffs2 = _global_offs;
                             else
@@ -1890,6 +1756,7 @@ out long left_width);
                             }
                             // this.Invalidate();
                             InvalidateBlockRegion();
+                            */
                         }
                     }
                     break;
@@ -1968,66 +1835,76 @@ out long left_width);
                         InvalidateBlockRegion();
                     }
                     break;
+                case Keys.PageUp:
+                case Keys.PageDown:
+                    {
+                        var old_value = VerticalScroll.Value;
+                        var value = VerticalScroll.Value;
+                        if (e.KeyCode == Keys.PageUp)
+                        {
+                            value -= this.ClientSize.Height;
+                            value = Math.Max(VerticalScroll.Minimum, value);
+                        }
+                        else
+                        {
+                            value += this.ClientSize.Height;
+                            value = Math.Min(VerticalScroll.Maximum, value);
+                        }
 
+                        var delta = value - old_value;
+
+                        if (delta != 0)
+                        {
+                            this.AutoScrollPosition = new Point(
+    this.HorizontalScroll.Value,
+    value);
+
+                            var caret_y = _caretInfo.Y + delta;
+                            var caret_x = Math.Max(_fieldProperty.ContentX + 1, _lastX);
+
+                            var hit_info = this._record.HitTest(caret_x, caret_y);
+                            SetGlobalOffs(hit_info.Offs);
+                            MoveCaret(hit_info);
+
+                            ChangeSelection(() =>
+                            {
+                                if (_shiftPressed)
+                                    _blockOffs2 = _global_offs;
+                                else
+                                {
+                                    _blockOffs1 = _global_offs;
+                                    _blockOffs2 = _global_offs;
+                                }
+                            });
+                            /*
+                            DetectBlockChange1(_blockOffs1, _blockOffs2);
+
+                            if (_shiftPressed)
+                                _blockOffs2 = _global_offs;
+                            else
+                            {
+                                _blockOffs1 = _global_offs;
+                                _blockOffs2 = _global_offs;
+                            }
+                            // this.Invalidate();
+                            InvalidateBlockRegion();
+                            */
+                        }
+
+                    }
+                    break;
                 case Keys.ShiftKey:
-                    _shiftPressed = true;
+                    //_shiftPressed = true;
                     break;
                 case Keys.ControlKey:
-                    _controlPressed = true;
+                    //_controlPressed = true;
                     break;
                 case Keys.Delete:
-                    if (this._readonly)
-                        return;
-                    if (HasBlock())
-                        SoftlyRemoveBolckText();
-                    else
-                    {
-                        var delay = _keySpeedDetector.Detect();
-                        // TODO: 可以考虑增加一个功能，Ctrl+Delete 删除一个 char。而不是删除一个不可分割的 cluster(cluster 可能包含若干个 char)
-                        if (_global_offs < _content_length)
-                        {
-                            var replace = this._record.GetReplaceMode(_caretInfo,
-                                "delete",
-                                PaddingChar,
-                                out string fill_content);
-                            if (string.IsNullOrEmpty(fill_content) == false)
-                                ReplaceText(_global_offs,
-                                    _global_offs,
-                                    fill_content,
-                                    delay_update: delay,
-                                    false);
-
-                            // 记忆起点 offs
-                            var old_offs = _global_offs;
-                            // 验证向右移动插入符
-                            var ret = _record.MoveByOffs(_global_offs, 1, out HitInfo info);
-                            if (ret != 0)
-                                break;
-
-                            if (info.Offs > old_offs)
-                            {
-                                // 删除一个或者多个字符
-
-                                if (replace)
-                                    ReplaceText(old_offs,
-                                        info.Offs,
-                                        new string(PaddingChar, info.Offs - old_offs),
-                                        delay_update: delay,
-                                        false);
-                                else
-                                    ReplaceText(old_offs,
-                                        info.Offs,
-                                        "",
-                                        delay_update: delay,
-                                        false);
-                            }
-
-                            // TODO: 严格来说 Delete 时候插入符也需要重新 MoveCaret()
-                        }
-                    }
-                    e.Handled = true;
+                    if (ProcessDeleteKey(_caretInfo) == true)
+                        e.Handled = true;
                     break;
                 case Keys.Back:
+#if REMOVED
                     if (this._readonly)
                         return;
                     if (HasBlock())
@@ -2037,6 +1914,8 @@ out long left_width);
                         var delay = _keySpeedDetector.Detect();
                         if (_global_offs > 0)
                         {
+                            // TODO: 改写函数，单独执行 back space 功能
+                            // 函数难点在于，向左移动“一步”，在泰文等特殊语言中，可能不只是一个 char
                             // TODO: 注意连续的、不可分割的一个整体的多个字符情况
                             var replace = this._record.GetReplaceMode(_caretInfo,
                                 "backspace",
@@ -2094,6 +1973,10 @@ out long left_width);
                     }
                     e.Handled = true;
                     return;
+#endif
+                    if (ProcessBackspaceKey(_caretInfo) == true)
+                        e.Handled = true;
+                    break;
             }
             base.OnKeyDown(e);
         }
@@ -2103,11 +1986,11 @@ out long left_width);
             switch (e.KeyCode)
             {
                 case Keys.ShiftKey:
-                    _shiftPressed = false;
+                    //_shiftPressed = false;
                     EndFieldSelect();
                     break;
                 case Keys.ControlKey:
-                    _controlPressed = false;
+                    //_controlPressed = false;
                     EndFieldSelect();
                     break;
             }
@@ -2142,475 +2025,7 @@ out long left_width);
             base.OnKeyPress(e);
         }
 
-        // 键盘输入回车时，是否自动填充分离位置左右两侧的文本，以防止出现不足 3 或 5 字符的短字段内容。
-        public bool PadWhileReturning = false;
-        public char PaddingChar = ' ';
 
-        // 处理输入字符
-        public virtual bool ProcessInputChar(char ch, HitInfo info)
-        {
-            if (!(ch >= 32 || ch == '\r'))
-                return false;
-
-            // 检测键盘输入速度
-            var delay = _keySpeedDetector.Detect();
-
-            if (HasBlock())
-                SoftlyRemoveBolckText();
-
-            var action = "input";
-            if (ch == '\r')
-            {
-                return ProcessInputReturnChar(ch, info, delay);
-#if REMOVED
-                ch = (char)0x1e;
-                action = "return";
-
-                // 如果在头标区的末尾，则调整为下一字符开头，插入一个字段结束符
-                if (info.ChildIndex == 0 && info.TextIndex >= 24)
-                {
-                    // 插入一个字符
-                    ReplaceText(_global_offs,
-                        _global_offs,
-                        ch.ToString(),
-                        delay_update: delay,
-                        false);
-                    // 修改后，插入符定位到头标区下一字段的开头
-                    MoveCaret(HitByGlobalOffs(24 + 1, -1));
-                }
-                else if (info.ChildIndex == 0 && info.TextIndex < 24)
-                {
-                    // 在头标区内回车，补足空格
-                    var fill_char_count = 24 - info.TextIndex;
-                    var fragment = new string('_', fill_char_count);
-                    // 插入一个字符
-                    ReplaceText(_global_offs,
-                        _global_offs,
-                        fragment,
-                        delay_update: delay,
-                        false);
-                    // 修改后，插入符定位到头标区下一字段的开头
-                    MoveCaret(HitByGlobalOffs(24 + 1, -1));
-
-                }
-                else
-                {
-                    // (已经优化) 如果在一个字段末尾 caret 位置插入回车，
-                    // 可以优化为先向后移动 1 char，然后插入回车，这样导致更新的数据更少
-
-                    // 插入一个字符
-                    ReplaceText(_global_offs,
-                        _global_offs,
-                        ch.ToString(),
-                        delay_update: delay,
-                        false);
-
-                    // 向前移动一次 Caret
-                    MoveGlobalOffsAndBlock(1);
-                }
-
-                return true;
-#endif
-            }
-            else if (ch == '\\')
-                ch = KERNEL_SUBFLD;
-
-            // TODO: 检查覆盖输入字符后，当前相关 Region 是否有足够的字符。如果不足则需要补足。
-            var replace = this._record.GetReplaceMode(_caretInfo,
-                action,
-                PaddingChar,
-                out string fill_content);
-            if (string.IsNullOrEmpty(fill_content) == false)
-                ReplaceText(_global_offs,
-                    _global_offs,
-                    fill_content,
-                    delay_update: delay,
-                    false);
-            if (replace)
-                ReplaceText(_global_offs,
-                    _global_offs + 1,
-                    ch.ToString(),
-                    delay_update: delay,
-                    false);
-            else
-                ReplaceText(_global_offs,
-                    _global_offs,
-                    ch.ToString(),
-                    delay_update: delay,
-                    false);
-
-            // 向前移动一次 Caret
-            MoveGlobalOffsAndBlock(1);
-            // e.Handled = true;
-            return true;
-        }
-
-        public virtual void SplitPadding(
-            ref string left,
-            ref string right)
-        {
-            if (left.Length <= 5)
-            {
-                if (left.Length == 3)
-                {
-                    var field_name = left.Substring(0, 3);
-                    if (MarcField.IsControlFieldName(field_name))
-                        goto SKIP;
-                }
-                left = left.PadRight(5, PaddingChar);
-            }
-
-        SKIP:
-            if (right.Length <= 5)
-            {
-                if (right.Length == 3)
-                {
-                    var field_name = right.Substring(0, 3);
-                    if (MarcField.IsControlFieldName(field_name))
-                        return;
-                }
-                right = right.PadRight(5, PaddingChar);
-            }
-        }
-
-        // 不包含字段结束符
-        void GetLeftRight(out string left,
-            out string right)
-        {
-            var infos = this._record.LocateFields(_global_offs, _global_offs);
-            if (infos == null || infos.Length == 0)
-            {
-                left = "";
-                right = "";
-                return;
-            }
-            var info = infos[0];
-            var index = info.Index;
-            var field = this._record.GetField(index);
-            //var start_offs = _global_offs - info.StartLength;
-            var text = field.MergePureText();
-            left = text.Substring(0, info.StartLength);
-            right = text.Substring(info.StartLength);
-        }
-
-        // 处理输入回车字符
-        public virtual bool ProcessInputReturnChar(char ch,
-            HitInfo info,
-            bool delay)
-        {
-            if (ch == '\r')
-            {
-                ch = (char)0x1e;
-
-                // 如果在头标区的末尾，则调整为下一字符开头，插入一个字段结束符
-                if (info.ChildIndex == 0 && info.TextIndex >= 24)
-                {
-                    if (PadWhileReturning)
-                    {
-                        // 插入一个回车字符后，新的字段就内容为空，需要插入 5 个空格
-                        ReplaceText(_global_offs,
-    _global_offs,
-    new string(PaddingChar, 5) + ch.ToString(),
-    delay_update: delay,
-    false);
-                        // 修改后，插入符定位到头标区下一字段的开头
-                        SetGlobalOffs(24);
-                        MoveCaret(HitByGlobalOffs(24 + 1, -1));
-                    }
-                    else
-                    {
-                        // 插入一个字符
-                        ReplaceText(_global_offs,
-                            _global_offs,
-                            ch.ToString(),
-                            delay_update: delay,
-                            false);
-                        // 修改后，插入符定位到头标区下一字段的开头
-                        SetGlobalOffs(24);
-                        MoveCaret(HitByGlobalOffs(24 + 1, -1));
-                    }
-                }
-                else if (info.ChildIndex == 0 && info.TextIndex < 24)
-                {
-                    // 在头标区内回车，补足空格
-                    var fill_char_count = 24 - info.TextIndex;
-                    // TODO: 头标区是否使用特殊字符填充?
-                    var fragment = new string(PaddingChar, fill_char_count);
-                    // 插入一个字符
-                    ReplaceText(_global_offs,
-                        _global_offs,
-                        fragment,
-                        delay_update: delay,
-                        false);
-
-                    if (PadWhileReturning)
-                    {
-                        // 观察插入点以后的新字段内容，如果不足 3 或 5 字符需要补齐
-                        var pad_info = PaddingRight(24);
-                        if (string.IsNullOrEmpty(pad_info.Text) == false)
-                        {
-                            ReplaceText(24 + pad_info.Offs, // 插入在原有字符后面
-    24 + pad_info.Offs,
-    pad_info.Text,
-    delay_update: delay,
-    false);
-                        }
-                    }
-
-                    // 修改后，插入符定位到头标区下一字段的开头
-                    // TODO: 使用 MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
-
-                    SetGlobalOffs(24);
-                    MoveCaret(HitByGlobalOffs(24 + 1, -1));
-                }
-                else
-                {
-                    // *** 其它普通字段内插入
-
-                    if (PadWhileReturning)
-                    {
-                        // 获得插入点以后直到字段结束符这一段的文字内容，
-                        // 触发一个函数，让它决定是否要补充字符，如何补充。
-                        GetLeftRight(out string left,
-                            out string right);
-                        var old_left = left;
-                        var old_right = right;
-                        SplitPadding(
-                ref left,
-                ref right);
-                        // 原来的 text
-                        var old_text = old_left + old_right;
-                        var new_text = left + Metrics.FieldEndCharDefault + right;
-
-                        // TODO: 优化，从两端向中间寻找，找到中间不一样的一段，只替换不一样的一段
-
-                        ReplaceText(_global_offs - old_left.Length,
-        _global_offs + old_right.Length + 1,
-        new_text,
-        delay_update: delay,
-        false);
-
-                        // 向前移动 Caret
-                        MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
-                    }
-                    else
-                    {
-                        // (已经优化) 如果在一个字段末尾 caret 位置插入回车，
-                        // 可以优化为先向后移动 1 char，然后插入回车，这样导致更新的数据更少
-                        // 插入一个字符
-                        ReplaceText(_global_offs,
-                            _global_offs,
-                            ch.ToString(),
-                            delay_update: delay,
-                            false);
-
-                        // 向前移动一次 Caret
-                        MoveGlobalOffsAndBlock(1);
-                    }
-                }
-
-                return true;
-            }
-            return false;
-        }
-
-        class PaddingInfo
-        {
-            // Text 要插入的偏移位置。注意是从测试起点计算
-            public int Offs { get; set; }
-            // 要插入的文字内容
-            public string Text { get; set; }
-        }
-
-        PaddingInfo PaddingRight(int offs)
-        {
-            var test_length = 5;    // 测试用字符串的最小长度
-            // right_count 有可能越过最大长度
-            var test_string = this._record.MergeText(offs, offs + test_length);
-            // 寻找字段结束符
-            var index = test_string.IndexOf(Metrics.FieldEndCharDefault);
-            if (index == -1 && test_string.Length >= test_length)
-                return new PaddingInfo();
-            if (index == -1)
-                index = 0;
-            if (index < 3)
-                return new PaddingInfo
-                {
-                    Offs = index,
-                    Text = new string(PaddingChar, 5 - index),
-                };
-            // 检查字段名是否为控制字段
-            if (MarcField.IsControlFieldName(test_string.Substring(0, 3)))
-            {
-                // 控制字段，3个字符已经足够
-                return new PaddingInfo();
-            }
-            // 否则需要至少 5 字符
-            if (index < 5)
-                return new PaddingInfo
-                {
-                    Offs = index,
-                    Text = new string(PaddingChar, 5 - index),
-                };
-            return new PaddingInfo();
-        }
-
-#if REMOVED
-        // 有几种观察。
-        // 第一种，为了插入回车。
-        // 1) 如果 offs < 24，左边(一直到整个开头)不足 24 字符，则左边补足空格。注: 中间即便有字段结束符也被当作头标区内容，因为头标区是用位置和长度定义的
-        // 2) 右边不足 3 或者 5 字符，则右边补足空格。到底是 3 还是 5 字符，取决于前三字符是否为控制字段名，控制字段只要求 3 字符足够，否则要 5 字符才够
-        // 第二种，为了插入其它普通字符
-        // 要求插入点左边至少有 5 字符，如果不足，则从 offs 点开始插入足够的字符。到底是 3 或 5 要看字段名
-        // 插入之后，注意保留插入的字符数信息，便于调用者调整插入符位置
-        public string Padding(int offs, 
-            int left_count,
-            int right_count)
-        {
-            int total_length = this.TextLength;
-            if (left_count > offs)
-                left_count = offs;
-            if (offs + right_count > total_length)
-                right_count = total_length - offs;
-            var start = offs - left_count;
-            var end = offs + right_count;
-            var text = this.MergeText(start, end);
-
-
-            // 观察左边是否不足 5 字符
-        }
-#endif
-
-
-        // 平移全局偏移量，和平移块范围
-        bool MoveGlobalOffsAndBlock(int delta)
-        {
-            if (_global_offs + delta < 0)
-                return false;
-
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-            var start_offs = _global_offs; // 记录开始偏移量
-
-            HitInfo info = null;
-            if (delta >= 0)
-            {
-                // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
-                // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
-                info = HitByGlobalOffs(_global_offs + delta + 1, -1);
-            }
-            else
-                info = HitByGlobalOffs(_global_offs, delta);
-            SetGlobalOffs(info.Offs); // 更新 _global_offs
-            MoveCaret(info);
-
-            _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
-
-            // 平移块范围
-            if (_blockOffs1 >= start_offs)
-                _blockOffs1 += delta;
-            if (_blockOffs2 >= start_offs)
-                _blockOffs2 += delta;
-
-            // 块定义发生刷新才有必要更新变化的区域
-            InvalidateBlockRegion();
-            return true;
-        }
-
-        HitInfo HitByGlobalOffs(int offs, int delta = 0)
-        {
-            _record.MoveByOffs(offs, delta, out HitInfo info);
-            return info;
-        }
-
-        public bool HasBlock()
-        {
-            return _blockOffs1 != _blockOffs2; // 选中范围不相等，表示有选中范围
-        }
-
-        // 柔和地删除块中文字。所谓柔和的意思是，保留固定长内容的字符数(只把这些字符替换为空格)
-        public bool SoftlyRemoveBolckText()
-        {
-            if (_blockOffs1 == _blockOffs2)
-                return false; // 不存在选中范围
-
-            var start = Math.Min(_blockOffs1, _blockOffs2);
-            var length = Math.Abs(_blockOffs1 - _blockOffs2);
-
-            /*
-            text = text.Remove(start, length);
-
-            Relayout(false);
-            */
-            var mask_text = _record.MergeTextMask(start, start + length);
-
-            ReplaceText(start,
-                start + length,
-                MarcRecord.CompressMaskText(mask_text, PaddingChar),
-                delay_update: false,
-                false);
-
-            _blockOffs1 = start;
-            _blockOffs2 = start;
-
-            if (_global_offs > start)
-            {
-                // DeltaGlobalOffs(-length); // 调整 _global_offs
-                AdjustGlobalOffs(-(length - 1));
-                MoveGlobalOffsAndBlock(-1);
-            }
-            //Invalidate();
-            return true;
-
-
-#if REMOVED
-            string process_mask_text(string text)
-            {
-                // 将 mask_text 中 0x01 字符替换为空格，其余内容丢弃
-                var result = new StringBuilder();
-                foreach (var ch in text)
-                {
-                    if (ch == (char)0x01)
-                        result.Append(' ');
-                }
-                return result.ToString();
-            }
-#endif
-        }
-
-
-        // 删除块中的文字。硬性删除的版本，可能会导致固定长内容的字符数变化
-        public bool RawRemoveBolckText()
-        {
-            if (_blockOffs1 == _blockOffs2)
-                return false; // 不存在选中范围
-
-            var start = Math.Min(_blockOffs1, _blockOffs2);
-            var length = Math.Abs(_blockOffs1 - _blockOffs2);
-
-            /*
-            text = text.Remove(start, length);
-
-            Relayout(false);
-            */
-            ReplaceText(start,
-                start + length,
-                "",
-                delay_update: false,
-                false);
-
-            _blockOffs1 = start;
-            _blockOffs2 = start;
-
-            if (_global_offs > start)
-            {
-                // DeltaGlobalOffs(-length); // 调整 _global_offs
-                AdjustGlobalOffs(-(length - 1));
-                MoveGlobalOffsAndBlock(-1);
-            }
-            //Invalidate();
-            return true;
-        }
 
         public const int DLGC_WANTARROWS = 0x0001;      /* Control wants arrow keys         */
         public const int DLGC_WANTTAB = 0x0002;      /* Control wants tab keys           */
@@ -2675,6 +2090,17 @@ out long left_width);
             base.DefWndProc(ref m);
         }
 
+        // 打开或者关闭输入法
+        public void OpenIME(bool open)
+        {
+            if (hIMC == IntPtr.Zero)
+                return;
+
+            // 打开或关闭 IME（保持简单，具体 conversion flags 可按需设置）
+            ImmSetOpenStatus(hIMC, open);
+            // 如需设置转换/模式，可调用 ImmSetConversionStatus(hIMC, conversion, sentence);
+        }
+
         protected override void OnScroll(ScrollEventArgs se)
         {
             base.OnScroll(se);
@@ -2695,6 +2121,8 @@ out long left_width);
 
         protected override void OnHandleDestroyed(EventArgs e)
         {
+            DisposeBlockRegion();
+
             Imm32.ImmReleaseContext(this.Handle, hIMC);
             // User32.DestroyCaret();
 
@@ -2714,15 +2142,6 @@ out long left_width);
             }
         }
         */
-
-        #region Caret and hittest
-
-
-        #endregion
-
-        #region Content processing
-
-        #endregion
 
         #region IME
 
@@ -2773,206 +2192,86 @@ out long left_width);
 
         #endregion
 
-        public void EnsureCaretVisible()
-        {
-            int x_delta = 0;
-            int y_delta = 0;
-            // 可见区域 左右边界
-            var left = this.HorizontalScroll.Value;
-            var right = this.HorizontalScroll.Value + this.ClientSize.Width;
-            right -= 10;
-            if (_caretInfo.X < left)
-                x_delta = _caretInfo.X - left;
-            else if (_caretInfo.X >= right)
-                x_delta = _caretInfo.X - right;
-            // 可见区域 上下边界
-            var top = this.VerticalScroll.Value;
-            var bottom = this.VerticalScroll.Value + this.ClientSize.Height;
-            if (_caretInfo.Y < top)
-                y_delta = _caretInfo.Y - top;
-            else if (_caretInfo.Y + FontContext.DefaultFontHeight >= bottom)
-                y_delta = _caretInfo.Y + FontContext.DefaultFontHeight - bottom;
-
-            if (x_delta != 0 || y_delta != 0)
-            {
-                this.AutoScrollPosition = new Point(
-                    this.HorizontalScroll.Value + x_delta,
-                    this.VerticalScroll.Value + y_delta);
-
-                if (_caretCreated)
-                {
-                    User32.HideCaret(this.Handle);
-                    User32.SetCaretPos(-this.HorizontalScroll.Value + _caretInfo.X,
-                        -this.VerticalScroll.Value + _caretInfo.Y);
-                    User32.ShowCaret(this.Handle);
-                }
-
-                // this.Invalidate();
-            }
-        }
-
-        int _oldOffs1 = 0;
-        int _oldOffs2 = 0;
-
-        // 为了比较块定义是否发生变化，从而决定是否刷新显示，第一步，记忆信息
-        void DetectBlockChange1(int offs1, int offs2)
-        {
-            _oldOffs1 = offs1;
-            _oldOffs2 = offs2;
-        }
-
-        // 为了比较块定义是否发生变化，从而决定是否刷新显示，第二步，进行比较
-        bool DetectBlockChange2(int offs1, int offs2)
-        {
-            // 新旧两种，都是无块定义
-            if (_oldOffs1 == _oldOffs2
-                && offs1 == offs2)
-                return false;
-            // 接上，此时说明新旧对比，至少有一个有快定义。
-            // 那么头尾有任何变化，都算作块定义发生了变化
-            if (_oldOffs1 != offs1 || _oldOffs2 != offs2)
-                return true;
-            return false;
-        }
-
-        // 多语种时不完备，即将废弃
-        void InvalidateBlock(bool trigger_event = true)
-        {
-            // 移动插入符的情况，不涉及到块定义和变化
-            if (_oldOffs1 == _oldOffs2
-                && _blockOffs1 == _blockOffs2)
-                return;
-            bool changed = false;
-            if (InvalidateBlock(_oldOffs1, _blockOffs1))
-                changed = true;
-            if (InvalidateBlock(_oldOffs2, _blockOffs2))
-                changed = true;
-
-            if (trigger_event == true && changed)
-            {
-                this.BlockChanged?.Invoke(this, new EventArgs());
-            }
-        }
-
-        void InvalidateBlockRegion(bool trigger_event = true)
-        {
-            // 移动插入符的情况，不涉及到块定义和变化
-            if (_oldOffs1 == _oldOffs2
-                && _blockOffs1 == _blockOffs2)
-                return;
-            bool changed = false;
-            if (InvalidateBlockRegion(_oldOffs1, _blockOffs1))
-                changed = true;
-            if (InvalidateBlockRegion(_oldOffs2, _blockOffs2))
-                changed = true;
-
-            if (trigger_event == true && changed)
-            {
-                this.BlockChanged?.Invoke(this, new EventArgs());
-            }
-        }
-
-
-        // 多语种时不完备，即将废弃
-        bool InvalidateBlock(int offs1, int offs2)
-        {
-            if (offs1 == offs2)
-                return false;
-            var rect = GetBlockRectangle(offs1, offs2);
-            if (rect.IsEmpty == false)
-            {
-                this.Invalidate(rect);
-                return true;
-            }
-
-            return false;
-        }
-
-        bool InvalidateBlockRegion(int offs1, int offs2)
-        {
-            if (offs1 == offs2)
-                return false;
-            var region = GetBlockRegion(offs1, offs2);
-            if (region != null)
-            {
-                this.Invalidate(region);
-                region.Dispose();
-                return true;
-            }
-
-            return false;
-        }
-
-        // 获得表示块大致范围的 Rectangle
-        Region GetBlockRegion(
-            int offs1,
-            int offs2)
-        {
-            if (offs1 < 0 || offs2 < 0)
-                return null;
-
-            if (offs1 == offs2)
-                return null;
-
-            int x = -this.HorizontalScroll.Value;
-            int y = -this.VerticalScroll.Value;
-
-            int start = Math.Min(offs1, offs2);
-            int end = Math.Max(offs1, offs2);
-
-            var region = _record.GetRegion(start, end, 1);
-            if (region != null)
-                region.Offset(x, y);
-            return region;
-        }
-
-
-        // 获得表示块大致范围的 Rectangle
-        Rectangle GetBlockRectangle(int offs1, int offs2)
-        {
-            if (offs1 < 0 || offs2 < 0)
-                return System.Drawing.Rectangle.Empty;
-
-            if (offs1 == offs2)
-                return System.Drawing.Rectangle.Empty;
-
-            int x = -this.HorizontalScroll.Value;
-            int y = -this.VerticalScroll.Value;
-
-            int start = Math.Min(offs1, offs2);
-            int end = Math.Max(offs1, offs2);
-            _record.MoveByOffs(start, 0, out HitInfo info1);
-            _record.MoveByOffs(end, 0, out HitInfo info2);
-
-            // start 或者 end 越出当前合法范围，返回一个巨大的矩形。迫使窗口全部失效
-            if (info1.Area != Area.Text
-                || info2.Area != Area.Text)
-                return new Rectangle(x + 0,
-    y + 0,
-    this.AutoScrollMinSize.Width,   // document width
-    this.AutoScrollMinSize.Height);
-
-            // return new Rectangle(0, 24, 5000, 24);
-            if (info1.Y == info2.Y)
-            {
-                var left = Math.Min(info1.X, info2.X);
-                var right = Math.Max(info1.X, info2.X);
-                return new Rectangle(x + left,
-                y + info1.Y,
-                right - left,
-                info2.Y + info2.LineHeight - info1.Y);
-            }
-            Debug.Assert(info1.Y <= info2.Y);
-            return new Rectangle(x + 0,
-                y + info1.Y,
-                this.AutoScrollMinSize.Width,   // document width
-                info2.Y + info2.LineHeight - info1.Y);
-        }
-
         public DomRecord GetDomRecord()
         {
             return new DomRecord(this._record);
         }
 
+        public MarcRecord MarcRecord
+        {
+            get
+            {
+                return _record;
+            }
+        }
+
+        int _disableUpdate = 0;
+        int _invalidateCount = 0;
+
+        public void BeginUpdate()
+        {
+            if (_disableUpdate == 0)
+                _invalidateCount = 0;
+            _disableUpdate++;
+            _disableResize++;
+        }
+
+        new void Invalidate(Rectangle rect)
+        {
+            if (_disableUpdate == 0)
+                base.Invalidate(rect);
+            else
+                _invalidateCount++;
+        }
+
+        new void Invalidate(Region region)
+        {
+            if (_disableUpdate == 0)
+                base.Invalidate(region);
+            else
+                _invalidateCount++;
+        }
+
+        new void Invalidate()
+        {
+            if (_disableUpdate == 0)
+                base.Invalidate();
+            else
+                _invalidateCount++;
+        }
+
+        // TODO: 禁止期间，搜集 Invalidate 的次数。如果一次也没有，最后也就不要 Invalidate()
+        public void EndUpdate(bool invalidate = true)
+        {
+            _disableResize--;
+            _disableUpdate--;
+            if (_disableUpdate == 0 && invalidate)
+            {
+                if (_invalidateCount > 0)
+                    base.Invalidate();
+                // 注: disable update 期间可能有些 BlockChanged 时间没有触发，需要补触发
+                // this.BlockChanged?.Invoke(this, new EventArgs());
+            }
+
+            if (_disableUpdate == 0)
+                _invalidateCount = 0;
+        }
+
+        char _highlightBlankChar = ' ';
+        public char HighlightBlankChar
+        {
+            get
+            {
+                return _highlightBlankChar;
+            }
+            set
+            {
+                if (_highlightBlankChar != value)
+                {
+                    _highlightBlankChar = value;
+                    Relayout(this._record.MergeText());
+                }
+            }
+        }
     }
 }

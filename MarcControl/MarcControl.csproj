@@ -48,6 +48,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Control\Caret.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\DragBlock.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\Selection.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\SelectMultiField.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\Splitter.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\Styling.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="DelayTrigger.cs" />
+    <Compile Include="Dialog\DeletingFieldDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialog\DeletingFieldDialog.Designer.cs">
+      <DependentUpon>DeletingFieldDialog.cs</DependentUpon>
+    </Compile>
     <Compile Include="Dialog\PropertyDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -57,18 +82,18 @@
     <Compile Include="Dialog\ViewModel.cs" />
     <Compile Include="DOM\DomField.cs" />
     <Compile Include="DOM\DomRecord.cs" />
-    <Compile Include="MarcControl_delayUpdate.cs">
+    <Compile Include="Control\DelayUpdate.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="KeystrokeSpeedDetector.cs" />
-    <Compile Include="MarcControl.cs">
+    <Compile Include="Control\MarcControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="MarcControl.Designer.cs">
+    <Compile Include="Control\MarcControl.Designer.cs">
       <DependentUpon>MarcControl.cs</DependentUpon>
     </Compile>
-    <Compile Include="MarcControl_doubleBuffered.cs" />
-    <Compile Include="MarcControl_editCommand.cs">
+    <Compile Include="Control\DoubleBuffered.cs" />
+    <Compile Include="Control\EditCommand.cs">
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="MarcField.cs" />
@@ -79,6 +104,7 @@
     <Compile Include="UnitTest\TestCompressMaskText.cs" />
     <Compile Include="UnitTest\TestDOM.cs" />
     <Compile Include="UnitTest\TestMarcField.cs" />
+    <Compile Include="UnitTest\TestMarcField2.cs" />
     <Compile Include="UnitTest\TestMarcRecord.cs" />
     <Compile Include="UnitTest\UiTestHelpers.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
@@ -86,6 +112,8 @@
   <ItemGroup>
     <Content Include="Document\Design.txt" />
     <Content Include="Document\Keys.txt" />
+    <None Include="Document\blank_char.md" />
+    <None Include="Document\refactor_ime.md" />
     <Content Include="Document\TestCase.txt" />
   </ItemGroup>
   <ItemGroup>
@@ -114,6 +142,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Dialog\DeletingFieldDialog.resx">
+      <DependentUpon>DeletingFieldDialog.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Dialog\PropertyDialog.resx">
       <DependentUpon>PropertyDialog.cs</DependentUpon>
     </EmbeddedResource>

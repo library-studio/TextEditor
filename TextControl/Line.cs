@@ -343,6 +343,7 @@ namespace LibraryStudio.Forms
                             Offs = start_offs + 0,
                             LineHeight = line_height,
                             Area = isRightBlank ? Area.RightBlank : Area.Text,
+                            InnerHitInfo = new HitInfo { X = 0 },
                         };
 
                     var result = ScriptXtoCP(x - current_x,
@@ -386,6 +387,7 @@ namespace LibraryStudio.Forms
                         Offs = start_offs + cp_index,
                         LineHeight = line_height,
                         Area = isRightBlank ? Area.RightBlank : Area.Text,
+                        InnerHitInfo = new HitInfo { X = hit_x_in_range },
                     };
                 }
             }
@@ -399,6 +401,7 @@ namespace LibraryStudio.Forms
                 Offs = 0,
                 LineHeight = line_height,
                 Area = Area.RightBlank,
+                InnerHitInfo = null,
             };
         }
 
@@ -469,7 +472,10 @@ namespace LibraryStudio.Forms
                         info.Y = 0;
                         info.ChildIndex = i;
                         info.Box = range;
-                        info.InnerHitInfo = new HitInfo { X = hit_x_in_range };
+                        info.InnerHitInfo = new HitInfo
+                        {
+                            X = hit_x_in_range,
+                        };
 
                         if (is_zero_width(range.sva, pos, direction >= 1) == false)   // range.advances.Where(o => o == 0).Any() == false
                         {
@@ -1528,13 +1534,16 @@ range.Text.Length);
                                 range,
                                 true);
 
-                            DrawSolidRectangle(hdc,
-                            block_rect.left,
-                            block_rect.top,
-                            block_rect.right,   // + (tail_in_block ? _average_char_width : 0),
-                            block_rect.bottom,
-                            back_color,
-                            clipRect);
+                            if (back_color != Color.Transparent)
+                            {
+                                DrawSolidRectangle(hdc,
+                                block_rect.left,
+                                block_rect.top,
+                                block_rect.right,   // + (tail_in_block ? _average_char_width : 0),
+                                block_rect.bottom,
+                                back_color,
+                                clipRect);
+                            }
                         }
                         // clipping 矩形的左右进行微调。避免斜体字的某些笔画伸出去的部分被显示成不同的颜色
                         var left_delta = range.pABC.abcA;
@@ -1573,14 +1582,16 @@ range.Text.Length);
                                 context?.GetBackColor,
                                 null,
                                 true);
-
-                            DrawSolidRectangle(hdc,
-                                    block_rect.left,
-                                    block_rect.top,
-                                    block_rect.right,
-                                    block_rect.bottom,
-                                    back_color,
-                                    clipRect);
+                            if (back_color != Color.Transparent)
+                            {
+                                DrawSolidRectangle(hdc,
+                                        block_rect.left,
+                                        block_rect.top,
+                                        block_rect.right,
+                                        block_rect.bottom,
+                                        back_color,
+                                        clipRect);
+                            }
                         }
                     }
                 }
@@ -1670,6 +1681,7 @@ range.Text.Length);
                                 false);
 
                             var old_color = Gdi32.SetTextColor(hdc, new COLORREF(text_color)); // 设置文本颜色为黑色
+                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
 
                             try
                             {
@@ -1691,6 +1703,7 @@ range.Text.Length);
                             }
                             finally
                             {
+                                Gdi32.SetBkMode(hdc, old_mode);
                                 Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
                             }
                         }
@@ -1706,6 +1719,7 @@ range.Text.Length);
                                 range,
                                 true);
                             var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
 
                             //var old_bk_color = Gdi32.SetBkColor(hdc, new COLORREF((uint)SystemColors.Highlight.ToArgb())); // 设置文本颜色为黑色
                             try
@@ -1728,8 +1742,8 @@ range.Text.Length);
                             }
                             finally
                             {
+                                Gdi32.SetBkMode(hdc, old_mode);
                                 Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
-                                                                    //Gdi32.SetBkColor(hdc, old_bk_color); // 恢复文本颜色
                             }
                         }
                     }
@@ -1764,14 +1778,16 @@ range.Text.Length);
                     context?.GetBackColor,
                     range,
                     true);
-
-                DrawSolidRectangle(hdc,
-                block_rect.Left,
-                block_rect.Top,
-                block_rect.Right,
-                block_rect.Bottom,
-                back_color,
-                clipRect);
+                if (back_color != Color.Transparent)
+                {
+                    DrawSolidRectangle(hdc,
+                    block_rect.Left,
+                    block_rect.Top,
+                    block_rect.Right,
+                    block_rect.Bottom,
+                    back_color,
+                    clipRect);
+                }
             }
         }
 
@@ -1796,8 +1812,10 @@ range.Text.Length);
                     var hBrush = Gdi32.CreateSolidBrush(color);
                     var oldBrush = Gdi32.SelectObject(hdc, hBrush);
 
-                    var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL, 1, color);
+                    int delta = 0;
+                    var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL, delta, color);
                     var hOldPen = Gdi32.SelectObject(hdc, hPen);
+                    //var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.OPAQUE);
 
                     // 绘制实心矩形
                     Gdi32.Rectangle(hdc,
@@ -1805,6 +1823,8 @@ range.Text.Length);
                         top,
                         right + 1,
                         bottom + 1);    // +1 的原因是想要让上下相邻的 rect 看起来连续。但要注意 GetRegion() 接口中得到的区域要向右下也扩大一个像素，避免刷新时漏掉一些线
+
+                    //Gdi32.SetBkMode(hdc, old_mode);
 
                     // 恢复原画刷并释放资源
                     Gdi32.SelectObject(hdc, oldBrush);
@@ -2206,7 +2226,7 @@ range.Text.Length);
             if (this.Ranges == null)
                 return;
             this.ColorCache?.Clear();
-            foreach(var range in this.Ranges)
+            foreach (var range in this.Ranges)
             {
                 range.ClearCache();
             }

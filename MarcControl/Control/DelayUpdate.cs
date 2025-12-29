@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace LibraryStudio.Forms
 {
     /// <summary>
-    /// 关于延迟更新的部分函数
+    /// 关于延迟更新
     /// </summary>
     public partial class MarcControl
     {

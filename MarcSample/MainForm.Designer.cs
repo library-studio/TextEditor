@@ -39,9 +39,13 @@ namespace MarcSample
             this.MenuItem_readonly = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_setFont = new System.Windows.Forms.ToolStripMenuItem();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
+            this.toolStripStatusLabel_caretFieldRegion = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.marcControl1 = new LibraryStudio.Forms.MarcControl();
+            this.toolStripStatusLabel_blockRange = new System.Windows.Forms.ToolStripStatusLabel();
+            this.toolStripStatusLabel_caretOffs = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1.SuspendLayout();
+            this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // menuStrip1
@@ -53,7 +57,7 @@ namespace MarcSample
             this.MenuItem_apperance});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(1309, 54);
+            this.menuStrip1.Size = new System.Drawing.Size(1309, 72);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -64,7 +68,7 @@ namespace MarcSample
             this.MenuItem_verifyCharCount,
             this.MenuItem_exit});
             this.MenuItem_file.Name = "MenuItem_file";
-            this.MenuItem_file.Size = new System.Drawing.Size(107, 50);
+            this.MenuItem_file.Size = new System.Drawing.Size(107, 68);
             this.MenuItem_file.Text = "&File";
             // 
             // MenuItem_dumpHistory
@@ -95,7 +99,7 @@ namespace MarcSample
             this.MenuItem_readonly,
             this.MenuItem_setFont});
             this.MenuItem_apperance.Name = "MenuItem_apperance";
-            this.MenuItem_apperance.Size = new System.Drawing.Size(233, 50);
+            this.MenuItem_apperance.Size = new System.Drawing.Size(233, 68);
             this.MenuItem_apperance.Text = "&Apperance";
             this.MenuItem_apperance.DropDownOpening += new System.EventHandler(this.MenuItem_apperance_DropDownOpening);
             // 
@@ -130,18 +134,28 @@ namespace MarcSample
             // statusStrip1
             // 
             this.statusStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
-            this.statusStrip1.Location = new System.Drawing.Point(0, 749);
+            this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolStripStatusLabel_caretFieldRegion,
+            this.toolStripStatusLabel_blockRange,
+            this.toolStripStatusLabel_caretOffs});
+            this.statusStrip1.Location = new System.Drawing.Point(0, 710);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(1309, 22);
+            this.statusStrip1.Size = new System.Drawing.Size(1309, 61);
             this.statusStrip1.TabIndex = 1;
             this.statusStrip1.Text = "statusStrip1";
+            // 
+            // toolStripStatusLabel_caretFieldRegion
+            // 
+            this.toolStripStatusLabel_caretFieldRegion.Name = "toolStripStatusLabel_caretFieldRegion";
+            this.toolStripStatusLabel_caretFieldRegion.Size = new System.Drawing.Size(142, 46);
+            this.toolStripStatusLabel_caretFieldRegion.Text = "Region";
             // 
             // toolStrip1
             // 
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
-            this.toolStrip1.Location = new System.Drawing.Point(0, 54);
+            this.toolStrip1.Location = new System.Drawing.Point(0, 72);
             this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(1309, 25);
+            this.toolStrip1.Size = new System.Drawing.Size(1309, 75);
             this.toolStrip1.TabIndex = 2;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -157,11 +171,25 @@ namespace MarcSample
             this.marcControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.marcControl1.FixedSizeFont = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Bold);
             this.marcControl1.Font = new System.Drawing.Font("宋体", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.marcControl1.Location = new System.Drawing.Point(0, 79);
+            this.marcControl1.Location = new System.Drawing.Point(0, 147);
             this.marcControl1.Name = "marcControl1";
+            this.marcControl1.PaddingChar = ' ';
+            this.marcControl1.PadWhileEditing = false;
             this.marcControl1.ReadOnly = false;
-            this.marcControl1.Size = new System.Drawing.Size(1309, 670);
+            this.marcControl1.Size = new System.Drawing.Size(1309, 563);
             this.marcControl1.TabIndex = 3;
+            // 
+            // toolStripStatusLabel_blockRange
+            // 
+            this.toolStripStatusLabel_blockRange.Name = "toolStripStatusLabel_blockRange";
+            this.toolStripStatusLabel_blockRange.Size = new System.Drawing.Size(223, 46);
+            this.toolStripStatusLabel_blockRange.Text = "BlockRange";
+            // 
+            // toolStripStatusLabel_caretOffs
+            // 
+            this.toolStripStatusLabel_caretOffs.Name = "toolStripStatusLabel_caretOffs";
+            this.toolStripStatusLabel_caretOffs.Size = new System.Drawing.Size(181, 46);
+            this.toolStripStatusLabel_caretOffs.Text = "CaretOffs";
             // 
             // MainForm
             // 
@@ -180,6 +208,8 @@ namespace MarcSample
             this.Load += new System.EventHandler(this.Form1_Load);
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
+            this.statusStrip1.ResumeLayout(false);
+            this.statusStrip1.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -200,6 +230,9 @@ namespace MarcSample
         private System.Windows.Forms.ToolStripMenuItem MenuItem_dumpHistory;
         private System.Windows.Forms.ToolStripMenuItem MenuItem_setFont;
         private System.Windows.Forms.ToolStripMenuItem MenuItem_verifyCharCount;
+        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_caretFieldRegion;
+        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_blockRange;
+        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_caretOffs;
     }
 }
 

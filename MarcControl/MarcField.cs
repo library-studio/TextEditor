@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Vanara.PInvoke;
+using static System.Net.Mime.MediaTypeNames;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -110,7 +111,9 @@ namespace LibraryStudio.Forms
         public bool CaretMoveDown(int x, int y, out HitInfo info)
         {
             if (y < 0)
+            {
                 y = 0;
+            }
 
             var rect = GetNameRect();
             if (x < rect.Right
@@ -119,11 +122,13 @@ namespace LibraryStudio.Forms
                 // ChildIndex 中要填入表示所在位置的数字
                 var ret = _name.CaretMoveDown(x - rect.X,
                     y - rect.Y,
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 0;
+                info.ChildIndex = (int)FieldRegion.Name;
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
 
@@ -133,11 +138,13 @@ namespace LibraryStudio.Forms
             {
                 var ret = _indicator.CaretMoveDown(x - rect.X,
                     y - rect.Y,
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 1;
+                info.ChildIndex = (int)FieldRegion.Indicator;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
 
@@ -147,11 +154,13 @@ namespace LibraryStudio.Forms
                 var y0 = GetContentY();
                 var ret = _content.CaretMoveDown(x - x0,
                     y - y0, // Math.Max(0, y - y0),    // 避免在上沿以上
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
-                info.ChildIndex = 2;
+                info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
 
@@ -168,11 +177,13 @@ namespace LibraryStudio.Forms
                 var rect = GetNameRect();
                 var ret = _name.CaretMoveUp(x - rect.X,
                     y - rect.Y,
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 0;
+                info.ChildIndex = (int)FieldRegion.Name;
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
             x -= _fieldProperty.NamePixelWidth;
@@ -182,11 +193,13 @@ namespace LibraryStudio.Forms
                 var rect = GetIndicatorRect();
                 var ret = _indicator.CaretMoveUp(x - rect.X,
                     y - rect.Y,
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 1;
+                info.ChildIndex = (int)FieldRegion.Indicator;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
 
@@ -197,11 +210,13 @@ namespace LibraryStudio.Forms
                 x -= _fieldProperty.IndicatorPixelWidth;
                 var ret = _content.CaretMoveUp(x - x0,
                     Math.Max(0, y - y0),
-                    out info);
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
-                info.ChildIndex = 2;
+                info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight()
+                info.InnerHitInfo = sub_info;
                 return ret;
             }
 
@@ -250,6 +265,8 @@ namespace LibraryStudio.Forms
         // 注意对于 _name _indicator _content 为 null 的时候，相应区域不应该允许点击，而要转移到最近相邻的一个区域返回点击信息
         public HitInfo HitTest(int x, int y)
         {
+            Debug.Assert(FieldRegion.Caption != 0);
+            Debug.Assert(FieldRegion.Splitter != 0);
             int caption_area_hitted = 0;
             // 点击到了左边 Caption 区域
             if (x < _fieldProperty.CaptionPixelWidth - _fieldProperty.SplitterPixelWidth)
@@ -266,14 +283,14 @@ namespace LibraryStudio.Forms
                     Area = Area.LeftBlank,
                 };
                 */
-                caption_area_hitted = -2;
+                caption_area_hitted = (int)FieldRegion.Caption;// -2 表示 caption 文字区域
                 // 继续向后处理，但在返回前有所区别
                 // 效果就是好像点击了 name indicator content 等部位，只是 ChildIndex 指示了 -2
                 // 这样做的目的是，让返回信息足够丰富，调主可以当作点击 name indicator content 等部位来设置 caret；也可以当作点击了提示区而做出特别处理
             }
 
             // 点击到了 Caption 区域和 Name 区域的缝隙位置
-            if (x < _fieldProperty.CaptionPixelWidth)
+            else if (x < _fieldProperty.CaptionPixelWidth)
             {
                 /*
                 return new HitInfo
@@ -287,7 +304,7 @@ namespace LibraryStudio.Forms
                     Area = Area.LeftBlank,
                 };
                 */
-                caption_area_hitted = -1;
+                caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
             }
 
             var start = _fieldProperty.NameBorderX; // 这里包括了左侧边沿空间
@@ -297,13 +314,15 @@ namespace LibraryStudio.Forms
                 && (x < start + _fieldProperty.NamePixelWidth || must))
             {
                 var rect = GetNameRect();
-                var info = _name.HitTest(x - rect.X, y - rect.Y);
+                var sub_info = _name.HitTest(x - rect.X, y - rect.Y);
+                var info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : 0; // 0 表示 _name
+                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Name; // 0 表示 _name
                 info.TextIndex = info.Offs;
                 info.Offs += 0; // 保持原来的偏移量
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.InnerHitInfo = sub_info;
                 return info;
             }
             start += _fieldProperty.NamePixelWidth;
@@ -313,13 +332,15 @@ namespace LibraryStudio.Forms
                 && (x < start + _fieldProperty.IndicatorPixelWidth || must))
             {
                 var rect = GetIndicatorRect();
-                var info = _indicator.HitTest(x - rect.X, y - rect.Y);
+                var sub_info = _indicator.HitTest(x - rect.X, y - rect.Y);
+                var info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : 1; // 1 表示 _indicator
+                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Indicator; // 1 表示 _indicator
                 info.TextIndex = info.Offs;
                 info.Offs += NameTextLength;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.InnerHitInfo = sub_info;
                 return info;
             }
             start += _fieldProperty.IndicatorPixelWidth;
@@ -329,36 +350,18 @@ namespace LibraryStudio.Forms
                 var x0 = GetContentX();
                 var y0 = GetContentY();
                 // 如果 y-y0 小于 0，表示点击在 _content 的上沿一点空间内，要调整为 0 调用
-                var info = _content.HitTest(x - x0, Math.Max(0, y - y0));
+                var sub_info = _content.HitTest(x - x0, Math.Max(0, y - y0));
+                var info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
-                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : 2; // 2 表示 _content
+                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content; // 2 表示 _content
                 info.TextIndex = info.Offs;
                 info.Offs += NameTextLength + IndicatorTextLength;
+                info.InnerHitInfo = sub_info;
                 // 保持 info.LineHeight
                 return info;
             }
 
-            /*
-            // TODO: 这时需要从右向左探测，找到一个有内容的区域
-            List<IBox> boxes = new List<IBox>();
-            if (_content != null)
-                boxes.Add(_content);
-            if (_indicator != null)
-                boxes.Add(_indicator);
-            if (_name != null)
-                boxes.Add(_name);
-
-            foreach (var box in boxes)
-            {
-                var info = box.HitTest(x - start, y);
-                info.X += start;
-                info.ChildIndex = 2; // 2 表示 _content
-                info.TextIndex = info.Offs;
-                info.Offs += _name.TextLength + _indicator.TextLength;
-                return info;
-            }
-            */
             return new HitInfo();
         }
 
@@ -395,6 +398,8 @@ namespace LibraryStudio.Forms
         public string MergeFullText(int start = 0,
             int end = int.MaxValue)
         {
+            if (start == end)
+                return "";
             int offs = 0;
             var name_text = _name?.MergeText(start, end);
             if (_name != null)
@@ -648,7 +653,7 @@ namespace LibraryStudio.Forms
                 var ret = _name.MoveByOffs(offs, direction, out info);
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 0; // 0 表示 _name
+                info.ChildIndex = (int)FieldRegion.Name; // 0 表示 _name
                 info.TextIndex = info.Offs;
                 //info.Offs += 0;
                 info.Offs += offs_original - offs; // 保持原来的偏移量
@@ -665,14 +670,18 @@ namespace LibraryStudio.Forms
                 && offs + direction >= 0 && offs + direction <= _indicator.TextLength)
             {
                 var rect = GetIndicatorRect();
-                var ret = _indicator.MoveByOffs(offs, direction, out info);
+                var ret = _indicator.MoveByOffs(offs,
+                    direction,
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
-                info.ChildIndex = 1; // 1 表示 _indicator
+                info.ChildIndex = (int)FieldRegion.Indicator; // 1 表示 _indicator
                 info.TextIndex = info.Offs;
                 //info.Offs += _name.TextLength;
                 info.Offs += offs_original - offs; // 保持原来的偏移量
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.InnerHitInfo = sub_info;
                 if (_indicator.TextLength < 2 && this.IsControlField == false)
                     return ret;
                 infos.Add(info);
@@ -693,15 +702,19 @@ namespace LibraryStudio.Forms
             {
                 var x0 = GetContentX();
                 var y0 = GetContentY();
-                var ret = _content.MoveByOffs(offs, direction, out info);
+                var ret = _content.MoveByOffs(offs,
+                    direction,
+                    out HitInfo sub_info);
+                info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
-                info.ChildIndex = 2; // 2 表示 _content
+                info.ChildIndex = (int)FieldRegion.Content; // 2 表示 _content
                 info.TextIndex = info.Offs;
                 //info.Offs += _name.TextLength + _indicator.TextLength;
                 info.Offs += offs_original - offs; // 保持原来的偏移量
                                                    // 保持 info.LineHeight
 
+                info.InnerHitInfo = sub_info;
                 // return ret;
                 infos.Add(info);
             }
@@ -822,10 +835,7 @@ namespace LibraryStudio.Forms
             if (rect.IntersectsWith(clipRect))
             {
                 DrawSolidRectangle(hdc,
-    rect.Left,
-    rect.Top,
-    rect.Right,
-    rect.Bottom,
+    rect,
     new COLORREF(color));
             }
         }
@@ -887,44 +897,112 @@ COLORREF border_color)
         }
 
         public static void DrawSolidRectangle(SafeHDC hdc,
-    int left,
-    int top,
-    int right,
-    int bottom,
+int left, int top, int right, int bottom,
+COLORREF color)
+        {
+            var rect = new Rectangle(left, top, right - left, bottom - top);
+            DrawSolidRectangle(hdc,
+    rect,
+    color);
+        }
+
+        public static void DrawSolidRectangle(SafeHDC hdc,
+    Rectangle rect,
     COLORREF color)
         {
             // 创建实心画刷
             var hBrush = Gdi32.CreateSolidBrush(color);
             var oldBrush = Gdi32.SelectObject(hdc, hBrush);
 
-            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL, 1, color);
+            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL, 0, color);
             var hOldPen = Gdi32.SelectObject(hdc, hPen);
-
-            // 绘制实心矩形
-            Gdi32.Rectangle(hdc,
-                left,
-                top,
-                right + 1,
-                bottom + 1);    // +1 的原因是想要让上下相邻的 rect 看起来连续。但要注意 GetRegion() 接口中得到的区域要向右下也扩大一个像素，避免刷新时漏掉一些线
-
-            // 恢复原画刷并释放资源
-            Gdi32.SelectObject(hdc, oldBrush);
-            Gdi32.SelectObject(hdc, hOldPen);
-            Gdi32.DeleteObject(hBrush);
-            Gdi32.DeleteObject(hPen);
+            try
+            {
+                // 绘制实心矩形
+                Gdi32.Rectangle(hdc,
+                    rect.Left,
+                    rect.Top,
+                    rect.Right,
+                    rect.Bottom);
+                // +1 的原因是想要让上下相邻的 rect 看起来连续。但要注意 GetRegion() 接口中得到的区域要向右下也扩大一个像素，避免刷新时漏掉一些线
+            }
+            finally
+            {
+                // 恢复原画刷并释放资源
+                Gdi32.SelectObject(hdc, oldBrush);
+                Gdi32.SelectObject(hdc, hOldPen);
+                Gdi32.DeleteObject(hBrush);
+                Gdi32.DeleteObject(hPen);
+            }
         }
 
+        public static void DrawVertLine(SafeHDC hdc,
+            Rectangle line_rect,
+            COLORREF border_color)
+        {
+            DrawLine(hdc,
+new Point(line_rect.Left, line_rect.Top),
+new Point(line_rect.Left, line_rect.Bottom),
+line_rect.Width,
+border_color);
+        }
+
+        public static void DrawLine(SafeHDC hdc,
+Point p1,
+Point p2,
+int border_thickness,
+COLORREF border_color)
+        {
+            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_SOLID,
+                border_thickness, border_color);
+            var hOldPen = Gdi32.SelectObject(hdc, hPen);
+
+            try
+            {
+                Gdi32.MoveToEx(hdc,
+                    p1.X,
+                    p1.Y,
+                    out _);
+                Gdi32.LineTo(hdc,
+    p2.X,
+    p2.Y);
+            }
+            finally
+            {
+                Gdi32.SelectObject(hdc, hOldPen);
+                Gdi32.DeleteObject(hPen);
+            }
+        }
 
         public void PaintBackAndBorder(SafeHDC hdc,
 int x,
 int y,
-Rectangle clipRect)
+Rectangle clipRect,
+bool focused = false)
         {
             // 调用前已经用可编辑背景色清除好了
 
             // 头标区，下部绘制全宽背景
             // 001 等控制字段，上部右侧，和下部绘制背景
             // 其余字段，下部绘制背景
+
+
+            // 绘制代表焦点的竖线
+            if (focused)
+            {
+                var line_rect = GetFocusedRect(x, y);
+                if (line_rect.IntersectsWith(clipRect))
+                {
+                    /*
+                    DrawVertLine(hdc,
+                    line_rect,
+                    Color.Red);
+                    */
+                    DrawSolidRectangle(hdc,
+                        line_rect,
+                        _fieldProperty.FocuseColor);
+                }
+            }
 
             var sep = _fieldProperty.GapThickness;
 
@@ -958,7 +1036,8 @@ Rectangle clipRect)
 
             void PaintRegion(Rectangle rect0)
             {
-                PaintWindow(rect0);
+                if (rect0.IntersectsWith(clipRect))
+                    PaintWindow(rect0);
                 /*
                 PaintBorder(hdc,
                     rect0.X,
@@ -996,12 +1075,12 @@ Rectangle clipRect)
                     back_color = _fieldProperty?.ReadOnlyBackColor ?? SystemColors.Control;
                 else
                     back_color = _fieldProperty?.BackColor ?? SystemColors.Window;
-                    PaintEdit(hdc,
-    rect00,
-    clipRect,
-    back_color,
-    _fieldProperty.BorderThickness,
-    _fieldProperty?.BorderColor ?? SystemColors.ControlDark);
+                PaintEdit(hdc,
+rect00,
+clipRect,
+back_color,
+_fieldProperty.BorderThickness,
+_fieldProperty?.BorderColor ?? SystemColors.ControlDark);
                 /*
                 PaintBack(hdc,
                     rect00,
@@ -1010,6 +1089,14 @@ Rectangle clipRect)
                     );
                 */
             }
+        }
+
+        // 获得表示输入焦点的标志区域的 Rectangle
+        public Rectangle GetFocusedRect(int x, int y)
+        {
+            // var x0 = x + _fieldProperty.ContentBorderX - _fieldProperty.BorderThickness * 2 - 1;
+            var x0 = x + _fieldProperty.SolidX;
+            return new Rectangle(x0, y, _fieldProperty.GapThickness, this.GetPixelHeight());
         }
 
 #if OLD
@@ -2214,10 +2301,17 @@ clipRect);
         }
 
         // 修改全部内容
+        // parameters:
+        //      text    字段的 MARC 机内格式全部内容。注意，有可能包含和不包含字段结束符
         public string ChangeText(string text)
         {
             if (text == null)
                 throw new ArgumentException("text 值不允许为 null");
+
+            // 确保有字段结束符
+            if (this.IsHeader == false
+                && text.LastOrDefault() != Metrics.FieldEndCharDefault)
+                text += Metrics.FieldEndCharDefault;
 
             var old_content = _name.MergeText();
 
@@ -2398,6 +2492,54 @@ clipRect);
             }
         }
 
+        // 对文本中的空格进行切割
+        public static Segment[] SplitBlankChar(Segment[] segments)
+        {
+            var results = new List<Segment>();
+            foreach (var segment in segments)
+            {
+                if (segment.Text.Contains(" "))
+                {
+                    foreach (var text in SplitByBlankChar(segment.Text))
+                    {
+                        results.Add(new Segment
+                        {
+                            Tag = segment.Tag,
+                            Text = text
+                        });
+                    }
+                }
+                else
+                {
+                    results.Add(segment);
+                }
+            }
+
+            return results.ToArray();
+        }
+
+        // TODO: 连续的空格可以粘在一起输出
+        // 根据空格切割字符串。比如 "12 34" 输出 "12"、" "、"34"
+        static IEnumerable<string> SplitByBlankChar(string text)
+        {
+            var content = new StringBuilder();
+            foreach (var ch in text)
+            {
+                if (ch == ' ')
+                {
+                    if (content.Length > 0)
+                        yield return content.ToString();
+                    content.Clear();
+                    yield return " ";
+                    continue;
+                }
+                content.Append(ch);
+            }
+
+            if (content.Length > 0)
+                yield return content.ToString();
+        }
+
         // 子字段周边信息
         public class SubfieldBound
         {
@@ -2417,7 +2559,9 @@ clipRect);
             }
         }
 
+        // 获得子字段周边信息
         // parameters:
+        //      offs        在当前字段内的 offs 偏移量
         //      right_most    当插入符处在内容末端时，是否认为命中最后一个子字段
         public SubfieldBound GetSubfieldBounds(
             int offs,
@@ -2506,11 +2650,223 @@ clipRect);
             }
         }
 
+        // 获得子字段周边信息，扩展版本，能获得 offs 所在的、不是子字段的区域的信息
+        // parameters:
+        //      offs        在当前字段内的 offs 偏移量
+        //      right_most    当插入符处在内容末端时，是否认为命中最后一个子字段
+        public SubfieldBound GetSubfieldBoundsEx(
+    int offs,
+    bool right_most = false)
+        {
+            if (offs < 0)
+                return new SubfieldBound
+                {
+                    Found = false
+                };
+            var subfld = Metrics.SubfieldCharDefault;
+
+            var text_length = this.PureTextLength;
+            if (offs > text_length)
+            {
+                return new SubfieldBound { Found = false };
+            }
+            /*
+            if (offs >= text_length && right_most == false)
+            {
+                return new SubfieldBound { Found = false };
+            }
+            */
+            if (this.IsHeader)
+                return new SubfieldBound
+                {
+                    Name = "!content",
+                    StartOffs = 0,
+                    ContentStartOffs = 0,
+                    EndOffs = Math.Min(24, text_length),
+                    CaretOffs = offs,
+                    Found = false
+                };
+            if (this.IsControlField)
+            {
+                if (offs < 3
+                    || (offs == 3 && offs == text_length))
+                    return new SubfieldBound
+                    {
+                        Name = "!name",
+                        StartOffs = 0,
+                        ContentStartOffs = 0,
+                        EndOffs = Math.Min(3, text_length),
+                        CaretOffs = offs,
+                        Found = false
+                    };
+                else
+                    return new SubfieldBound
+                    {
+                        Name = "!content",
+                        StartOffs = 3,
+                        ContentStartOffs = 3,
+                        EndOffs = text_length,
+                        CaretOffs = offs,
+                        Found = false
+                    };
+            }
+
+            if (offs < 3
+    || (offs == 3 && offs == text_length && right_most == true))
+                return new SubfieldBound
+                {
+                    Name = "!name",
+                    StartOffs = 0,
+                    ContentStartOffs = 0,
+                    EndOffs = Math.Min(3, text_length),
+                    CaretOffs = offs,
+                    Found = false
+                };
+
+            if (offs == 3 && offs == text_length && right_most == false)
+                return new SubfieldBound
+                {
+                    Found = false
+                };
+
+            if (offs < 5
+                || (offs == 5 && offs == text_length && right_most == true))
+            {
+                return new SubfieldBound
+                {
+                    Name = "!indicator",
+                    StartOffs = 3,
+                    ContentStartOffs = 3,
+                    EndOffs = Math.Min(5, text_length),
+                    CaretOffs = offs,
+                    Found = false
+                };
+            }
+
+            if (offs == 5 && offs == text_length && right_most == false)
+                return new SubfieldBound
+                {
+                    Found = false
+                };
+
+            Debug.Assert(offs >= 5);
+            Debug.Assert(this.IsHeader == false);
+            Debug.Assert(this.IsControlField == false);
+
+            // 只需要得到不包含结束符的文本
+            var text = this.MergePureText();
+            var start = -1;
+
+            if (offs >= text_length)
+            {
+                if (right_most == false)
+                    return new SubfieldBound { Found = false };
+
+                if (text_length > 5)
+                {
+                    // 特殊处理插入符在内容末端的情况
+                    start = GetStartOffs(text_length - 1);
+                }
+                else if (text_length == 5)
+                {
+                    // 没有内容时，caret 在 5 被当作命中指示符
+                    return new SubfieldBound
+                    {
+                        Name = "!indicator",
+                        StartOffs = 3,
+                        ContentStartOffs = 3,
+                        EndOffs = Math.Min(5, text_length),
+                        CaretOffs = offs,
+                        Found = false
+                    };
+                }
+                else
+                {
+                    return new SubfieldBound { Found = false };
+                }
+            }
+
+            var current_name = "";
+
+            if (start == -1)
+            {
+                start = GetStartOffs(offs);
+            }
+
+            if (start < 5)
+            {
+                // 说明这是内容区第一个子字段范围以左的一段文字
+                return new SubfieldBound
+                {
+                    Name = "!content",
+                    StartOffs = 5,
+                    ContentStartOffs = 5,
+                    EndOffs = GetEndOffs(offs),
+                    CaretOffs = offs,
+                    Found = false
+                };
+            }
+
+            var end = GetEndOffs(offs);
+            if (end > start + 1)
+                current_name = text.Substring(start + 1, 1);
+
+            var found = text[start] == subfld;
+            if (found == false)
+                return new SubfieldBound { Found = false };
+
+            return new SubfieldBound
+            {
+                Name = current_name,
+                StartOffs = start,
+                ContentStartOffs = Math.Min(end, start + 2),
+                EndOffs = end,
+                CaretOffs = offs,
+                Found = found,
+            };
+
+            int GetEndOffs(int c)
+            {
+                int j = c;
+                foreach (var ch in text.Substring(c))
+                {
+                    if (ch == subfld && j > c)
+                        break;
+                    j++;
+                }
+                return j;
+            }
+
+            int GetStartOffs(int c)
+            {
+                if (c >= text.Length)
+                    c--;
+                for (; c >= 0; c--)
+                {
+                    var ch = text[c];
+                    if (text[c] == subfld)
+                        break;
+                }
+                return c;
+            }
+        }
+
+
         public void ClearCache()
         {
             _name?.ClearCache();
             _indicator?.ClearCache();
             _content?.ClearCache();
         }
+    }
+
+    public enum FieldRegion
+    {
+        None = -100,
+        Caption = -2,
+        Splitter = -1,  // -1 表示 caption 和 name 之间的缝隙
+        Name = 0,
+        Indicator = 1,
+        Content = 2,
     }
 }
