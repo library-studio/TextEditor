@@ -54,6 +54,9 @@
     <Compile Include="Control\DragBlock.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Control\Mouse.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Control\Selection.cs">
       <SubType>UserControl</SubType>
     </Compile>

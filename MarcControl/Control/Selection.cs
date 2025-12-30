@@ -231,6 +231,7 @@ namespace LibraryStudio.Forms
         }
 #endif
 
+#if OLD
         // 多语种时不完备，即将废弃
         void InvalidateBlock(bool trigger_event = true)
         {
@@ -249,6 +250,7 @@ namespace LibraryStudio.Forms
                 this.BlockChanged?.Invoke(this, new EventArgs());
             }
         }
+#endif
 
         void InvalidateBlockRegion(bool trigger_event = true)
         {
@@ -271,7 +273,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-
+#if OLD
         // 多语种时不完备，即将废弃
         bool InvalidateBlock(int offs1, int offs2)
         {
@@ -286,6 +288,7 @@ namespace LibraryStudio.Forms
 
             return false;
         }
+#endif
 
         bool InvalidateBlockRegion(int offs1, int offs2)
         {
@@ -302,7 +305,7 @@ namespace LibraryStudio.Forms
             return false;
         }
 
-        // 获得表示块大致范围的 Rectangle
+        // 获得表示块精确边界范围的 Region 对象
         Region GetBlockRegion(
             int offs1,
             int offs2)
@@ -326,7 +329,7 @@ namespace LibraryStudio.Forms
         }
 
 
-        // 获得表示块大致范围的 Rectangle
+        // 获得包围块边界范围的 Rectangle。若需要精确边界请使用 GetBlockRegion()
         Rectangle GetBlockRectangle(int offs1, int offs2)
         {
             if (offs1 < 0 || offs2 < 0)
@@ -367,7 +370,6 @@ namespace LibraryStudio.Forms
                 this.AutoScrollMinSize.Width,   // document width
                 info2.Y + info2.LineHeight - info1.Y);
         }
-
 
     }
 }

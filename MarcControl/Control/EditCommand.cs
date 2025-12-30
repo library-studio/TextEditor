@@ -1982,4 +1982,17 @@ namespace LibraryStudio.Forms
             }
         }
     }
+
+    // Delete 和 Backspace 键的功能风格
+    [Flags]
+    public enum DeleteKeyStyle
+    {
+        None = 0x00,
+        // 在字段名和指示符区域 Delete 键被当作删除字段。
+        // 如果为 false，表示效果为用填充字符替换插入符位置字符
+        DeleteKeyAsDeleteField = 0x01,
+        // 在字段内容最后一个字符以右删除，效果是否为删除字段结束符。删除后下一个字段的内容会接续上来
+        // 如果为 false，表示效果为不允许删除字段结束符
+        DeleteFieldTerminator = 0x02,
+    }
 }

@@ -486,3 +486,7 @@ https://learn.microsoft.com/zh-cn/dotnet/desktop/winforms/high-dpi-support-in-wi
 001 字段，内容的最后一个字符位置开始 backspace，当删除到只剩下 00 时，会自动填充一个空格。
 但这个做法是还可以探讨的。是否需要自动填充 三个空格？因为 '00 ' 字段已经不是 Control Field 了，要填满应该是包括指示符区。
 不过这样做有点怪异，感觉 backspace 删着删着突然一下字符还多出来了。
+
+~~~
+当拖动鼠标越出窗口 Client Area 时，应该触发时钟，每隔一秒钟自动卷滚一段距离，这样可以
+提高拖动定义块时候的舒适性。(不然就要来回移动一下鼠标，才能引起卷动)
