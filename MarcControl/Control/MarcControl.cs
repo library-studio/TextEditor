@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Vanara.PInvoke;
+using static System.Net.Mime.MediaTypeNames;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
 using static Vanara.PInvoke.User32;
@@ -522,6 +523,7 @@ namespace LibraryStudio.Forms
                 _content = value;
 #endif
 
+#if REMOVED
                 // _initialized = false;
                 Relayout(value, true);
 
@@ -529,6 +531,37 @@ namespace LibraryStudio.Forms
                 MoveCaret(HitByGlobalOffs(_global_offs + 1, -1));
                 this.Invalidate();
                 this._history.Clear();
+#endif
+                // 不改变 Changed; 清除编辑历史
+                SetContent(value,
+                    set_changed: false,
+                    clear_history: true);
+            }
+        }
+
+        public void SetContent(string value,
+            bool set_changed = false,
+            bool clear_history = false)
+        {
+            string replaced_text = this._record.MergeText();
+            Relayout(value, true);
+            if (set_changed)
+                SetChanged();
+            MoveCaret(HitByGlobalOffs(_global_offs + 1, -1));
+            this.Invalidate();
+            if (clear_history)
+            {
+                this._history.Clear();
+            }
+            else
+            {
+                _history.Memory(new EditAction
+                {
+                    Start = 0,
+                    End = replaced_text.Length,
+                    OldText = replaced_text,
+                    NewText = value,
+                });
             }
         }
 

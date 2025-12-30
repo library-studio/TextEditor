@@ -2375,12 +2375,26 @@ out int max_pixel_width)
             }
             else
             {
-                // 其余位置替换
+                // 观察是否处在字段名、指示符位置
+                if ((field.IsControlField && caret_offs_in_field < 3)
+                    || (field.IsControlField == false && caret_offs_in_field < 5))
+                {
+                    // 替换
+                    return new InputInfo
+                    {
+                        Text = new string(ch, 1),
+                        Start = start + caret_offs_in_field,
+                        End = start + caret_offs_in_field + 1
+                    };
+                }
+
+
+                // 其余位置插入
                 return new InputInfo
                 {
                     Text = new string(ch, 1),
                     Start = start + caret_offs_in_field,
-                    End = start + caret_offs_in_field + 1
+                    End = start + caret_offs_in_field// + 1
                 };
             }
         }
