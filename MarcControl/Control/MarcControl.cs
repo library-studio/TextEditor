@@ -10,11 +10,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Vanara.PInvoke;
-using static LibraryStudio.Forms.MarcRecord;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
 using static Vanara.PInvoke.User32;
-using static Vanara.PInvoke.User32.RAWINPUT;
 
 namespace LibraryStudio.Forms
 {
@@ -1900,7 +1898,7 @@ e.Y + this.VerticalScroll.Value);
                     //_controlPressed = true;
                     break;
                 case Keys.Delete:
-                    if (ProcessDeleteKey(_caretInfo) == true)
+                    if (ProcessDeleteKey(_caretInfo, _deleteKeyStyle) == true)
                         e.Handled = true;
                     break;
                 case Keys.Back:

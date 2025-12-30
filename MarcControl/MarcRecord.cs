@@ -2016,6 +2016,206 @@ out int max_pixel_width)
             public int Caret { get; set; } = -1;
         }
 
+        // Delete 和 Backspace 键的功能风格
+        [Flags]
+        public enum DeleteKeyStyle
+        {
+            None = 0x00,
+            // 在字段名和指示符区域 Delete 键被当作删除字段。
+            // 如果为 false，表示效果为用填充字符替换插入符位置字符
+            DeleteKeyAsDeleteField = 0x01,
+            // 在字段内容最后一个字符以右删除，效果是否为删除字段结束符。删除后下一个字段的内容会接续上来
+            // 如果为 false，表示效果为不允许删除字段结束符
+            DeleteFieldTerminator = 0x02,
+        }
+
+        public InputInfo GetDeleteInfo(HitInfo info,
+            DeleteKeyStyle style,
+    //char ch,
+    char padding_char = (char)0)
+        {
+            var index = info.ChildIndex;
+
+            // 在最后一个字段以后
+            if (index >= _fields.Count)
+            {
+                var text_length = this.TextLength;
+                if (padding_char != 0)
+                {
+                    // 如果头标区字符数不足，当前 index 正好位于头标区的下一个字段
+                    if (index == 1 && _fields[0].FullTextLength < 24)
+                    {
+                        var header = _fields[0];
+                        var header_length = header.FullTextLength;
+
+                        var content = header.MergeFullText() + new string(padding_char, 24 - header_length) + new string(padding_char, 5);
+
+                        return new InputInfo
+                        {
+                            Text = content.Substring(info.Offs),
+                            Start = info.Offs,
+                            End = header_length,
+                            Caret = 24,
+                        };
+                    }
+                    return new InputInfo
+                    {
+                        Text = (new string(padding_char, 5)),
+                        Start = text_length,
+                        End = text_length
+                    };
+                }
+
+                // 无需动作
+                return new InputInfo
+                {
+                    Text = "",
+                    Start = text_length,
+                    End = text_length
+                };
+            }
+
+            Debug.Assert(index < _fields.Count);
+            var field = _fields[index];
+
+            if (this.GetFieldOffsRange(index, out int start, out int end) == false)
+                return null;
+
+            var caret_offs_in_field = info.Offs - start;
+            // 头标区
+            if (index == 0)
+            {
+                // 需要填充足够字符，让头标区达到 24 字符
+                if (padding_char != 0
+                    && end < 24)
+                {
+                    return Build24();
+                }
+                // 实际上在下一个字段的第一字符进行替换或插入
+                if (end == caret_offs_in_field)
+                {
+                    if (_fields.Count == 1
+                        || _fields[1].TextLength <= 1)
+                    {
+                        index = 1;  // 调整到头标区后第一个字段，重做
+                        var temp = info.Clone();
+                        temp.ChildIndex = 1;
+                        return GetDeleteInfo(temp,
+                            style,
+                            padding_char);
+                    }
+                }
+                else
+                {
+                    // 替换字符
+                    return new InputInfo
+                    {
+                        Text = padding_char != 0 ? " " : new string(padding_char, 1),
+                        Start = caret_offs_in_field,
+                        End = caret_offs_in_field + 1
+                    };
+                }
+            }
+
+            InputInfo Build24()
+            {
+                var content = field.MergeFullText() + new string(padding_char, 24 - end);
+                // 替换一个字符以后的全部文字
+                content = content.Substring(0, caret_offs_in_field) + padding_char + content.Substring(caret_offs_in_field + 1);
+                return new InputInfo
+                {
+                    Text = content.Substring(caret_offs_in_field, 24 - caret_offs_in_field),
+                    Start = caret_offs_in_field,
+                    End = end,
+                };
+            }
+
+            // 将填充部分和需要输入的 ch 结合起来构造一个 replaceText() 动作
+            // 比如字符数不足，但输入的位置不一定在字段末尾(指结束符之前的位置)，就是典型情况。输入和位置和要填充的一段有点距离，是断开的
+            // parameters:
+            //      length  试图要达到的字段全部文字长度。不包括结束符
+            InputInfo Build(int length)
+            {
+                // 字段结束符左边的位置
+                var pure_end = end - 1;
+                // 填充后要达到的全部文字，注意排除了结束符。因为结束符本来就具备，替换和插入均不影响到它
+                var content = field.MergePureText() + new string(padding_char, (start + length) - pure_end);
+                // 再输入一个字符后要达到的全部文字，注意排除了结束符
+                content = content.Substring(0, caret_offs_in_field) + padding_char + content.Substring(caret_offs_in_field + 1);
+                return new InputInfo
+                {
+                    Text = content.Substring(caret_offs_in_field, (content.Length) - caret_offs_in_field),
+                    Start = start + caret_offs_in_field,
+                    End = pure_end, // 在结束符左边位置
+                };
+            }
+
+            // 填充，控制字段和普通字段
+            if (padding_char != 0)
+            {
+                if (field.IsControlField)
+                {
+                    if (end - start < 3 + 1)
+                    {
+                        return Build(3);
+                    }
+                }
+                else
+                {
+                    if (end - start < 5 + 1)
+                    {
+                        return Build(5);
+                    }
+                }
+            }
+
+            // 在字段结束符以右，或者以左，都只能是无需动作
+            if (end - 1 <= start + caret_offs_in_field)
+            {
+                // 要删除结束符
+                if (style.HasFlag(DeleteKeyStyle.DeleteFieldTerminator))
+                {
+                    return new InputInfo
+                    {
+                        Text = "",
+                        Start = end - 1,
+                        End = end
+                    };
+                }
+                // 无需动作
+                return new InputInfo
+                {
+                    Text = "",
+                    Start = end - 1,
+                    End = end - 1
+                };
+            }
+            else
+            {
+                // 观察是否处在字段名、指示符位置
+                if ((field.IsControlField && caret_offs_in_field < 3)
+                    || (field.IsControlField == false && caret_offs_in_field < 5))
+                {
+                    // 填充
+                    return new InputInfo
+                    {
+                        Text = padding_char != 0 ? " " : new string(padding_char, 1),
+                        Start = start + caret_offs_in_field,
+                        End = start + caret_offs_in_field + 1
+                    };
+                }
+
+                // 其余位置删除
+                return new InputInfo
+                {
+                    Text = "",
+                    Start = start + caret_offs_in_field,
+                    End = start + caret_offs_in_field + 1
+                };
+            }
+        }
+
+
         // 获得输入一个普通字符的操作信息
         // 注意字段名和字段指示符区域，是覆盖输入效果；内容区是插入字符效果
         // 本函数还可以根据要求，观察输入所在的区域，如果字符数不足规则要求，自动填充足量的字符
@@ -2129,6 +2329,7 @@ out int max_pixel_width)
                 var content = field.MergeFullText() + new string(padding_char, 24 - end);
                 // 输入一个字符以后的全部文字
                 content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
+                Debug.Assert(content.Length == 24);
                 return new InputInfo
                 {
                     Text = content.Substring(caret_offs_in_field, 24 - caret_offs_in_field),
@@ -2140,7 +2341,7 @@ out int max_pixel_width)
             // 将填充部分和需要输入的 ch 结合起来构造一个 replaceText() 动作
             // 比如字符数不足，但输入的位置不一定在字段末尾(指结束符之前的位置)，就是典型情况。输入和位置和要填充的一段有点距离，是断开的
             // parameters:
-            //      length  试图要达到的字段长度。包括结束符
+            //      length  试图要达到的字段全部文字长度。不包括结束符
             InputInfo Build(int length)
             {
                 // 字段结束符左边的位置
@@ -2151,7 +2352,7 @@ out int max_pixel_width)
                 content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
                 return new InputInfo
                 {
-                    Text = content.Substring(caret_offs_in_field, (pure_end - start) - caret_offs_in_field),
+                    Text = content.Substring(caret_offs_in_field, (content.Length) - caret_offs_in_field),
                     Start = start + caret_offs_in_field,
                     End = pure_end, // 在结束符左边位置
                 };
@@ -2162,28 +2363,30 @@ out int max_pixel_width)
             {
                 if (field.IsControlField)
                 {
-                    if (end < 3 + 1)
+                    if (end - start < 3 + 1)
                     {
-                        return Build(3 + 1);
+                        return Build(3);
                     }
                 }
                 else
                 {
-                    if (end < 5 + 1)
+                    if (end - start < 5 + 1)
                     {
-                        return Build(5+1);
+                        return Build(5);
                     }
                 }
             }
 
             // 在字段结束符以右，或者以左，都只能是插入
             if (end - 1 <= start + caret_offs_in_field)
+            {
                 return new InputInfo
                 {
                     Text = new string(ch, 1),
                     Start = end - 1,
                     End = end - 1
                 };
+            }
             else
             {
                 // 其余位置替换
