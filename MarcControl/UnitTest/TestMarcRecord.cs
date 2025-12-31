@@ -20,6 +20,7 @@ namespace LibraryStudio.Forms
             _output = output;
         }
 
+        #region SoftReplace
 
         [Theory]
         [InlineData("", "", "")]
@@ -133,6 +134,10 @@ namespace LibraryStudio.Forms
             Assert.Equal(correct, result);
         }
 
+        #endregion
+
+        #region SplitFields
+
         [Theory]
         [InlineData("", 0, new string[] { "" })]
         [InlineData("1", 0, new string[] { "1" })]
@@ -163,6 +168,10 @@ namespace LibraryStudio.Forms
                 i++;
             }
         }
+
+        #endregion
+
+        #region FindFields
 
         [Theory]
         // 在(空的)头标区开头插入
@@ -426,6 +435,10 @@ namespace LibraryStudio.Forms
             }
         }
 
+        #endregion
+
+        #region GetFieldOffsList
+
         [Theory]
         [InlineData(1,
             @"012345678901234567890123
@@ -577,6 +590,11 @@ namespace LibraryStudio.Forms
                     throw;
             }
         }
+
+        #endregion
+
+
+        #region FindFieldsV2
 
         [Theory]
         // 在(空的)头标区开头插入
@@ -958,6 +976,151 @@ ABCDEF",
             }
         }
 
+        #endregion
+
+
+        #region MergeTextMask
+
+        [Theory]
+        [InlineData(
+    "01",
+    @"012345678901234567890123
+001ABCDE",
+    0,
+    24,
+    "\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06\x06"
+)]
+        [InlineData(
+    "02",
+    @"012345678901234567890123
+001ABCDE",
+    24,
+    32,
+    "\u0001\u0002\u0003ABCDE"
+)]
+        [InlineData(
+    "03",
+    @"012345678901234567890123
+001ABCDE",
+    24,
+    33,
+    "\u0001\u0002\u0003ABCDE\u001e"
+)]
+        [InlineData(
+    "04",
+    @"012345678901234567890123
+200ABCDE",
+    24,
+    33,
+    "\u0001\u0002\u0003\u0004\u0005CDE\u001e"
+)]
+        [InlineData(
+    "05",
+    @"012345678901234567890123
+200ABCDE",
+    25,
+    33,
+    "\u0002\u0003\u0004\u0005CDE\u001e"
+)]
+        [InlineData(
+    "06",
+    @"012345678901234567890123
+200ABCDE",
+    26,
+    33,
+    "\u0003\u0004\u0005CDE\u001e"
+)]
+        [InlineData(
+    "07",
+    @"012345678901234567890123
+200ABCDE",
+    27,
+    33,
+    "\u0004\u0005CDE\u001e"
+)]
+        [InlineData(
+    "08",
+    @"012345678901234567890123
+200ABCDE",
+    28,
+    33,
+    "\u0005CDE\u001e"
+)]
+        [InlineData(
+    "09",
+    @"012345678901234567890123
+200ABCDE",
+    29,
+    33,
+    "CDE\u001e"
+)]
+        [InlineData(
+    "10",
+    @"012345678901234567890123
+200ABCDE",
+    30,
+    33,
+    "DE\u001e"
+)]
+        [InlineData(
+    "11",
+    @"012345678901234567890123
+200ABCDE",
+    31,
+    33,
+    "E\u001e"
+)]
+        [InlineData(
+    "12",
+    @"012345678901234567890123
+200ABCDE",
+    32,
+    33,
+    "\u001e"
+)]
+        [InlineData(
+    "13",
+    @"012345678901234567890123
+200ABCDE",
+    33,
+    33,
+    ""
+)]
+        [InlineData(
+    "14",
+    @"012345678901234567890123
+200ABCDE",
+    23,
+    25,
+    "\u0006\u0001"
+)]
+        [InlineData(
+    "20",
+    @"012345678901234567890123
+200  $a测试中文$Aceshi zhongwen",
+    31,
+    35,
+    "测试中文"
+)]
+        public void test_mergeTextMask(
+string number,
+string fields,
+int start,
+int end,
+string correct_result)
+        {
+            var record = BuildRecord(fields);
+            var result = record.MergeTextMask(
+            start,
+            end);
+
+            _output.WriteLine($"case {number}");
+
+            Assert.Equal(correct_result, result);
+        }
+
+
+        #endregion
 
         static List<IBox> BuildFields(string text, int start = 0)
         {

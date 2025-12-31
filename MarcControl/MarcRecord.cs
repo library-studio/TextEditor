@@ -511,7 +511,7 @@ namespace LibraryStudio.Forms
         }
 #endif
 
-
+        // TODO: 单元测试
         // 获得带有 Mask Char 的文本内容
         public string MergeTextMask(int start = 0, int end = int.MaxValue)
         {
@@ -1602,7 +1602,11 @@ namespace LibraryStudio.Forms
             {
                 {
                     var backColor = context?.GetBackColor?.Invoke(null, false) ?? SystemColors.Window;
-                    MarcField.DrawSolidRectangle(hdc, clipRect, backColor);
+                    var rect = clipRect;
+                    // 注: 如果直接用 clipRect 来绘制背景，右下会漏一条线的面积没有填充到
+                    rect.Width += 1;
+                    rect.Height += 1;
+                    MarcField.DrawSolidRectangle(hdc, rect, backColor);
                 }
 
                 // var height = this.AutoScrollMinSize.Height - FontContext.DefaultFontHeight;

@@ -80,7 +80,9 @@ namespace LibraryStudio.Forms
                     if (range != null
                         && range.Tag is MarcField.Tag tag
                         && tag.Delimeter)
+                    {
                         return _fieldProperty?.DelimeterBackColor ?? Metrics.DefaultDelimeterBackColor; // 子字段名文本为红色
+                    }
                     if (range != null)
                         return Color.Transparent;
                     if (this._readonly)

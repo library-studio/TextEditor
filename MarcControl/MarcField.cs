@@ -549,45 +549,59 @@ namespace LibraryStudio.Forms
 
         public string MergeFullTextMask(int start = 0, int end = int.MaxValue)
         {
+            if (Utility.Cross(start, end, 0, this.FullTextLength) == false)
+                return "";
             if (end <= start || end <= 0)
                 return "";
 
-            var name_text = _name?.MergeText(start, end);
-            if (_name != null)
-            {
-                start -= _name.TextLength;
-                if (end != -1)
-                    end -= _name.TextLength;
-            }
-            // 按照字符所在的位置，mask char 值有所不同
-            name_text = GetMaskString(start, (char)0x01, name_text?.Length ?? 0);
-
-            var indicator_text = _indicator?.MergeText(start, end);
-            if (_indicator != null)
-            {
-                start -= _indicator.TextLength;
-                if (end != -1)
-                    end -= _indicator.TextLength;
-            }
-            indicator_text = GetMaskString(start, (char)0x04, indicator_text?.Length ?? 0);
-
-            var content_text = _content?.MergeText(start, end);
             if (this.IsHeader)
+            {
+                var content_text = _content?.MergeText(start, end);
                 content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+                return (content_text ?? "");
+            }
 
-            start -= content_text?.Length ?? 0;
-            end -= content_text?.Length ?? 0;
+            {
+                var name_text = _name?.MergeText(start, end);
+                // 按照字符所在的位置，mask char 值有所不同
+                name_text = GetMaskString(start, (char)0x01, name_text?.Length ?? 0);
+                if (_name != null)
+                {
+                    start -= _name.TextLength;
+                    if (end != -1)
+                        end -= _name.TextLength;
+                }
 
-            var terminator = "";
-            if (Utility.InRange(0, start, end))
-                terminator = new string(Metrics.FieldEndCharDefault, 1);
-            return (name_text ?? "")
-                + (indicator_text ?? "")
-                + (content_text ?? "")
-                + (this.IsHeader ? "" : terminator);
+                var indicator_text = _indicator?.MergeText(start, end);
+                indicator_text = GetMaskString(start, (char)0x04, indicator_text?.Length ?? 0);
+                if (_indicator != null)
+                {
+                    start -= _indicator.TextLength;
+                    if (end != -1)
+                        end -= _indicator.TextLength;
+                }
+
+                var content_text = _content?.MergeText(start, end);
+                //if (this.IsHeader)
+                //    content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+
+                start -= _content?.TextLength ?? 0;
+                end -= _content?.TextLength ?? 0;
+
+                var terminator = "";
+                if (Utility.InRange(0, start, end))
+                    terminator = new string(Metrics.FieldEndCharDefault, 1);
+                return (name_text ?? "")
+                    + (indicator_text ?? "")
+                    + (content_text ?? "")
+                    + (/*this.IsHeader ? "" :*/ terminator);
+            }
 
             // parameters:
-            //      start_char  text 文本处在 Region 中的起始偏移位置
+            //      start_offs  text 文本处在 Region 中的起始偏移位置。
+            //                  以当前 Region 自己的坐标计算，开始位置为 0。
+            //                  决定了完整的文本编号开始时的字符位置(但完整的文本只有其中一部分进入了 mask string)
+            //                  如果是负数，表示已经用掉了若干字符
             string GetMaskString(int start_offs, char first_char, int length)
             {
                 if (length <= 0)

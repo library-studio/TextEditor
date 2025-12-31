@@ -596,6 +596,7 @@ namespace LibraryStudio.Forms
                         // 触发一个函数，让它决定是否要补充字符，如何补充。
                         GetLeftRight(out string left,
                             out string right);
+                        // 注意 right 不包含字段结束符
                         var old_left = left;
                         var old_right = right;
                         SplitPadding(
@@ -608,7 +609,7 @@ namespace LibraryStudio.Forms
                         // TODO: 优化，从两端向中间寻找，找到中间不一样的一段，只替换不一样的一段
 
                         ReplaceText(_global_offs - old_left.Length,
-        _global_offs + old_right.Length + 1,
+        _global_offs + old_right.Length,    // + 1,
         new_text,
         delay_update: delay,
         false);

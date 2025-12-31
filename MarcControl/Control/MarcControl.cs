@@ -483,6 +483,11 @@ namespace LibraryStudio.Forms
             // Custom painting code can go here
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            // base.OnPaintBackground(e);
+        }
+
         Rectangle GetFocusRect()
         {
             if (_caretInfo.ChildIndex >= this._record.FieldCount)
@@ -555,16 +560,30 @@ namespace LibraryStudio.Forms
             }
             else
             {
-                _history.Memory(new EditAction
+                // 简化编辑历史
+                var result = Utility.CompareTwoContent(value, replaced_text);
+                if (result.StartLength == 0 && result.EndLength == 0)
                 {
-                    Start = 0,
-                    End = replaced_text.Length,
-                    OldText = replaced_text,
-                    NewText = value,
-                });
+                    _history.Memory(new EditAction
+                    {
+                        Start = 0,
+                        End = replaced_text.Length,
+                        OldText = replaced_text,
+                        NewText = value,
+                    });
+                }
+                else
+                {
+                    _history.Memory(new EditAction
+                    {
+                        Start = result.StartLength,
+                        End = replaced_text.Length - result.EndLength,
+                        OldText = replaced_text.Substring(result.StartLength, replaced_text.Length - result.EndLength - result.StartLength),
+                        NewText = value.Substring(result.StartLength, value.Length - result.EndLength - result.StartLength),
+                    });
+                }
             }
         }
-
 
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]

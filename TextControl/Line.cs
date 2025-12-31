@@ -1460,8 +1460,8 @@ y,
 line_height,
 0,
 range.Text.Length);
-                        var larger = ((Rectangle)(rect)).Larger();
-                        if (clipRect.IntersectsWith(larger))
+                        // var larger = ((Rectangle)(rect)).Larger();
+                        if (clipRect.IntersectsWith((Rectangle)rect))
                         {
                             DrawSolidRectangle(hdc,
                             rect.left,
@@ -1524,9 +1524,9 @@ range.Text.Length);
                             }
                         }
 
-                        var larger = ((Rectangle)(block_rect)).Larger();
+                        // var larger = ((Rectangle)(block_rect)).Larger();
 
-                        if (clipRect.IntersectsWith(larger))
+                        if (clipRect.IntersectsWith((Rectangle)block_rect))
                         {
                             // var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
                             var back_color = range.ColorCache
@@ -1573,8 +1573,8 @@ range.Text.Length);
                             x + FontContext.DefaultReturnWidth,
                             y + line_height);
 
-                        var larger = ((Rectangle)(block_rect)).Larger();
-                        if (clipRect.IntersectsWith(larger))
+                        // var larger = ((Rectangle)(block_rect)).Larger();
+                        if (clipRect.IntersectsWith((Rectangle)block_rect))
                         {
                             // var back_color = context?.GetBackColor?.Invoke(null, true) ?? SystemColors.Highlight;
                             var back_color = line.ColorCache

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -17,12 +17,11 @@ namespace LibraryStudio.Forms
             region.Translate(x, y);
         }
 
+        // TODO: 即将取消
         public static Rectangle Larger(this Rectangle rect)
         {
-            /*
-            rect.Width += 1;
-            rect.Height += 1;
-            */
+            //rect.Width += 1;
+            //rect.Height += 1;
             return rect;
         }
     }
@@ -33,12 +32,72 @@ namespace LibraryStudio.Forms
     public class Utility
     {
 
+        public class CompareResult
+        {
+            // 头部相同的字符数
+            public int StartLength { get; set; }
+            //尾部相同的字符数
+            public int EndLength { get; set; }
+        }
+
+        // 从两端向中间比较，找到内容相同的最大段落
+        public static CompareResult CompareTwoContent(string content1, string content2)
+        {
+            int min_length = Math.Min(content1.Length, content2.Length);
+            if (min_length == 0)
+                return new CompareResult
+                {
+                    StartLength = 0,
+                    EndLength = 0
+                };
+            int start_length = 0;
+            using (var iterator1 = content1.GetEnumerator())
+            using (var iterator2 = content2.GetEnumerator())
+            {
+                while (start_length < min_length)
+                {
+                    iterator1.MoveNext();
+                    iterator2.MoveNext();
+                    if (iterator1.Current != iterator2.Current)
+                        break;
+                    start_length++;
+                }
+            }
+
+            int end_length = 0;
+            // start_length 用掉的部分扣除
+            min_length -= start_length;
+            if (min_length > 0)
+            {
+                using (var iterator1 = content1.Reverse().GetEnumerator())
+                using (var iterator2 = content2.Reverse().GetEnumerator())
+                {
+                    while (end_length < min_length)
+                    {
+                        iterator1.MoveNext();
+                        iterator2.MoveNext();
+                        if (iterator1.Current != iterator2.Current)
+                            break;
+                        end_length++;
+                    }
+                }
+            }
+
+            return new CompareResult
+            {
+                StartLength = start_length,
+                EndLength = end_length
+            };
+        }
+
+
+
         // 判断两个 offs 范围是否有交叉
         // 如果 start == end，表示空范围。只用 start 探测一次，不用 end-1 进行探测
         public static bool Cross(int start1, int end1,
             int start2, int end2)
         {
-            if (start1 > end1) 
+            if (start1 > end1)
                 throw new ArgumentException("start1 必须 <= end1");
             if (start2 > end2)
                 throw new ArgumentException("start2 必须 <= end2");
