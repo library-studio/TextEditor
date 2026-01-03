@@ -42,7 +42,7 @@ namespace MarcSample
             this.toolStripStatusLabel_caretFieldRegion = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.marcControl1 = new LibraryStudio.Forms.MarcControl();
-            this.toolStripStatusLabel_blockRange = new System.Windows.Forms.ToolStripStatusLabel();
+            this.toolStripStatusLabel_selectionRange = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel_caretOffs = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
@@ -136,7 +136,7 @@ namespace MarcSample
             this.statusStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripStatusLabel_caretFieldRegion,
-            this.toolStripStatusLabel_blockRange,
+            this.toolStripStatusLabel_selectionRange,
             this.toolStripStatusLabel_caretOffs});
             this.statusStrip1.Location = new System.Drawing.Point(0, 710);
             this.statusStrip1.Name = "statusStrip1";
@@ -181,9 +181,9 @@ namespace MarcSample
             // 
             // toolStripStatusLabel_blockRange
             // 
-            this.toolStripStatusLabel_blockRange.Name = "toolStripStatusLabel_blockRange";
-            this.toolStripStatusLabel_blockRange.Size = new System.Drawing.Size(223, 46);
-            this.toolStripStatusLabel_blockRange.Text = "BlockRange";
+            this.toolStripStatusLabel_selectionRange.Name = "toolStripStatusLabel_blockRange";
+            this.toolStripStatusLabel_selectionRange.Size = new System.Drawing.Size(223, 46);
+            this.toolStripStatusLabel_selectionRange.Text = "BlockRange";
             // 
             // toolStripStatusLabel_caretOffs
             // 
@@ -231,7 +231,7 @@ namespace MarcSample
         private System.Windows.Forms.ToolStripMenuItem MenuItem_setFont;
         private System.Windows.Forms.ToolStripMenuItem MenuItem_verifyCharCount;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_caretFieldRegion;
-        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_blockRange;
+        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_selectionRange;
         private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_caretOffs;
     }
 }

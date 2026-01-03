@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using LibraryStudio.Forms.MarcControlDialog;
-using Vanara.PInvoke;
+
 using static LibraryStudio.Forms.MarcField;
 using static LibraryStudio.Forms.MarcRecord;
 using static Vanara.PInvoke.Gdi32;
@@ -33,14 +33,14 @@ namespace LibraryStudio.Forms
                 return false;
             }
 
-            if (HasBlock())
+            if (HasSelection())
             {
-                SoftlyRemoveBolckText();
+                SoftlyRemoveSelectionText();
                 return true;
             }
 
             var delay = _keySpeedDetector.Detect();
-            if (_global_offs > 0)
+            if (_caret_offs > 0)
             {
                 return ProcessBackspaceChar(info, _deleteKeyStyle, delay);
             }
@@ -84,7 +84,7 @@ namespace LibraryStudio.Forms
                     input_info.End,
                     input_info.Text,
                     delay_update: delay,
-                    false);
+                    auto_adjust_caret_and_selection: false);
             }
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
@@ -162,7 +162,7 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return _deleteKeyStyle; 
+                return _deleteKeyStyle;
             }
             set
             {
@@ -206,9 +206,9 @@ namespace LibraryStudio.Forms
             if (this._readonly)
                 return false;
 
-            if (HasBlock())
+            if (HasSelection())
             {
-                SoftlyRemoveBolckText();
+                SoftlyRemoveSelectionText();
                 return true;
             }
 
@@ -295,13 +295,13 @@ namespace LibraryStudio.Forms
                     input_info.End,
                     input_info.Text,
                     delay_update: delay,
-                    false);
+                    auto_adjust_caret_and_selection: false);
             }
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                SetGlobalOffs(input_info.Caret);
-                MoveCaret(HitByGlobalOffs(input_info.Caret));
+                SetCaretOffs(input_info.Caret);
+                MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
             return true;
@@ -356,8 +356,8 @@ namespace LibraryStudio.Forms
             // 检测键盘输入速度
             var delay = _keySpeedDetector.Detect();
 
-            if (HasBlock())
-                SoftlyRemoveBolckText();
+            if (HasSelection())
+                SoftlyRemoveSelectionText();
 
             var action = "input";
             if (ch == '\r')
@@ -500,7 +500,7 @@ namespace LibraryStudio.Forms
         void GetLeftRight(out string left,
             out string right)
         {
-            var infos = this._record.LocateFields(_global_offs, _global_offs);
+            var infos = this._record.LocateFields(_caret_offs, _caret_offs);
             if (infos == null || infos.Length == 0)
             {
                 left = "";
@@ -531,26 +531,26 @@ namespace LibraryStudio.Forms
                     if (PadWhileEditing)
                     {
                         // 插入一个回车字符后，新的字段就内容为空，需要插入 5 个空格
-                        ReplaceText(_global_offs,
-    _global_offs,
+                        ReplaceText(_caret_offs,
+    _caret_offs,
     new string(PaddingChar, 5) + ch.ToString(),
     delay_update: delay,
-    false);
+    auto_adjust_caret_and_selection: false);
                         // 修改后，插入符定位到头标区下一字段的开头
-                        SetGlobalOffs(24);
-                        MoveCaret(HitByGlobalOffs(24 + 1, -1));
+                        SetCaretOffs(24);
+                        MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
                     else
                     {
                         // 插入一个字符
-                        ReplaceText(_global_offs,
-                            _global_offs,
+                        ReplaceText(_caret_offs,
+                            _caret_offs,
                             ch.ToString(),
                             delay_update: delay,
-                            false);
+                            auto_adjust_caret_and_selection: false);
                         // 修改后，插入符定位到头标区下一字段的开头
-                        SetGlobalOffs(24);
-                        MoveCaret(HitByGlobalOffs(24 + 1, -1));
+                        SetCaretOffs(24);
+                        MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
                 }
                 else if (info.ChildIndex == 0 && info.TextIndex < 24)
@@ -560,11 +560,11 @@ namespace LibraryStudio.Forms
                     // TODO: 头标区是否使用特殊字符填充?
                     var fragment = new string(PaddingChar, fill_char_count);
                     // 插入一个字符
-                    ReplaceText(_global_offs,
-                        _global_offs,
+                    ReplaceText(_caret_offs,
+                        _caret_offs,
                         fragment,
                         delay_update: delay,
-                        false);
+                        auto_adjust_caret_and_selection: false);
 
                     if (PadWhileEditing)
                     {
@@ -576,15 +576,15 @@ namespace LibraryStudio.Forms
     24 + pad_info.Offs,
     pad_info.Text,
     delay_update: delay,
-    false);
+    auto_adjust_caret_and_selection: false);
                         }
                     }
 
                     // 修改后，插入符定位到头标区下一字段的开头
                     // TODO: 使用 MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
 
-                    SetGlobalOffs(24);
-                    MoveCaret(HitByGlobalOffs(24 + 1, -1));
+                    SetCaretOffs(24);
+                    MoveCaret(HitByCaretOffs(24 + 1, -1));
                 }
                 else
                 {
@@ -608,28 +608,28 @@ namespace LibraryStudio.Forms
 
                         // TODO: 优化，从两端向中间寻找，找到中间不一样的一段，只替换不一样的一段
 
-                        ReplaceText(_global_offs - old_left.Length,
-        _global_offs + old_right.Length,    // + 1,
+                        ReplaceText(_caret_offs - old_left.Length,
+        _caret_offs + old_right.Length,    // + 1,
         new_text,
         delay_update: delay,
-        false);
+        auto_adjust_caret_and_selection: false);
 
                         // 向前移动 Caret
-                        MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
+                        DeltaCaretOffsAndSelectionOffs(left.Length - old_left.Length + 1);
                     }
                     else
                     {
                         // (已经优化) 如果在一个字段末尾 caret 位置插入回车，
                         // 可以优化为先向后移动 1 char，然后插入回车，这样导致更新的数据更少
                         // 插入一个字符
-                        ReplaceText(_global_offs,
-                            _global_offs,
+                        ReplaceText(_caret_offs,
+                            _caret_offs,
                             ch.ToString(),
                             delay_update: delay,
-                            false);
+                            auto_adjust_caret_and_selection: false);
 
                         // 向前移动一次 Caret
-                        MoveGlobalOffsAndBlock(1);
+                        DeltaCaretOffsAndSelectionOffs(1);
                     }
                 }
 
@@ -650,16 +650,16 @@ namespace LibraryStudio.Forms
                 input_info.End,
                 input_info.Text,
                 delay_update: delay,
-                false);
+                auto_adjust_caret_and_selection: false);
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                SetGlobalOffs(input_info.Caret);
-                MoveCaret(HitByGlobalOffs(input_info.Caret));
+                SetCaretOffs(input_info.Caret);
+                MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
             // 向前移动一次 Caret
-            MoveGlobalOffsAndBlock(1);
+            DeltaCaretOffsAndSelectionOffs(1);
             return true;
         }
 
@@ -780,8 +780,8 @@ namespace LibraryStudio.Forms
             else
             {
                 var offs = this._record.TextLength;
-                this.SetGlobalOffs(offs);
-                MoveCaret(HitByGlobalOffs(offs, 0));
+                this.SetCaretOffs(offs);
+                MoveCaret(HitByCaretOffs(offs, 0));
                 return true;
             }
             if (this._record.GetFieldOffsRange(index,
@@ -794,8 +794,8 @@ namespace LibraryStudio.Forms
             else
                 start += 5;
             start = Math.Min(end, start);
-            this.SetGlobalOffs(start);
-            MoveCaret(HitByGlobalOffs(start, 0));
+            this.SetCaretOffs(start);
+            MoveCaret(HitByCaretOffs(start, 0));
             return true;
         }
 
@@ -908,7 +908,7 @@ namespace LibraryStudio.Forms
             this.ReplaceText(start,
                 end,
                 null,   // 彻底删除
-                false);
+                delay_update: false);
             return true;
         }
 
@@ -917,7 +917,7 @@ namespace LibraryStudio.Forms
         // 除了子字段，字段名，指示符，或者子字段左侧的无主文字，都可以被选择
         public bool SelectCaretSubfield(bool toggle = true)
         {
-            var field_info = this._record.LocateFields(_global_offs, _global_offs).FirstOrDefault();
+            var field_info = this._record.LocateFields(_caret_offs, _caret_offs).FirstOrDefault();
             if (field_info == null)
                 return false;
             var index = field_info.Index;
@@ -937,33 +937,33 @@ namespace LibraryStudio.Forms
                 return false;
             int offs_start = start + (_selectCurrentFull || toggle == false ? subfield_info.StartOffs : subfield_info.ContentStartOffs);
             int offs_end = start + subfield_info.EndOffs;
-            this.Select(offs_start, offs_end, _global_offs, 0);
+            this.Select(offs_start, offs_end, _caret_offs, 0);
             if (toggle)
                 _selectCurrentFull ^= true;
             return true;
         }
 
-        public bool RawCut()
+        public virtual bool RawCut()
         {
             if (this._readonly)
                 return false;
 
-            if (HasBlock() == false)
+            if (HasSelection() == false)
                 return false;
-            var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
-            var length = Math.Abs(this.BlockEndOffset - this.BlockStartOffset);
+            var start = Math.Min(this.SelectionStart, this.SelectionEnd);
+            var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
             var text = this.Content.Substring(start, length);
             Clipboard.SetText(text);
             RawRemoveBolckText();
             return true;
         }
 
-        public bool SoftlyCut()
+        public virtual bool SoftlyCut()
         {
             if (this._readonly)
                 return false;
 
-            if (HasBlock() == false)
+            if (HasSelection() == false)
                 return false;
             /*
             var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
@@ -972,13 +972,13 @@ namespace LibraryStudio.Forms
             */
 
             Clipboard.SetText(GetSelectedContent());
-            SoftlyRemoveBolckText();
+            SoftlyRemoveSelectionText();
             return true;
         }
 
-        public bool Copy()
+        public virtual bool Copy()
         {
-            if (HasBlock() == false)
+            if (HasSelection() == false)
                 return false;
             /*
             var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
@@ -992,18 +992,19 @@ namespace LibraryStudio.Forms
             return true;
         }
 
+        // 获得文字块中的文字
         public string GetSelectedContent()
         {
-            if (HasBlock() == false)
+            if (HasSelection() == false)
                 return "";
-            var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
-            var length = Math.Abs(this.BlockEndOffset - this.BlockStartOffset);
+            var start = Math.Min(this.SelectionStart, this.SelectionEnd);
+            var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
             return this._record.MergeText(start, start + length);
         }
 
         public bool CanCut()
         {
-            return this.HasBlock() && this.ReadOnly == false;
+            return this.HasSelection() && this.ReadOnly == false;
         }
 
         public bool CanPaste()
@@ -1016,16 +1017,17 @@ namespace LibraryStudio.Forms
         }
 
         // 硬粘贴
-        public bool RawPaste()
+        public virtual bool RawPaste(string text = null)
         {
             if (this._readonly)
                 return false;
 
-            var text = Clipboard.GetText();
+            if (text == null)
+                text = Clipboard.GetText();
             if (string.IsNullOrEmpty(text))
                 return false;
-            var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
-            var length = Math.Abs(this.BlockEndOffset - this.BlockStartOffset);
+            var start = Math.Min(this.SelectionStart, this.SelectionEnd);
+            var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
             this.ReplaceText(start,
                 start + length,
                 text,
@@ -1038,7 +1040,7 @@ namespace LibraryStudio.Forms
         // parameters:
         //      text    要粘贴进入的文本。
         //              如果为 null，表示自动从 Windows 剪贴板中获取粘贴
-        public bool SoftlyPaste(string text = null)
+        public virtual bool SoftlyPaste(string text = null)
         {
             if (this._readonly)
                 return false;
@@ -1047,8 +1049,8 @@ namespace LibraryStudio.Forms
                 text = Clipboard.GetText();
             if (string.IsNullOrEmpty(text))
                 return false;
-            var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
-            var length = Math.Abs(this.BlockEndOffset - this.BlockStartOffset);
+            var start = Math.Min(this.SelectionStart, this.SelectionEnd);
+            var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
             //var old_text = _record.MergeText(start, start + length);
 
             // 获得即将被替换部分内容的 mask 形态
@@ -1077,6 +1079,7 @@ namespace LibraryStudio.Forms
             return true;
         }
 
+        // *** 旧算法被弃用。原来用于 SoftlyPaste
         // TODO!!! mask char 规则变了。需要考虑 mask text 中间用字段结束符分隔为多个片段，单独处理
         // 利用掩码，指导进行字符替换
         // mask char 规则: 0x01~0x03 表示字段名位置, 0x04~0x05 表示指示符位置, 0x06 表示头标区位置(最多 24 个字符都是这个值)
@@ -1155,8 +1158,8 @@ namespace LibraryStudio.Forms
 
         public void SelectAll()
         {
-            _blockOffs1 = 0;
-            _blockOffs2 = this._record.TextLength;
+            _selectOffs1 = 0;
+            _selectOffs2 = this._record.TextLength;
             this.Invalidate();
         }
 
@@ -1201,8 +1204,8 @@ namespace LibraryStudio.Forms
                 end,
                 action.OldText,
                 delay_update: false,
-                false,
-                false);
+                auto_adjust_caret_and_selection: true,   // 这里必须要自动调整选择范围，因为这一次 undo 插入的内容可能会把原有的 selection range 挤到后面。如果不自动调整，当后面 InvalidateSelectionRegion() 的时候就会造成刷新不干净，会残留 selection 图像
+                add_history: false);
             Select(start, start + action.OldText.Length, start);
             return true;
         }
@@ -1226,8 +1229,8 @@ namespace LibraryStudio.Forms
                 end,
                 action.NewText,
                 delay_update: false,
-                false,
-                false);
+                auto_adjust_caret_and_selection: true,
+                add_history: false);
             Select(start, start + action.NewText.Length, start);
             return true;
         }
@@ -1239,7 +1242,7 @@ namespace LibraryStudio.Forms
         //      被删除的子字段内容
         public string DeleteCaretSubfield()
         {
-            var offs = _global_offs;
+            var offs = _caret_offs;
 
             // 根据全局偏移找到字段
             var ret = this._record.LocateFields(offs, offs);
@@ -1326,7 +1329,7 @@ namespace LibraryStudio.Forms
                     Caption="复制(&C)",
                     KeyData=Keys.Control | Keys.C,
                     Handler=(s,e) => this.Copy(),
-                    CanExecute=()=> this.HasBlock(),
+                    CanExecute=()=> this.HasSelection(),
                 },
                 new CommandItem()
                 {
@@ -1887,14 +1890,14 @@ namespace LibraryStudio.Forms
                     ReplaceText(offs + start,
                         offs + start,
                         new string(PaddingChar, length),
-                        true);
+                        delay_update: true);
                 }
                 else
                 {
                     ReplaceText(offs + start + length,
                         offs + start,
                         "",
-                        true);
+                        delay_update: true);
                 }
             };
             var errors = new List<string>();
@@ -1911,6 +1914,46 @@ namespace LibraryStudio.Forms
                 }
             }
             return errors;
+        }
+
+        // 获得 MARC content。
+        // 注意得到修正后的 content，过程并未改变编辑器中的原有内容，而是只把返回的内容修正了。函数执行后编辑器中的原有内容不变(并没有添加 PaddingChar)。
+        public string GetContent(bool return_padded_content)
+        {
+            if (return_padded_content == false)
+                return this._record.MergeText();
+
+            StringBuilder result = new StringBuilder();
+            delegate_fix func = (field, start, length) =>
+            {
+                var value = field.MergeText();
+
+                this._record.GetFieldOffsRange(field,
+                    out int offs,
+                    out _);
+                if (length > 0)
+                {
+                    value = value.Substring(0, offs + start)
+                    + new string(PaddingChar, length)
+                    + value.Substring(offs + start);
+                }
+                else
+                {
+                    value = value.Substring(0, offs + start)
+                    + ""
+                    + value.Substring(offs + start);
+                }
+                result.Append(value);
+            };
+
+            // errors 可用作调试观察
+            var errors = new List<string>();
+            for (int i = 0; i < this._record.FieldCount; i++)
+            {
+                var field = this._record.GetField(i);
+                errors.AddRange(field.Verify(func));
+            }
+            return result.ToString();
         }
     }
 

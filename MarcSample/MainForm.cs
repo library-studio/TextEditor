@@ -30,8 +30,8 @@ namespace MarcSample
                 toolStripStatusLabel_caretOffs.Text = $"Caret:{this.marcControl1.CaretOffset}";
                 toolStripStatusLabel_caretFieldRegion.Text = "FieldRegion:" + this.marcControl1.CaretFieldRegion.ToString();
             };
-            this.marcControl1.BlockChanged += (s, e) => {
-                toolStripStatusLabel_blockRange.Text = $"Block:{this.marcControl1.BlockStartOffset}-{this.marcControl1.BlockEndOffset}";
+            this.marcControl1.SelectionChanged += (s, e) => {
+                toolStripStatusLabel_selectionRange.Text = $"Block:{this.marcControl1.SelectionStart}-{this.marcControl1.SelectionEnd}";
             };
         }
 
@@ -49,7 +49,7 @@ namespace MarcSample
             // this.marcControl1.Content = "012345678901234567890123";
             // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB شلاؤيث ฟิแกำดเ 中文 english\u001e100  \u001fatest333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333";
             this.marcControl1.Content = "01234567890123456789";
-            this.marcControl1.PadWhileEditing = true;
+            this.marcControl1.PadWhileEditing = false;
             // this.marcControl1.PaddingChar = '*';
 
             this.marcControl1.HighlightBlankChar = '·';  // '◌'; // '▪';// '▫'; // '□'; // '⸗';

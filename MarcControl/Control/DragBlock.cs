@@ -14,65 +14,65 @@ namespace LibraryStudio.Forms
     /// </summary>
     public partial class MarcControl
     {
-        Region _blockRegion = null;
+        Region _selectionRegion = null;
 
         // 是否正在拖动文字块，在拖动的哪个阶段
         //  0:  不在拖动中
         //  1:  已经启动拖动，等待第一次 MouseMove
         //  2:  经过了 MouseMove
-        int _draggingBlock = 0;
+        int _draggingSelectionText = 0;
 
         // 获得当前文字块的 Region
         // 此 Region 对象为系统持有，用后不用 Dispose()
-        Region GetCurrentBlockRegion()
+        Region GetCurrentSelectionRegion()
         {
-            if (_blockOffs1 == _blockOffs2)
+            if (_selectOffs1 == _selectOffs2)
                 return null;
-            if (_blockRegion == null)
+            if (_selectionRegion == null)
             {
-                var start = Math.Min(_blockOffs1, _blockOffs2);
-                var end = Math.Max(_blockOffs1, _blockOffs2);
-                _blockRegion = this._record.GetRegion(start, end);
+                var start = Math.Min(_selectOffs1, _selectOffs2);
+                var end = Math.Max(_selectOffs1, _selectOffs2);
+                _selectionRegion = this._record.GetRegion(start, end);
             }
-            return _blockRegion;
+            return _selectionRegion;
         }
 
-        void DisposeBlockRegion()
+        void DisposeSelectionRegion()
         {
-            if (_blockRegion != null)
+            if (_selectionRegion != null)
             {
-                _blockRegion.Dispose();
-                _blockRegion = null;
+                _selectionRegion.Dispose();
+                _selectionRegion = null;
             }
         }
 
-        void BeginDragBlock(int stage)
+        void BeginDragSelectionText(int stage)
         {
             if (stage != 1 && stage != 2)
                 throw new ArgumentException($"stage 值 {stage} 不合法");
-            _draggingBlock = stage;
+            _draggingSelectionText = stage;
         }
 
-        int InDraggingBlock()
+        int InDraggingSelectionText()
         {
-            return _draggingBlock;
+            return _draggingSelectionText;
         }
 
-        bool CompleteDragBlock()
+        bool CompleteDragSelectionText()
         {
-            _draggingBlock = 0;
+            _draggingSelectionText = 0;
 
             if (this._readonly)
                 return false;
 
-            if (HasBlock() == false)
+            if (HasSelection() == false)
                 return false;
 
-            var start = Math.Min(this.BlockStartOffset, this.BlockEndOffset);
-            var length = Math.Abs(this.BlockEndOffset - this.BlockStartOffset);
+            var start = Math.Min(this.SelectionStart, this.SelectionEnd);
+            var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
 
             // 要去的位置在块边沿和边沿之内，也就没有必要真正拖动
-            if (_global_offs >= start && _global_offs <= start + length)
+            if (_caret_offs >= start && _caret_offs <= start + length)
                 return false;
 
             var text = _record.MergeText(start, start + length);
@@ -81,7 +81,7 @@ namespace LibraryStudio.Forms
             if (_controlPressed == false)
             {
                 // 先剪切，再粘贴
-                SoftlyRemoveBolckText();
+                SoftlyRemoveSelectionText();
                 copy = false;
             }
 
@@ -111,17 +111,16 @@ _global_offs + 1,
 
             return true;
 #endif
-            this.Select(_global_offs, _global_offs, _global_offs);
+            this.Select(_caret_offs, _caret_offs, _caret_offs);
             return SoftlyPaste(text);
         }
 
-        // 判断光标是否在 block region 范围内
-        bool IsCursorInBlockRegion(MouseEventArgs e)
+        // 判断光标是否在 selection region 范围内
+        bool IsCursorInsideSelectionRegion(MouseEventArgs e)
         {
-            // 判断光标是否在 block region 范围内
             var p = new Point(e.X + this.HorizontalScroll.Value,
                 e.Y + this.VerticalScroll.Value);
-            var region = GetCurrentBlockRegion();
+            var region = GetCurrentSelectionRegion();
             return (region != null && region.IsVisible(p));
         }
 

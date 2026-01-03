@@ -5,6 +5,7 @@ using System.Windows.Forms;
 
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using static LibraryStudio.Forms.MarcRecord;    // BuildContent()
+using static LibraryStudio.Forms.UiTestHelpers;
 
 namespace LibraryStudio.Forms
 {
@@ -14,7 +15,7 @@ namespace LibraryStudio.Forms
         [TestMethod]
         public void replaceText_01()
         {
-            UseControl((ctl) =>
+            UiTestHelpers.UseControl((ctl) =>
             {
                 // 直接调用 API
                 ctl.ReplaceText(0, 0, "abc", delay_update: false);
@@ -28,7 +29,7 @@ namespace LibraryStudio.Forms
         [TestMethod]
         public void replaceText_02()
         {
-            UseControl((ctl) =>
+            UiTestHelpers.UseControl((ctl) =>
             {
                 ctl.Content = BuildContent(@"012345678901234567890123
 001ABCDE");
@@ -45,7 +46,7 @@ namespace LibraryStudio.Forms
         [TestMethod]
         public void replaceText_03()
         {
-            UseControl((ctl) =>
+            UiTestHelpers.UseControl((ctl) =>
             {
                 ctl.Content = BuildContent(@"012345678901234567890123
 001ABCDE");
@@ -61,7 +62,7 @@ namespace LibraryStudio.Forms
         [TestMethod]
         public void replaceText_04()
         {
-            UseControl((ctl) =>
+            UiTestHelpers.UseControl((ctl) =>
             {
                 ctl.Content = BuildContent(@"01234567890123456789012");
                 // 头标区尾部插入一个字符
@@ -75,7 +76,7 @@ namespace LibraryStudio.Forms
         [TestMethod]
         public void replaceText_05()
         {
-            UseControl((ctl) =>
+            UiTestHelpers.UseControl((ctl) =>
             {
                 ctl.Content = BuildContent(@"012345678901234567890123
 001
@@ -93,7 +94,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_01()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 // 插入字段前内容为空
                 Assert.AreEqual("", record.GetControl().Content);
@@ -110,7 +111,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_02()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 // 插入字段前内容为空
                 Assert.AreEqual("", record.GetControl().Content);
@@ -137,7 +138,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_03()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -160,7 +161,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_04()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -184,7 +185,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_05()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -207,7 +208,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_06()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -230,7 +231,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_07()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -246,7 +247,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_08()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -261,7 +262,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_08_a()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -284,7 +285,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_08_b()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123";
 
@@ -304,7 +305,7 @@ ABCDEF");
         [TestMethod]
         public void domRecord_09()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
                 record.GetControl().Content = "012345678901234567890123ABC12\u001e";
 
@@ -330,7 +331,7 @@ ABCDEF");
         [TestMethod]
         public void traceChange_01()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
 
                 record.InsertField(0, "", "", "012345678901234567890123");
@@ -352,7 +353,7 @@ ABCDEF");
         [TestMethod]
         public void traceChange_02()
         {
-            UseDomRecord((record) =>
+            UiTestHelpers.UseDomRecord((record) =>
             {
 
                 record.InsertField(0, "", "", "012345678901234567890123");
@@ -758,54 +759,6 @@ ABCDEF");
 
         #endregion
 
-
-
-        delegate void delegate_useMarcControl(MarcControl marcControl);
-
-        void UseControl(delegate_useMarcControl action)
-        {
-            UiTestHelpers.RunInSta(() =>
-            {
-                using (var form = new Form())
-                {
-                    var ctl = new MarcControl();
-                    ctl.Size = new Size(1024, 768);
-                    form.Controls.Add(ctl);
-                    form.CreateControl();
-
-                    action(ctl);
-
-                    /*
-                    // 直接调用 API
-                    ctl.ReplaceText(0, 0, "abc", delay_update: false);
-
-                    Application.DoEvents(); // 若需要处理 Timer 或重绘
-                    Assert.IsTrue(ctl.Content.Contains("abc"));
-                    */
-                }
-            });
-        }
-
-        delegate void delegate_useDomRecord(DomRecord domRecord);
-
-        void UseDomRecord(delegate_useDomRecord action)
-        {
-            UiTestHelpers.RunInSta(() =>
-            {
-                using (var form = new Form())
-                {
-                    var ctl = new MarcControl();
-                    ctl.Size = new Size(1024, 768);
-                    form.Controls.Add(ctl);
-                    form.CreateControl();
-
-                    Application.DoEvents();
-                    action(ctl.GetDomRecord());
-                    Application.DoEvents();
-                    ctl.Dispose();
-                }
-            });
-        }
 
 
     }

@@ -981,6 +981,7 @@ namespace LibraryStudio.Forms
                 // var width = new_field.Initialize(dc, field, pixel_width, splitRange);
                 if (ret.MaxPixel > max_pixel_width)
                     max_pixel_width = ret.MaxPixel;
+
                 new_h = old_fields.Sum(p => p.GetPixelHeight());
                 if (old_h != new_h)
                 {
@@ -990,6 +991,7 @@ namespace LibraryStudio.Forms
                         max_update_width = current_update_width;
                     goto END1;
                 }
+
                 ProcessBaseline();
 
                 // 如果高度没有变化，则最小刷新区域
@@ -1005,18 +1007,33 @@ namespace LibraryStudio.Forms
             var new_fields = new List<MarcField>();
             if (string.IsNullOrEmpty(content) == false)
             {
+                /*
                 // 去掉 right_text 末尾的 \r 字符。避免 SplitLine 多生成一个 field
                 if (content.EndsWith(new string(Metrics.FieldEndCharDefault, 1)))
                 {
                     content = content.Substring(0, content.Length - 1);
+                    if (string.IsNullOrEmpty(right_text)
+                        && text.EndsWith(new string(Metrics.FieldEndCharDefault, 1)))
+                        result.NewText = text.Substring(0, text.Length - 1);
                 }
                 else
                 {
                     if (start >= 24)
                         result.NewText = text + new string(Metrics.FieldEndCharDefault, 1);
                 }
+                */
 
-                var lines = SplitFields(content, start - left_text.Length);
+                if (content.EndsWith(new string(Metrics.FieldEndCharDefault, 1)))
+                {
+                }
+                else
+                {
+                    if (start + text.Length > 24)
+                        result.NewText = text + new string(Metrics.FieldEndCharDefault, 1);
+                }
+
+                // var lines = SplitFields(content, start - left_text.Length);
+                var lines = SplitFields_v2(content, start - left_text.Length);
 
                 foreach (var line in lines)
                 {
@@ -1158,6 +1175,7 @@ namespace LibraryStudio.Forms
         }
 #endif
 
+        // 旧版本。对字段结束符的处理有瑕疵。即将废弃。
         // parameters:
         //      start   content 部分内容在整个文本中的开始偏移
         public static List<string> SplitFields(string content,
@@ -1200,6 +1218,7 @@ namespace LibraryStudio.Forms
             return lines;
         }
 
+        // 旧版本。对字段结束符的处理有瑕疵。即将废弃。
         // TODO: 加入单元测试
         // 将文本内容按行分割。至少会返回一行内容
         public static string[] SplitLines(string text,
@@ -1240,6 +1259,87 @@ namespace LibraryStudio.Forms
             */
             return lines.ToArray();
         }
+
+        // parameters:
+        //      start   content 部分内容在整个文本中的开始偏移
+        public static List<string> SplitFields_v2(string content,
+            int start)
+        {
+            if (start < 0)
+                throw new ArgumentException($"start 参数值不应小于 0 ({start})", nameof(start));
+            if (content == null)
+                throw new ArgumentException($"content 参数值不应为 null", nameof(content));
+
+            string header = null;
+            if (start < 24)
+            {
+                var first_length = Math.Min(content.Length, 24 - start);
+                header = content.Substring(0, first_length);
+                content = content.Substring(first_length);
+                if (string.IsNullOrEmpty(content))
+                    content = null;
+            }
+
+            var lines = new List<string>();
+
+            if (content != null)
+            {
+                lines = SplitLines_v2(content,
+        Metrics.FieldEndCharDefault,
+        contain_return:false).ToList();
+            }
+
+            if (start < 24 && header != null)
+            {
+                Debug.Assert(header.Length <= 24);
+                lines.Insert(0, header);
+            }
+
+            /*
+            if (lines.Count == 0)
+                lines.Add("");
+            */
+            return lines;
+        }
+
+        // 将文本内容按行分割。至少会返回一行内容
+        // "\r" 理解为最后正好一个空内容字段。
+        // "\r2" 理解为最后一个字段内容为 ‘2’，但缺少了结束符。会自动补全
+        // 问题: 因为 yield return 了，所以函数似乎不方便返回修正状态信息
+        public static IEnumerable<string> SplitLines_v2(string text,
+    char delimeter = '\r',
+    bool contain_return = true,
+    bool complete_delimeter = true)
+        {
+            List<string> lines = new List<string>();
+            StringBuilder line = new StringBuilder();
+            foreach (var ch in text)
+            {
+                if (ch == delimeter)
+                {
+                    if (line == null)
+                        line = new StringBuilder();
+                    if (contain_return)
+                        line.Append(ch);
+                    yield return line.ToString();
+                    line = null;
+                }
+                else
+                {
+                    if (line == null)
+                        line = new StringBuilder();
+                    line.Append(ch);
+                }
+            }
+            if (line != null)
+            {
+                if (complete_delimeter && contain_return)
+                    line.Append(delimeter);
+
+                yield return line.ToString();
+            }
+        }
+
 
         // 旧版本函数。有缺陷，不能识别 24 offs 以后的字段被删除结束符的情况(这时间应当把后一个字段连带返回)
         // 另外，借用了 LocateFields() 函数，并不能满足功能需要，但又不方便改变 LocateFields() 函数

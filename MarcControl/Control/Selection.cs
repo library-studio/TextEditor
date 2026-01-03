@@ -14,21 +14,21 @@ namespace LibraryStudio.Forms
     /// </summary>
     public partial class MarcControl
     {
-        int _blockOffs1 = 0;    // -1;   // 选中范围开始的偏移量
-        int _blockOffs2 = 0;    // -1;   // 选中范围的结束的偏移量
+        int _selectOffs1 = 0;    // -1;   // 选中范围开始的偏移量
+        int _selectOffs2 = 0;    // -1;   // 选中范围的结束的偏移量
 
         // 文字块的起始偏移量
-        public int BlockStartOffset
+        // 注: 开始偏移量不一定比结束偏移量小
+        public int SelectionStart
         {
-            get { return _blockOffs1; }
-            //get { return Math.Min(_blockOffs1, _blockOffs2); }
+            get { return _selectOffs1; }
         }
 
         // 文字块的结束偏移量
-        public int BlockEndOffset
+        // 注: 结束偏移量不一定比开始偏移量大
+        public int SelectionEnd
         {
-            get { return _blockOffs2; }
-            //get { return Math.Max(_blockOffs1, _blockOffs2); }
+            get { return _selectOffs2; }
         }
 
         // 选择一段文字
@@ -39,44 +39,35 @@ namespace LibraryStudio.Forms
         {
             ChangeSelection(() => {
                 if (start >= 0)
-                    this._blockOffs1 = start;
+                    this._selectOffs1 = start;
                 if (end >= 0)
-                    this._blockOffs2 = end;
+                    this._selectOffs2 = end;
             });
-            /*
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
 
-            if (start >= 0)
-                this._blockOffs1 = start;
-            if (end >= 0)
-                this._blockOffs2 = end;
-
-            InvalidateBlockRegion();
-            */
             if (caret_offs + caret_delta >= 0)
             {
-                if (caret_offs + caret_delta != _global_offs)
+                if (caret_offs + caret_delta != _caret_offs)
                 {
                     // _global_offs = caret_offs + caret_delta;
-                    SetGlobalOffs(caret_offs + caret_delta);
-                    MoveCaret(HitByGlobalOffs(caret_offs, caret_delta), false);
+                    SetCaretOffs(caret_offs + caret_delta);
+                    MoveCaret(HitByCaretOffs(caret_offs, caret_delta), false);
                 }
             }
         }
 
-        public bool HasBlock()
+        public bool HasSelection()
         {
-            return _blockOffs1 != _blockOffs2; // 选中范围不相等，表示有选中范围
+            return _selectOffs1 != _selectOffs2; // 选中范围不相等，表示有选中范围
         }
 
         // 柔和地删除块中文字。所谓柔和的意思是，保留固定长内容的字符数(只把这些字符替换为空格)
-        public bool SoftlyRemoveBolckText()
+        public bool SoftlyRemoveSelectionText()
         {
-            if (_blockOffs1 == _blockOffs2)
+            if (_selectOffs1 == _selectOffs2)
                 return false; // 不存在选中范围
 
-            var start = Math.Min(_blockOffs1, _blockOffs2);
-            var length = Math.Abs(_blockOffs1 - _blockOffs2);
+            var start = Math.Min(_selectOffs1, _selectOffs2);
+            var length = Math.Abs(_selectOffs1 - _selectOffs2);
 
             /*
             text = text.Remove(start, length);
@@ -89,8 +80,9 @@ namespace LibraryStudio.Forms
                 start + length,
                 MarcRecord.CompressMaskText(mask_text, PaddingChar),
                 delay_update: false,
-                false);
+                auto_adjust_caret_and_selection:true);
 
+#if REMOVED
             {
                 ChangeSelection(start);
                 /*
@@ -111,33 +103,19 @@ namespace LibraryStudio.Forms
                 // 这里面已经有更新块显示的动作
                 MoveGlobalOffsAndBlock(-1);
             }
-            return true;
-
-
-#if REMOVED
-            string process_mask_text(string text)
-            {
-                // 将 mask_text 中 0x01 字符替换为空格，其余内容丢弃
-                var result = new StringBuilder();
-                foreach (var ch in text)
-                {
-                    if (ch == (char)0x01)
-                        result.Append(' ');
-                }
-                return result.ToString();
-            }
 #endif
+            return true;
         }
 
 
         // 删除块中的文字。硬性删除的版本，可能会导致固定长内容的字符数变化
         public bool RawRemoveBolckText()
         {
-            if (_blockOffs1 == _blockOffs2)
+            if (_selectOffs1 == _selectOffs2)
                 return false; // 不存在选中范围
 
-            var start = Math.Min(_blockOffs1, _blockOffs2);
-            var length = Math.Abs(_blockOffs1 - _blockOffs2);
+            var start = Math.Min(_selectOffs1, _selectOffs2);
+            var length = Math.Abs(_selectOffs1 - _selectOffs2);
 
             /*
             text = text.Remove(start, length);
@@ -152,22 +130,13 @@ namespace LibraryStudio.Forms
 
             {
                 ChangeSelection(start);
-                /*
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                _blockOffs1 = start;
-                _blockOffs2 = start;
-
-                // 块定义发生刷新才有必要更新变化的区域
-                InvalidateBlockRegion();
-                */
             }
 
-            if (_global_offs > start)
+            if (_caret_offs > start)
             {
                 // DeltaGlobalOffs(-length); // 调整 _global_offs
                 AdjustGlobalOffs(-(length - 1));
-                MoveGlobalOffsAndBlock(-1);
+                DeltaCaretOffsAndSelectionOffs(-1);
             }
             return true;
         }
@@ -179,37 +148,37 @@ namespace LibraryStudio.Forms
         // 修改 _blockOffs1, _blockOffs2，并刷新显示
         public void ChangeSelection(Action change_action)
         {
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
+            DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
             change_action?.Invoke();
 
-            InvalidateBlockRegion();
+            InvalidateSelectionRegion();
         }
 
         // 修改 _blockOffs1, _blockOffs2，并刷新显示
         public void ChangeSelection(int start, int end)
         {
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
+            DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
-            _blockOffs1 = start;
-            _blockOffs2 = end;
+            _selectOffs1 = start;
+            _selectOffs2 = end;
 
-            InvalidateBlockRegion();
+            InvalidateSelectionRegion();
         }
 
         // 修改 _blockOffs1, _blockOffs2，并刷新显示
         public void ChangeSelection(int value)
         {
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
+            DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
-            _blockOffs1 = value;
-            _blockOffs2 = value;
+            _selectOffs1 = value;
+            _selectOffs2 = value;
 
-            InvalidateBlockRegion();
+            InvalidateSelectionRegion();
         }
 
         // 为了比较块定义是否发生变化，从而决定是否刷新显示，第一步，记忆信息
-        void DetectBlockChange1(int offs1, int offs2)
+        void DetectSelectionChange1(int offs1, int offs2)
         {
             _oldOffs1 = offs1;
             _oldOffs2 = offs2;
@@ -252,24 +221,24 @@ namespace LibraryStudio.Forms
         }
 #endif
 
-        void InvalidateBlockRegion(bool trigger_event = true)
+        void InvalidateSelectionRegion(bool trigger_event = true)
         {
             // 移动插入符的情况，不涉及到块定义和变化
             if (_oldOffs1 == _oldOffs2
-                && _blockOffs1 == _blockOffs2)
+                && _selectOffs1 == _selectOffs2)
                 return;
             bool changed = false;
-            if (InvalidateBlockRegion(_oldOffs1, _blockOffs1))
+            if (InvalidateSelectionRegion(_oldOffs1, _selectOffs1))
                 changed = true;
-            if (InvalidateBlockRegion(_oldOffs2, _blockOffs2))
+            if (InvalidateSelectionRegion(_oldOffs2, _selectOffs2))
                 changed = true;
 
             if (changed == true)
-                DisposeBlockRegion();
+                DisposeSelectionRegion();
 
             if (trigger_event == true && changed)
             {
-                this.BlockChanged?.Invoke(this, new EventArgs());
+                this.SelectionChanged?.Invoke(this, new EventArgs());
             }
         }
 
@@ -290,11 +259,11 @@ namespace LibraryStudio.Forms
         }
 #endif
 
-        bool InvalidateBlockRegion(int offs1, int offs2)
+        bool InvalidateSelectionRegion(int offs1, int offs2)
         {
             if (offs1 == offs2)
                 return false;
-            var region = GetBlockRegion(offs1, offs2);
+            var region = GetSelectionRegion(offs1, offs2);
             if (region != null)
             {
                 this.Invalidate(region);
@@ -306,7 +275,7 @@ namespace LibraryStudio.Forms
         }
 
         // 获得表示块精确边界范围的 Region 对象
-        Region GetBlockRegion(
+        Region GetSelectionRegion(
             int offs1,
             int offs2)
         {
@@ -329,8 +298,8 @@ namespace LibraryStudio.Forms
         }
 
 
-        // 获得包围块边界范围的 Rectangle。若需要精确边界请使用 GetBlockRegion()
-        Rectangle GetBlockRectangle(int offs1, int offs2)
+        // 获得包围块边界范围的 Rectangle。若需要精确边界请使用 GetSelectionRegion()
+        Rectangle GetSelectionRectangle(int offs1, int offs2)
         {
             if (offs1 < 0 || offs2 < 0)
                 return System.Drawing.Rectangle.Empty;

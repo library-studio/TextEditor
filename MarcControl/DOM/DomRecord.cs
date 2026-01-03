@@ -137,7 +137,8 @@ namespace LibraryStudio.Forms
             _marcRecord.GetFieldOffsRange(insert_index,
     out int offs,
     out _);
-            if (text.Length > 0
+            if (insert_index > 0    // 头标区内容不用补充字段结束符
+                && text.Length > 0
                 && text.Last() != Metrics.FieldEndCharDefault)
                 text += Metrics.FieldEndCharDefault;
             _marcRecord._marcControl?.ReplaceText(offs,
@@ -383,7 +384,7 @@ out int count)
         {
             get
             {
-                return GetControl().BlockStartOffset;
+                return GetControl().SelectionStart;
             }
         }
 
@@ -392,7 +393,7 @@ out int count)
         {
             get
             {
-                return GetControl().BlockEndOffset;
+                return GetControl().SelectionEnd;
             }
         }
 

@@ -126,9 +126,9 @@ Rectangle rect)
                 }
 
                 if (splitter_test >= 0
-                    && IsCursorInBlockRegion(e))
+                    && IsCursorInsideSelectionRegion(e))
                 {
-                    BeginDragBlock(1);
+                    BeginDragSelectionText(1);
                     base.OnMouseDown(e);
                     return;
                 }
@@ -174,9 +174,9 @@ Rectangle rect)
             }
 
             // 结束拖动文字块过程
-            if (InDraggingBlock() == 2)
+            if (InDraggingSelectionText() == 2)
             {
-                CompleteDragBlock();
+                CompleteDragSelectionText();
                 base.OnMouseUp(e);
                 return;
             }
@@ -196,9 +196,9 @@ Rectangle rect)
 
                 // 曾进入拖拽阶段 1，但直到 MouseUp 也没有经历过 MouseMove
                 // 延迟兑现鼠标点击的功能
-                if (InDraggingBlock() == 1)
+                if (InDraggingSelectionText() == 1)
                 {
-                    CompleteDragBlock();
+                    CompleteDragSelectionText();
                     SetCaret(result, reset_selection: true);
                     base.OnMouseUp(e);
                     return;
@@ -206,11 +206,11 @@ Rectangle rect)
 
                 {
                     // 选中范围结束
-                    DetectBlockChange1(_blockOffs1, _blockOffs2);
-                    var old_offs = _global_offs;
+                    DetectSelectionChange1(_selectOffs1, _selectOffs2);
+                    var old_offs = _caret_offs;
 
                     if (old_offs != result.Offs)
-                        SetGlobalOffs(result.Offs); // _record.GetGlobalOffs(result);
+                        SetCaretOffs(result.Offs); // _record.GetGlobalOffs(result);
 
                     {
                         MoveCaret(result, true, true/*有条件地触发事件*/);
@@ -218,7 +218,7 @@ Rectangle rect)
 
                         ChangeSelection(() =>
                         {
-                            _blockOffs2 = _global_offs;
+                            _selectOffs2 = _caret_offs;
                         });
                     }
 #if OLD
@@ -275,7 +275,7 @@ e.Y + this.VerticalScroll.Value);
                         AdjustFieldSelect(result.ChildIndex);
                     }
 
-                    SetGlobalOffs(result.Offs);
+                    SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
@@ -285,21 +285,21 @@ e.Y + this.VerticalScroll.Value);
 
                 // 如果光标是首次进入块范围
                 if (splitter_test >= 0
-                    && InDraggingBlock() == 1
-                    && IsCursorInBlockRegion(e))
+                    && InDraggingSelectionText() == 1
+                    && IsCursorInsideSelectionRegion(e))
                 {
-                    BeginDragBlock(2);
-                    SetGlobalOffs(result.Offs);
+                    BeginDragSelectionText(2);
+                    SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
                 }
 
                 // 正在拖动文字块中途
-                if (InDraggingBlock() == 2)
+                if (InDraggingSelectionText() == 2)
                 {
                     // 拖入块范围内，显示表示禁止的光标形状
-                    if (IsCursorInBlockRegion(e))
+                    if (IsCursorInsideSelectionRegion(e))
                     {
                         Cursor = Cursors.No;
                     }
@@ -309,31 +309,24 @@ e.Y + this.VerticalScroll.Value);
                         // Cursor = GetMoveCursor();
                     }
 
-                    SetGlobalOffs(result.Offs);
+                    SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
                 }
 
                 // 按下鼠标左键，拖动定义文字块
-                SetGlobalOffs(result.Offs);
+                SetCaretOffs(result.Offs);
 
-                if (_blockOffs2 != _global_offs)
+                if (_selectOffs2 != _caret_offs)
                 {
-                    SetGlobalOffs(result.Offs);
+                    SetCaretOffs(result.Offs);
                     MoveCaret(result);
 
                     ChangeSelection(() =>
                     {
-                        _blockOffs2 = _global_offs;
+                        _selectOffs2 = _caret_offs;
                     });
-                    /*
-                    DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                    _blockOffs2 = _global_offs;
-
-                    InvalidateBlockRegion();
-                    */
                 }
             }
             else
@@ -344,8 +337,8 @@ e.Y + this.VerticalScroll.Value);
                     Cursor = Cursors.SizeWE;
                 else if (splitter_test >= 0)
                 {
-                    // 判断光标是否在 block region 范围内
-                    if (IsCursorInBlockRegion(e))
+                    // 判断光标是否在 selection region 范围内
+                    if (IsCursorInsideSelectionRegion(e))
                     {
                         // 箭头光标形状，暗示文字块可以被拖动。
                         // TODO: 或者改用更贴合这个意思的带有可移动按时的某种箭头光标形状

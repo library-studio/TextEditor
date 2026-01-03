@@ -22,7 +22,7 @@ namespace LibraryStudio.Forms
     /// </summary>
     public partial class MarcControl : UserControl
     {
-        public event EventHandler BlockChanged;
+        public event EventHandler SelectionChanged;
 
         public event EventHandler CaretMoved;
 
@@ -467,8 +467,8 @@ namespace LibraryStudio.Forms
                     x,
                     y,
                     clipRect,
-                    _blockOffs1,
-                    _blockOffs2,
+                    _selectOffs1,
+                    _selectOffs2,
                     0);
 
             }
@@ -552,7 +552,7 @@ namespace LibraryStudio.Forms
             Relayout(value, true);
             if (set_changed)
                 SetChanged();
-            MoveCaret(HitByGlobalOffs(_global_offs + 1, -1));
+            MoveCaret(HitByCaretOffs(_caret_offs + 1, -1));
             this.Invalidate();
             if (clear_history)
             {
@@ -584,6 +584,7 @@ namespace LibraryStudio.Forms
                 }
             }
         }
+
 
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -642,15 +643,15 @@ namespace LibraryStudio.Forms
             // 当可能越出合法范围时，自动调整 _global_offs 的范围
             if (auto_adjust_global_offs)
             {
-                if (_global_offs > text.Length)
+                if (_caret_offs > text.Length)
                 {
                     // 注意这里没有 MoveCaret();
-                    SetGlobalOffs(text.Length);
+                    SetCaretOffs(text.Length);
                 }
-                if (_blockOffs1 > text.Length)
-                    _blockOffs1 = text.Length;
-                if (_blockOffs2 > text.Length)
-                    _blockOffs2 = text.Length;
+                if (_selectOffs1 > text.Length)
+                    _selectOffs1 = text.Length;
+                if (_selectOffs2 > text.Length)
+                    _selectOffs2 = text.Length;
             }
 
 #if REMOVED
@@ -773,7 +774,7 @@ namespace LibraryStudio.Forms
                 User32.SetCaretPos(_caretInfo.X, _caretInfo.Y);
                 User32.ShowCaret(this.Handle);
                 */
-                MoveCaret(HitByGlobalOffs(_global_offs + 1, -1), false);
+                MoveCaret(HitByCaretOffs(_caret_offs + 1, -1), false);
             }
         }
 
@@ -1052,7 +1053,7 @@ out long left_width);
             int end,
             string text,
             bool delay_update,
-            bool auto_adjust_global_offs = true,
+            bool auto_adjust_caret_and_selection = true,
             bool add_history = true)
         {
             ReplaceTextResult ret = null;
@@ -1142,16 +1143,16 @@ out long left_width);
             */
 
             // 自动调整 _global_offs 的范围
-            if (auto_adjust_global_offs)
+            if (auto_adjust_caret_and_selection)
             {
                 int e = start + replaced_text.Length;
                 int delta = text.Length - (replaced_text.Length/*end - start*/);
-                SetGlobalOffs(Adjust(_global_offs, start, e, delta));
-                _blockOffs1 = Adjust(_blockOffs1, start, e, delta);
-                _blockOffs2 = Adjust(_blockOffs2, start, e, delta);
+                SetCaretOffs(Adjust(_caret_offs, start, e, delta));
+                _selectOffs1 = Adjust(_selectOffs1, start, e, delta);
+                _selectOffs2 = Adjust(_selectOffs2, start, e, delta);
             }
 
-            // 会改变 _blockOffs2 的 bug 已经解决。临时禁用了 OnResize()
+            // 会改变 _selectOffs2 的 bug 已经解决。临时禁用了 OnResize()
             ChangeDocumentSize(max_pixel_width);
 
 
@@ -1167,7 +1168,7 @@ out long left_width);
 
             if (this.Focused)
             {
-                MoveCaret(HitByGlobalOffs(_global_offs + 1, -1), false);
+                MoveCaret(HitByCaretOffs(_caret_offs + 1, -1), false);
             }
 
             if (add_history)
@@ -1299,13 +1300,13 @@ out long left_width);
                         {
                             // 如果是向左，并且 caret 正好在块头部，需要先向左移动一个字符
                             if (
-                                HasBlock()
-                                && _global_offs == _blockOffs1 || _global_offs == _blockOffs2)
+                                HasSelection()
+                                && _caret_offs == _selectOffs1 || _caret_offs == _selectOffs2)
                             {
-                                var ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+                                var ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Left ? 1 : -1),
     e.KeyCode == Keys.Left ? -2 : 2,
     out HitInfo info);
-                                SetGlobalOffs(info.Offs);
+                                SetCaretOffs(info.Offs);
                                 MoveCaret(info);
                             }
 
@@ -1314,15 +1315,15 @@ out long left_width);
                             int offs;
                             if (e.KeyCode == Keys.Left)
                             {
-                                offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                                offs = Math.Min(_selectOffs1, _selectOffs2);  // 到块的头部
                             }
                             else
                             {
-                                offs = Math.Max(_blockOffs1, _blockOffs2);
+                                offs = Math.Max(_selectOffs1, _selectOffs2);
                             }
 
-                            SetGlobalOffs(offs);
-                            MoveCaret(HitByGlobalOffs(offs, 0));
+                            SetCaretOffs(offs);
+                            MoveCaret(HitByCaretOffs(offs, 0));
                             /*
                             var ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
                                 e.KeyCode == Keys.Left ? -1 : 1,
@@ -1332,23 +1333,23 @@ out long left_width);
                         }
 
                         {
-                            DetectBlockChange1(_blockOffs1, _blockOffs2);
+                            DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
                             HitInfo info = null;
                             int ret = 0;
-                            if (HasBlock() && _shiftPressed == false)
+                            if (HasSelection() && _shiftPressed == false)
                             {
                                 int offs;
                                 if (e.KeyCode == Keys.Left)
-                                    offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                                    offs = Math.Min(_selectOffs1, _selectOffs2);  // 到块的头部
                                 else
-                                    offs = Math.Max(_blockOffs1, _blockOffs2);
+                                    offs = Math.Max(_selectOffs1, _selectOffs2);
 
-                                _blockOffs1 = offs;
-                                _blockOffs2 = offs;
-                                SetGlobalOffs(offs);
+                                _selectOffs1 = offs;
+                                _selectOffs2 = offs;
+                                SetCaretOffs(offs);
 
-                                ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+                                ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Left ? 1 : -1),
                                     e.KeyCode == Keys.Left ? -1 : 1,
                                     out info);
                             }
@@ -1360,12 +1361,12 @@ out long left_width);
                                 {
                                     // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                                     // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
-                                    ret = _record.MoveByOffs(_global_offs + 2,
+                                    ret = _record.MoveByOffs(_caret_offs + 2,
                                         -1,
                                         out info);
                                 }
                                 else
-                                    ret = _record.MoveByOffs(_global_offs,
+                                    ret = _record.MoveByOffs(_caret_offs,
                                         e.KeyCode == Keys.Left ? -1 : 1,
                                         out info);
                             }
@@ -1373,20 +1374,20 @@ out long left_width);
                             if (ret != 0)
                                 break;
 
-                            SetGlobalOffs(info.Offs);
+                            SetCaretOffs(info.Offs);
                             MoveCaret(info);
 
                             if (_shiftPressed)
-                                _blockOffs2 = _global_offs;
+                                _selectOffs2 = _caret_offs;
                             else
                             {
-                                _blockOffs1 = _global_offs;
-                                _blockOffs2 = _global_offs;
+                                _selectOffs1 = _caret_offs;
+                                _selectOffs2 = _caret_offs;
                             }
                             _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
 
                             // this.Invalidate();  // TODO: 优化为失效具体的行。失效范围可以根据 offs1 -- offs2 整数可以设法直接提供给 Paint() 函数，用以替代 Rectangle
-                            InvalidateBlockRegion();
+                            InvalidateSelectionRegion();
                         }
                     }
                     break;
@@ -1408,8 +1409,8 @@ out long left_width);
                                 1,
                                 out int start,
                                 out _);
-                            SetGlobalOffs(start);
-                            MoveCaret(HitByGlobalOffs(start, 0));
+                            SetCaretOffs(start);
+                            MoveCaret(HitByCaretOffs(start, 0));
                             AdjustFieldSelect(_caretInfo.ChildIndex);
                         }
 
@@ -1427,17 +1428,17 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            SetGlobalOffs(temp_info.Offs);
+                            SetCaretOffs(temp_info.Offs);
                             MoveCaret(temp_info);
 
                             ChangeSelection(() =>
                             {
                                 if (_shiftPressed)
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs2 = _caret_offs;
                                 else
                                 {
-                                    _blockOffs1 = _global_offs;
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs1 = _caret_offs;
+                                    _selectOffs2 = _caret_offs;
                                 }
                             });
                             /*
@@ -1471,8 +1472,8 @@ out long left_width);
                                 1,
                                 out _,
                                 out int end);
-                            SetGlobalOffs(end);
-                            MoveCaret(HitByGlobalOffs(end, 0));
+                            SetCaretOffs(end);
+                            MoveCaret(HitByCaretOffs(end, 0));
                             AdjustFieldSelect(_caretInfo.ChildIndex);
                         }
 
@@ -1490,17 +1491,17 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            SetGlobalOffs(temp_info.Offs);
+                            SetCaretOffs(temp_info.Offs);
                             MoveCaret(temp_info);
 
                             ChangeSelection(() =>
                             {
                                 if (_shiftPressed)
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs2 = _caret_offs;
                                 else
                                 {
-                                    _blockOffs1 = _global_offs;
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs1 = _caret_offs;
+                                    _selectOffs2 = _caret_offs;
                                 }
                             });
                             /*
@@ -1521,23 +1522,23 @@ out long left_width);
                 case Keys.Home:
                 case Keys.End:
                     {
-                        DetectBlockChange1(_blockOffs1, _blockOffs2);
+                        DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
                         HitInfo info = null;
                         int ret = 0;
-                        if (HasBlock() && _shiftPressed == false)
+                        if (HasSelection() && _shiftPressed == false)
                         {
                             int offs;
                             if (e.KeyCode == Keys.Left)
-                                offs = Math.Min(_blockOffs1, _blockOffs2);  // 到块的头部
+                                offs = Math.Min(_selectOffs1, _selectOffs2);  // 到块的头部
                             else
-                                offs = Math.Max(_blockOffs1, _blockOffs2);
+                                offs = Math.Max(_selectOffs1, _selectOffs2);
 
-                            _blockOffs1 = offs;
-                            _blockOffs2 = offs;
-                            SetGlobalOffs(offs);
+                            _selectOffs1 = offs;
+                            _selectOffs2 = offs;
+                            SetCaretOffs(offs);
 
-                            ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Home ? 1 : -1),
+                            ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Home ? 1 : -1),
                                 e.KeyCode == Keys.Home ? -1 : 1,
                                 out info);
                         }
@@ -1557,7 +1558,7 @@ out long left_width);
                                     int start = field_start;
                                     // 如果已经在字段名第一字符
                                     if (e.KeyCode == Keys.Home
-                                        && _global_offs == field_start)
+                                        && _caret_offs == field_start)
                                     {
                                         if (this._record.GetField(field_index)?.IsControlField ?? false)
                                             start = Math.Min(field_end, field_start + 3);
@@ -1578,19 +1579,19 @@ out long left_width);
                         if (ret != 0)
                             break;
 
-                        SetGlobalOffs(info.Offs);
+                        SetCaretOffs(info.Offs);
                         MoveCaret(info);
 
                         if (_shiftPressed)
-                            _blockOffs2 = _global_offs;
+                            _selectOffs2 = _caret_offs;
                         else
                         {
-                            _blockOffs1 = _global_offs;
-                            _blockOffs2 = _global_offs;
+                            _selectOffs1 = _caret_offs;
+                            _selectOffs2 = _caret_offs;
                         }
                         _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
 
-                        InvalidateBlockRegion();
+                        InvalidateSelectionRegion();
                     }
                     break;
                 case Keys.PageUp:
@@ -1621,17 +1622,17 @@ out long left_width);
                             var caret_x = Math.Max(_fieldProperty.ContentX + 1, _lastX);
 
                             var hit_info = this._record.HitTest(caret_x, caret_y);
-                            SetGlobalOffs(hit_info.Offs);
+                            SetCaretOffs(hit_info.Offs);
                             MoveCaret(hit_info);
 
                             ChangeSelection(() =>
                             {
                                 if (_shiftPressed)
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs2 = _caret_offs;
                                 else
                                 {
-                                    _blockOffs1 = _global_offs;
-                                    _blockOffs2 = _global_offs;
+                                    _selectOffs1 = _caret_offs;
+                                    _selectOffs2 = _caret_offs;
                                 }
                             });
                             /*
@@ -1879,7 +1880,7 @@ out long left_width);
 
         protected override void OnHandleDestroyed(EventArgs e)
         {
-            DisposeBlockRegion();
+            DisposeSelectionRegion();
 
             Imm32.ImmReleaseContext(this.Handle, hIMC);
             // User32.DestroyCaret();

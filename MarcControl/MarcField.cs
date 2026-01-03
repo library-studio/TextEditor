@@ -599,9 +599,9 @@ namespace LibraryStudio.Forms
 
             // parameters:
             //      start_offs  text 文本处在 Region 中的起始偏移位置。
-            //                  以当前 Region 自己的坐标计算，开始位置为 0。
-            //                  决定了完整的文本编号开始时的字符位置(但完整的文本只有其中一部分进入了 mask string)
-            //                  如果是负数，表示已经用掉了若干字符
+            //                  以当前 Region 自己的坐标计算
+            //                  决定了文本编号字符的开始值
+            //      first_char  区域开始的字符值。name 区域为 (char)1，indicator 区域为 (char)4
             string GetMaskString(int start_offs, char first_char, int length)
             {
                 if (length <= 0)
@@ -1760,33 +1760,22 @@ clipRect);
                 //string.IsNullOrEmpty(name_value) == false
                 )
             {
-                //var func = context.GetFont;
-                //context.GetFont = (p, o) => {
-                //    return func?.Invoke(_name, o);
-                //};
-                try
-                {
-                    EnsureName();
-                    // var width =
-                    var ret = _name.ReplaceText(
-                        context,
-                        dc,
-                        0,
-                        -1,
-                        name_value,
-                        _fieldProperty.NameTextWidth);
+                EnsureName();
+                // var width =
+                var ret = _name.ReplaceText(
+                    context,
+                    dc,
+                    0,
+                    -1,
+                    name_value,
+                    _fieldProperty.NameTextWidth);
 
-                    var r = GetNameRect();
-                    var update_rect_name = Utility.Offset(ret.UpdateRect, r.X, r.Y);
+                var r = GetNameRect();
+                var update_rect_name = Utility.Offset(ret.UpdateRect, r.X, r.Y);
 
-                    update_rect = Utility.Union(update_rect, update_rect_name);
-                    max_pixel_width = Math.Max(max_pixel_width,
-                        _fieldProperty.NameX + ret.MaxPixel);
-                }
-                finally
-                {
-                    //context.GetFont = func;
-                }
+                update_rect = Utility.Union(update_rect, update_rect_name);
+                max_pixel_width = Math.Max(max_pixel_width,
+                    _fieldProperty.NameX + ret.MaxPixel);
             }
             else
             {
@@ -1803,25 +1792,14 @@ clipRect);
             if (_fieldProperty?.GetFieldCaption != null
                 && name_value != old_name_value)
             {
-                //var func = context.GetFont;
-                //context.GetFont = (p, o) => {
-                //    return func?.Invoke(_caption, o);
-                //};
-                try
-                {
-                    RefreshCaptionText(
-                    context,
-                    dc,
-                    out Rectangle update_rect_caption); // 返回前 update_rect_caption 已经被平移过了
-                    update_rect_caption.Width = Math.Min(update_rect_caption.Width, _fieldProperty.CaptionPixelWidth);
-                    update_rect = Utility.Union(update_rect, update_rect_caption);
-                    max_pixel_width = Math.Max(max_pixel_width,
-                        _fieldProperty.NameBorderX);
-                }
-                finally
-                {
-                    //context.GetFont = func;
-                }
+                RefreshCaptionText(
+                context,
+                dc,
+                out Rectangle update_rect_caption); // 返回前 update_rect_caption 已经被平移过了
+                update_rect_caption.Width = Math.Min(update_rect_caption.Width, _fieldProperty.CaptionPixelWidth);
+                update_rect = Utility.Union(update_rect, update_rect_caption);
+                max_pixel_width = Math.Max(max_pixel_width,
+                    _fieldProperty.NameBorderX);
             }
 
             if (true
@@ -1830,34 +1808,23 @@ clipRect);
             {
                 EnsureIndicator();
 
-                //var func = context.GetFont;
-                //context.GetFont = (p, o) => {
-                //    return func?.Invoke(_indicator, o);
-                //};
-                try
-                {
-                    var ret = _indicator.ReplaceText(
-                    context,
-                    dc,
-        0,
-        -1,
-        indicator_value,
-        _fieldProperty.IndicatorTextWidth);
+                var ret = _indicator.ReplaceText(
+                context,
+                dc,
+    0,
+    -1,
+    indicator_value,
+    _fieldProperty.IndicatorTextWidth);
 
-                    var r = GetIndicatorRect();
-                    var update_rect_indicator = Utility.Offset(
-                        ret.UpdateRect,
-                        r.X,
-                        r.Y);
-                    update_rect = Utility.Union(update_rect, update_rect_indicator);
+                var r = GetIndicatorRect();
+                var update_rect_indicator = Utility.Offset(
+                    ret.UpdateRect,
+                    r.X,
+                    r.Y);
+                update_rect = Utility.Union(update_rect, update_rect_indicator);
 
-                    max_pixel_width = Math.Max(max_pixel_width,
-                        _fieldProperty.IndicatorX + ret.MaxPixel);
-                }
-                finally
-                {
-                    //context.GetFont = func;
-                }
+                max_pixel_width = Math.Max(max_pixel_width,
+                    _fieldProperty.IndicatorX + ret.MaxPixel);
             }
             else
             {
@@ -1877,54 +1844,49 @@ clipRect);
 
                 if (content_value != _content.MergeText())
                 {
-                    //var func = context.GetFont;
-                    //context.GetFont = (p, o) => {
-                    //    return func?.Invoke(_content, o);
-                    //};
-                    try
-                    {
-                        var ret = _content.ReplaceText(
-                        context,
-                        dc,
-        0,
-        -1,
-        content_value,
-        pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fieldProperty.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
-        /*,
-        out replaced,
-        out Rectangle update_rect_content,
-        out scroll_rect,
-        out scroll_distance*/);
-                        var y0 = GetContentY();
-                        var update_rect_content = Utility.Offset(
-                            ret.UpdateRect,
-                            GetContentX(),
-                            y0);
-                        /*
-                        // 注: 右侧加上虚拟回车符号的宽度。避免失效区域不足
-                        if (update_rect_content.IsEmpty == false)
-                            update_rect_content.Width += Line.ReturnWidth();
-                        if (scroll_rect.IsEmpty == false)
-                            scroll_rect.Width += Line.ReturnWidth();
-                        */
+                    var ret = _content.ReplaceText(
+                    context,
+                    dc,
+    0,
+    -1,
+    content_value,
+    pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fieldProperty.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
+    /*,
+    out replaced,
+    out Rectangle update_rect_content,
+    out scroll_rect,
+    out scroll_distance*/);
 
-                        /*
-                        // 若 Paragraph 中 Line 数变化，就要连左边的矩形一起刷新和滚动
-                        if (scroll_rect.IsEmpty == false)
-                        {
-                            update_rect.Width += update_rect.X;
-                            update_rect.X = 0;
-                        }
-                        */
-                        update_rect = Utility.Union(update_rect, update_rect_content);
+                    // 由于块背景实际上可能包含了字符面积以外的高度更大的面积，
+                    // 所以 update_rect 上边沿要依然为 0，但高度要加大 y0 那么多。相当于下移以后再调整 Y 为 0
+                    var y0 = GetContentY();
+                    var rect = ret.UpdateRect;
+                    rect.Height += y0;
+                    
+                    var update_rect_content = Utility.Offset(
+                        rect,
+                        GetContentX(),
+                        0/*y0*/);
+                    /*
+                    // 注: 右侧加上虚拟回车符号的宽度。避免失效区域不足
+                    if (update_rect_content.IsEmpty == false)
+                        update_rect_content.Width += Line.ReturnWidth();
+                    if (scroll_rect.IsEmpty == false)
+                        scroll_rect.Width += Line.ReturnWidth();
+                    */
 
-                        max_pixel_width = Math.Max(max_pixel_width,
-                            _fieldProperty.ContentX + ret.MaxPixel);
-                    }
-                    finally
+                    /*
+                    // 若 Paragraph 中 Line 数变化，就要连左边的矩形一起刷新和滚动
+                    if (scroll_rect.IsEmpty == false)
                     {
-                        //context.GetFont = func;
+                        update_rect.Width += update_rect.X;
+                        update_rect.X = 0;
                     }
+                    */
+                    update_rect = Utility.Union(update_rect, update_rect_content);
+
+                    max_pixel_width = Math.Max(max_pixel_width,
+                        _fieldProperty.ContentX + ret.MaxPixel);
                 }
                 else
                 {

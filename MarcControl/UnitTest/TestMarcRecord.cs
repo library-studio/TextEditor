@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 
@@ -11,17 +12,21 @@ using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
 {
-    public class TestMarcControl
+    public class TestMarcRecord
     {
         // 在类中增加字段与构造函数注入 ITestOutputHelper
+        // 这是因为测试运行在界面线程，如果输出 Console 信息，可能不会被测试容器捕获
         private readonly Xunit.Abstractions.ITestOutputHelper _output;
-        public TestMarcControl(Xunit.Abstractions.ITestOutputHelper output)
+
+
+        public TestMarcRecord(Xunit.Abstractions.ITestOutputHelper output)
         {
             _output = output;
         }
 
         #region SoftReplace
 
+        // 测试 SoftReplace() 函数。不过此函数已经弃用
         [Theory]
         [InlineData("", "", "")]
         [InlineData("", "n", "n")]
@@ -124,7 +129,7 @@ namespace LibraryStudio.Forms
         [InlineData("oo||oo||oo", "n12345", "n12345")]
         [InlineData("oo||oo||oo", "n123456", "n123456")]
 
-        public void test_softReplace_01(string old_mask_text,
+        public void softReplace(string old_mask_text,
             string new_text,
             string correct)
         {
@@ -150,7 +155,9 @@ namespace LibraryStudio.Forms
 
         [InlineData("12345ABCD\x001e", 24, new string[] { "12345ABCD", "" })]
         [InlineData("12345ABCD\x001e\x001e", 24, new string[] { "12345ABCD", "", "" })]
-        public void test_splitFiels_01(string content, int start, string[] correct)
+        public void splitFields(string content,
+            int start,
+            string[] correct)
         {
             var results = MarcRecord.SplitFields(content, start);
             AssertAreEqual(correct, results.ToArray());
@@ -170,6 +177,153 @@ namespace LibraryStudio.Forms
         }
 
         #endregion
+
+
+        #region SplitLines_v2
+
+        [Theory]
+        [InlineData(
+            "01",
+            "",
+            new string[] { "" })]
+        [InlineData(
+            "02",
+            "1",
+            new string[] { "1" })]
+        [InlineData(
+            "03",
+            "12",
+            new string[] { "12" })]
+        [InlineData(
+            "04",
+            "012345678901234567890123",
+            new string[] { "012345678901234567890123" })]
+        // 本函数不会辨别头标区
+        [InlineData(
+            "05",
+            "012345678901234567890123a",
+            new string[] { "012345678901234567890123a" })]
+        [InlineData(
+            "06",
+            "012345678901234567890123abcde12",
+            new string[] { "012345678901234567890123abcde12" })]
+        [InlineData(
+            "07",
+            "012345678901234567890123\u001e",
+            new string[] { "012345678901234567890123" })]
+        [InlineData(
+            "08",
+            "012345678901234567890123abcde12\u001e",
+            new string[] { "012345678901234567890123abcde12" })]
+
+        [InlineData(
+            "09",
+            "12345ABCD\x001e",
+            new string[] { "12345ABCD" })]
+        [InlineData(
+            "10",
+            "12345ABCD\x001e\x001e",
+            new string[] { "12345ABCD", "" })]
+        [InlineData(
+            "11",
+            "12345ABCD\x001e\x001e2",
+            new string[] { "12345ABCD", "", "2" })]
+        public void splitLines_v2(
+            string index,
+            string content,
+            string[] correct)
+        {
+            {
+                var results = MarcRecord.SplitLines_v2(content,
+                    Metrics.FieldEndCharDefault,
+                    false,
+                    false);
+                AssertAreEqual(correct, results.ToArray());
+
+            }
+
+            {
+                var results = MarcRecord.SplitLines_v2(content,
+                    Metrics.FieldEndCharDefault,
+                    contain_return : true,
+                    complete_delimeter : true);
+               
+                AssertAreEqual(correct.Select(o=>o+Metrics.FieldEndCharDefault).ToArray(),
+                    results.ToArray());
+            }
+        }
+
+        // 测试 complete_delimeter 参数为 false 的情况。
+        // 如果最后一个字段没有字段结束符，则 SplitLines_v2() 不给它自动补充
+        [Theory]
+        [InlineData(
+    "01",
+    "12345ABCD\x001e\x001e2",
+    new string[] { "12345ABCD\u001e", "\u001e", "2" })]
+        [InlineData(
+    "02",
+    "12345ABCD\x001e\x001e2\u001e",
+    new string[] { "12345ABCD\u001e", "\u001e", "2\u001e" })]
+        [InlineData(
+    "03",
+    "",
+    new string[] { "" })]
+        [InlineData(
+    "04",
+    "\u001e",
+    new string[] { "\u001e" })]
+
+        public void splitLines_v2_missing(
+    string index,
+    string content,
+    string[] correct)
+        {
+            {
+                var results = MarcRecord.SplitLines_v2(content,
+                    Metrics.FieldEndCharDefault,
+                    contain_return: true,
+                    complete_delimeter: false);
+
+                AssertAreEqual(correct,
+                    results.ToArray());
+            }
+        }
+
+
+        #endregion
+
+
+        #region SplitFields_v2
+
+        [Theory]
+        [InlineData(1, "", 0, new string[] { "" })]
+        [InlineData(2, "1", 0, new string[] { "1" })]
+        [InlineData(3, "12", 0, new string[] { "12" })]
+        [InlineData(4, "012345678901234567890123", 0, new string[] { "012345678901234567890123" })]
+        [InlineData(5, "012345678901234567890123a", 0, new string[] { "012345678901234567890123", "a" })]
+        [InlineData(6, "012345678901234567890123abcde12", 0, new string[] { "012345678901234567890123", "abcde12" })]
+        [InlineData(7, "012345678901234567890123\u001e", 0, new string[] { "012345678901234567890123", "" })]
+        [InlineData(8, "012345678901234567890123abcde12\u001e", 0, new string[] { "012345678901234567890123", "abcde12" })]
+
+        [InlineData(9, "12345ABCD\x001e", 24, new string[] { "12345ABCD" })]
+        [InlineData(10, "12345ABCD\x001e\x001e", 24, new string[] { "12345ABCD", "" })]
+        // 头标区 24 字符内出现了字段结束符
+        [InlineData(11, "01234567890123456789012\u001e", 0, new string[] { "01234567890123456789012\u001e" })]
+        [InlineData(12, "01234567890123456789012\u001e\u001e", 0, new string[] { "01234567890123456789012\u001e", "" })]
+        [InlineData(13, "01234567890123456789012\u001e1\u001e", 0, new string[] { "01234567890123456789012\u001e", "1" })]
+
+        public void splitFields_v2(
+            int index,
+            string content,
+            int start,
+            string[] correct)
+        {
+            var results = MarcRecord.SplitFields_v2(content, start);
+            AssertAreEqual(correct, results.ToArray());
+        }
+
+        #endregion
+
 
         #region FindFields
 
@@ -1119,6 +1273,72 @@ string correct_result)
             Assert.Equal(correct_result, result);
         }
 
+
+        #endregion
+
+        #region ReplaceText
+
+        [Theory]
+        [InlineData(
+            "01",
+            "",
+            0,
+            0,
+            "012345678901234567890123",
+            "012345678901234567890123",
+            "012345678901234567890123")]
+        // 自动补上字段结束符
+        [InlineData(
+            "02",
+            "",
+            0,
+            0,
+            "0123456789012345678901231",
+            "0123456789012345678901231\u001e",
+            "0123456789012345678901231\u001e")]
+        [InlineData(
+            "11",
+            "",
+            0,
+            0,
+            "012345678901234567890123\u001e",
+            "012345678901234567890123\u001e",
+            "012345678901234567890123\u001e")]
+        [InlineData(
+            "12",
+            "",
+            0,
+            0,
+            "0123456789012345678901231\u001e",
+            "0123456789012345678901231\u001e",
+            "0123456789012345678901231\u001e")]
+        public void replaceText(
+            string index,
+            string content,
+            int start,
+            int end,
+            string new_text,
+            string correct_content,
+            string return_new_text)
+        {
+            MarcRecord.BuildContent(content);
+            UiTestHelpers.UseControl((ctl) =>
+            {
+                ctl.Content = content;
+                Assert.Equal(content, ctl.Content);
+
+                // 直接调用 API
+                var result = ctl.ReplaceText(
+            start,
+            end,
+            new_text,
+            delay_update: false);
+
+                // Application.DoEvents(); // 若需要处理 Timer 或重绘
+                Assert.Equal(correct_content, ctl.Content);
+                Assert.Equal(return_new_text, result.NewText);
+            });
+        }
 
         #endregion
 

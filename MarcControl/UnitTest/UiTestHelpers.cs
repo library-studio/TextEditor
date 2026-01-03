@@ -7,6 +7,57 @@ namespace LibraryStudio.Forms
 {
     public static class UiTestHelpers
     {
+
+        public delegate void delegate_useMarcControl(MarcControl marcControl);
+
+        public static void UseControl(delegate_useMarcControl action)
+        {
+            UiTestHelpers.RunInSta(() =>
+            {
+                using (var form = new Form())
+                {
+                    var ctl = new MarcControl();
+                    ctl.Size = new Size(1024, 768);
+                    form.Controls.Add(ctl);
+                    form.CreateControl();
+
+                    action(ctl);
+
+                    /*
+                    // 直接调用 API
+                    ctl.ReplaceText(0, 0, "abc", delay_update: false);
+
+                    Application.DoEvents(); // 若需要处理 Timer 或重绘
+                    Assert.IsTrue(ctl.Content.Contains("abc"));
+                    */
+                }
+            });
+        }
+
+        public delegate void delegate_useDomRecord(DomRecord domRecord);
+
+        public static void UseDomRecord(delegate_useDomRecord action)
+        {
+            UiTestHelpers.RunInSta(() =>
+            {
+                using (var form = new Form())
+                {
+                    var ctl = new MarcControl();
+                    ctl.Size = new Size(1024, 768);
+                    form.Controls.Add(ctl);
+                    form.CreateControl();
+
+                    Application.DoEvents();
+                    action(ctl.GetDomRecord());
+                    Application.DoEvents();
+                    ctl.Dispose();
+                }
+            });
+        }
+
+
+
+
         // 在 STA 线程上运行一个 action，并在该线程上启动一个短暂的消息循环以保证 WinForms 能正常初始化。
         // 如果 action 抛出异常，会在调用线程重新抛出以便测试框架捕获。
         public static void RunInSta(Action action)

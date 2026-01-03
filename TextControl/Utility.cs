@@ -128,12 +128,12 @@ namespace LibraryStudio.Forms
         public static Rectangle EmptyRect = Rectangle.Empty;
 
         // PRECT 本身也有 operator Rectangle
-        public static Rectangle GetRectangle(PRECT block_rect)
+        public static Rectangle GetRectangle(PRECT rect)
         {
-            return new Rectangle(block_rect.X,
-    block_rect.Y,
-    block_rect.Width,
-    block_rect.Height);
+            return new Rectangle(rect.X,
+    rect.Y,
+    rect.Width,
+    rect.Height);
         }
 
         // 对 Empty 的 Rectangle 跳过 Offset()

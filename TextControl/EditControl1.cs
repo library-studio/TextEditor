@@ -20,7 +20,7 @@ namespace LibraryStudio.Forms
     /// </summary>
     public partial class EditControl1 : UserControl
     {
-        public event EventHandler BlockChanged;
+        public event EventHandler SelectionChanged;
 
         public new event EventHandler TextChanged;
 
@@ -1586,7 +1586,7 @@ out long left_width);
 
             if (trigger_event == true && changed)
             {
-                this.BlockChanged?.Invoke(this, new EventArgs());
+                this.SelectionChanged?.Invoke(this, new EventArgs());
             }
         }
 

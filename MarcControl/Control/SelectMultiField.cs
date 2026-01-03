@@ -83,12 +83,6 @@ namespace LibraryStudio.Forms
             if (ret == true)
             {
                 ChangeSelection(start_offs, end_offs);
-                /*
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-                _blockOffs1 = start_offs;
-                _blockOffs2 = end_offs;
-                InvalidateBlockRegion();
-                */
             }
         }
 

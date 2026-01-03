@@ -30,23 +30,15 @@ namespace LibraryStudio.Forms
         void SetCaret(HitInfo result,
             bool reset_selection = true)
         {
-            SetGlobalOffs(result.Offs);
+            SetCaretOffs(result.Offs);
 
-            Debug.Assert(_global_offs <= _content_length);
+            Debug.Assert(_caret_offs <= _content_length);
 
             MoveCaret(result);
 
             if (reset_selection)
             {
-                ChangeSelection(_global_offs);
-                /*
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                _blockOffs1 = _global_offs;
-                _blockOffs2 = _global_offs;
-
-                InvalidateBlockRegion();
-                */
+                ChangeSelection(_caret_offs);
             }
         }
 
@@ -181,19 +173,19 @@ namespace LibraryStudio.Forms
                 this.CaretMoved?.Invoke(this, EventArgs.Empty);
         }
 
-        private int _global_offs = 0; // Caret 全局偏移量。
+        private int _caret_offs = 0; // Caret 全局偏移量。
 
         // 插入符全局偏移量
         public int CaretOffset
         {
-            get { return _global_offs; }
+            get { return _caret_offs; }
         }
 
-        void SetGlobalOffs(int offs)
+        void SetCaretOffs(int offs)
         {
-            if (_global_offs != offs)
+            if (_caret_offs != offs)
             {
-                _global_offs = offs;
+                _caret_offs = offs;
                 //if (trigger_event)
                 //    this.CaretMoved?.Invoke(this, new EventArgs());
             }
@@ -203,7 +195,7 @@ namespace LibraryStudio.Forms
         {
             if (delta != 0)
             {
-                _global_offs += delta;
+                _caret_offs += delta;
                 // this.CaretMoved?.Invoke(this, new EventArgs());
             }
         }
@@ -211,41 +203,41 @@ namespace LibraryStudio.Forms
 
         // TODO: 名字叫 offset... 比较好
         // 平移全局偏移量，和平移块范围
-        bool MoveGlobalOffsAndBlock(int delta)
+        bool DeltaCaretOffsAndSelectionOffs(int delta)
         {
-            if (_global_offs + delta < 0)
+            if (_caret_offs + delta < 0)
                 return false;
 
-            DetectBlockChange1(_blockOffs1, _blockOffs2);
+            DetectSelectionChange1(_selectOffs1, _selectOffs2);
 
-            var start_offs = _global_offs; // 记录开始偏移量
+            var start_offs = _caret_offs; // 记录开始偏移量
 
             HitInfo info = null;
             if (delta >= 0)
             {
                 // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                 // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
-                info = HitByGlobalOffs(_global_offs + delta + 1, -1);
+                info = HitByCaretOffs(_caret_offs + delta + 1, -1);
             }
             else
-                info = HitByGlobalOffs(_global_offs, delta);
-            SetGlobalOffs(info.Offs); // 更新 _global_offs
+                info = HitByCaretOffs(_caret_offs, delta);
+            SetCaretOffs(info.Offs); // 更新 _global_offs
             MoveCaret(info);
 
             _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
 
             // 平移块范围
-            if (_blockOffs1 >= start_offs)
-                _blockOffs1 += delta;
-            if (_blockOffs2 >= start_offs)
-                _blockOffs2 += delta;
+            if (_selectOffs1 >= start_offs)
+                _selectOffs1 += delta;
+            if (_selectOffs2 >= start_offs)
+                _selectOffs2 += delta;
 
             // 块定义发生刷新才有必要更新变化的区域
-            InvalidateBlockRegion();
+            InvalidateSelectionRegion();
             return true;
         }
 
-        HitInfo HitByGlobalOffs(int offs, int delta = 0)
+        HitInfo HitByCaretOffs(int offs, int delta = 0)
         {
             _record.MoveByOffs(offs, delta, out HitInfo info);
             return info;
