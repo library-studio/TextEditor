@@ -646,7 +646,8 @@ namespace LibraryStudio.Forms
                 if (_caret_offs > text.Length)
                 {
                     // 注意这里没有 MoveCaret();
-                    SetCaretOffs(text.Length);
+                    // SetCaretOffs(text.Length);
+                    MoveCaret(HitByCaretOffs(text.Length), false);  // 2026/1/4
                 }
                 if (_selectOffs1 > text.Length)
                     _selectOffs1 = text.Length;
@@ -1142,12 +1143,15 @@ out long left_width);
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
             */
 
+            int new_caret_offs = -1;
+
             // 自动调整 _global_offs 的范围
             if (auto_adjust_caret_and_selection)
             {
                 int e = start + replaced_text.Length;
                 int delta = text.Length - (replaced_text.Length/*end - start*/);
-                SetCaretOffs(Adjust(_caret_offs, start, e, delta));
+                // SetCaretOffs(Adjust(_caret_offs, start, e, delta));
+                new_caret_offs = Adjust(_caret_offs, start, e, delta);
                 _selectOffs1 = Adjust(_selectOffs1, start, e, delta);
                 _selectOffs2 = Adjust(_selectOffs2, start, e, delta);
             }
@@ -1166,9 +1170,12 @@ out long left_width);
                 return v;
             }
 
-            if (this.Focused)
+            if (this.Focused || new_caret_offs != -1)
             {
-                MoveCaret(HitByCaretOffs(_caret_offs + 1, -1), false);
+                if (new_caret_offs != -1)
+                    MoveCaret(HitByCaretOffs(new_caret_offs + 1, -1), false);
+                else
+                    MoveCaret(HitByCaretOffs(_caret_offs + 1, -1), false);
             }
 
             if (add_history)
@@ -1306,7 +1313,7 @@ out long left_width);
                                 var ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Left ? 1 : -1),
     e.KeyCode == Keys.Left ? -2 : 2,
     out HitInfo info);
-                                SetCaretOffs(info.Offs);
+                                //SetCaretOffs(info.Offs);
                                 MoveCaret(info);
                             }
 
@@ -1322,7 +1329,7 @@ out long left_width);
                                 offs = Math.Max(_selectOffs1, _selectOffs2);
                             }
 
-                            SetCaretOffs(offs);
+                            //SetCaretOffs(offs);
                             MoveCaret(HitByCaretOffs(offs, 0));
                             /*
                             var ret = _record.MoveByOffs(_global_offs + (e.KeyCode == Keys.Left ? 1 : -1),
@@ -1347,7 +1354,7 @@ out long left_width);
 
                                 _selectOffs1 = offs;
                                 _selectOffs2 = offs;
-                                SetCaretOffs(offs);
+                                //SetCaretOffs(offs);
 
                                 ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Left ? 1 : -1),
                                     e.KeyCode == Keys.Left ? -1 : 1,
@@ -1374,7 +1381,7 @@ out long left_width);
                             if (ret != 0)
                                 break;
 
-                            SetCaretOffs(info.Offs);
+                            //SetCaretOffs(info.Offs);
                             MoveCaret(info);
 
                             if (_shiftPressed)
@@ -1409,7 +1416,7 @@ out long left_width);
                                 1,
                                 out int start,
                                 out _);
-                            SetCaretOffs(start);
+                            //SetCaretOffs(start);
                             MoveCaret(HitByCaretOffs(start, 0));
                             AdjustFieldSelect(_caretInfo.ChildIndex);
                         }
@@ -1428,7 +1435,7 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            SetCaretOffs(temp_info.Offs);
+                            //SetCaretOffs(temp_info.Offs);
                             MoveCaret(temp_info);
 
                             ChangeSelection(() =>
@@ -1472,7 +1479,7 @@ out long left_width);
                                 1,
                                 out _,
                                 out int end);
-                            SetCaretOffs(end);
+                            //SetCaretOffs(end);
                             MoveCaret(HitByCaretOffs(end, 0));
                             AdjustFieldSelect(_caretInfo.ChildIndex);
                         }
@@ -1491,7 +1498,7 @@ out long left_width);
                             out HitInfo temp_info);
                         if (ret == true)
                         {
-                            SetCaretOffs(temp_info.Offs);
+                            //SetCaretOffs(temp_info.Offs);
                             MoveCaret(temp_info);
 
                             ChangeSelection(() =>
@@ -1536,7 +1543,7 @@ out long left_width);
 
                             _selectOffs1 = offs;
                             _selectOffs2 = offs;
-                            SetCaretOffs(offs);
+                            //SetCaretOffs(offs);
 
                             ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Home ? 1 : -1),
                                 e.KeyCode == Keys.Home ? -1 : 1,
@@ -1579,7 +1586,7 @@ out long left_width);
                         if (ret != 0)
                             break;
 
-                        SetCaretOffs(info.Offs);
+                        //SetCaretOffs(info.Offs);
                         MoveCaret(info);
 
                         if (_shiftPressed)
@@ -1622,7 +1629,7 @@ out long left_width);
                             var caret_x = Math.Max(_fieldProperty.ContentX + 1, _lastX);
 
                             var hit_info = this._record.HitTest(caret_x, caret_y);
-                            SetCaretOffs(hit_info.Offs);
+                            //SetCaretOffs(hit_info.Offs);
                             MoveCaret(hit_info);
 
                             ChangeSelection(() =>

@@ -28,6 +28,8 @@ namespace LibraryStudio.Forms
 
         public virtual bool ProcessBackspaceKey(HitInfo info)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
             if (this._readonly)
             {
                 return false;
@@ -51,6 +53,8 @@ namespace LibraryStudio.Forms
             DeleteKeyStyle style,
             bool delay)
         {
+            Debug.Assert(this._caret_offs == info_param.Offs);
+
             var save_info = info_param.Clone();
             // 记忆起点 offs
             var old_offs = info_param.Offs;
@@ -97,6 +101,7 @@ namespace LibraryStudio.Forms
             // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
             _record.MoveByOffs(info.Offs + 1, -1, out info);
 
+            //SetCaretOffs(info.Offs);
             MoveCaret(info);
             _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
 
@@ -203,6 +208,8 @@ namespace LibraryStudio.Forms
         public virtual bool ProcessDeleteKey(HitInfo info,
             DeleteKeyStyle style)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
             if (this._readonly)
                 return false;
 
@@ -281,6 +288,8 @@ namespace LibraryStudio.Forms
             DeleteKeyStyle style,
             bool delay)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
             var input_info = this._record.GetDeleteInfo(info,
                 style,
     PadWhileEditing ? PaddingChar : (char)0);
@@ -300,7 +309,7 @@ namespace LibraryStudio.Forms
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                SetCaretOffs(input_info.Caret);
+                //SetCaretOffs(input_info.Caret);
                 MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
@@ -350,6 +359,10 @@ namespace LibraryStudio.Forms
         // 处理输入字符
         public virtual bool ProcessInputChar(char ch, HitInfo info)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
+            if (ch == '\b')
+                return false;   // ProcessBackspaceChar() 应该处理过了，这里避免重复处理
             if (!(ch >= 32 || ch == '\r' || ch == 31))
                 return false;
 
@@ -521,6 +534,8 @@ namespace LibraryStudio.Forms
             HitInfo info,
             bool delay)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
             if (ch == '\r')
             {
                 ch = (char)0x1e;
@@ -537,7 +552,7 @@ namespace LibraryStudio.Forms
     delay_update: delay,
     auto_adjust_caret_and_selection: false);
                         // 修改后，插入符定位到头标区下一字段的开头
-                        SetCaretOffs(24);
+                        //SetCaretOffs(24);
                         MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
                     else
@@ -549,7 +564,7 @@ namespace LibraryStudio.Forms
                             delay_update: delay,
                             auto_adjust_caret_and_selection: false);
                         // 修改后，插入符定位到头标区下一字段的开头
-                        SetCaretOffs(24);
+                        //SetCaretOffs(24);
                         MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
                 }
@@ -583,7 +598,7 @@ namespace LibraryStudio.Forms
                     // 修改后，插入符定位到头标区下一字段的开头
                     // TODO: 使用 MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
 
-                    SetCaretOffs(24);
+                    //SetCaretOffs(24);
                     MoveCaret(HitByCaretOffs(24 + 1, -1));
                 }
                 else
@@ -643,23 +658,31 @@ namespace LibraryStudio.Forms
             HitInfo info,
             bool delay)
         {
+            Debug.Assert(this._caret_offs == info.Offs);
+
             var input_info = this._record.GetInputInfo(info,
                 ch,
                 PadWhileEditing ? PaddingChar : (char)0);
+            int save_offs = this._caret_offs;
             ReplaceText(input_info.Start,
                 input_info.End,
                 input_info.Text,
                 delay_update: delay,
                 auto_adjust_caret_and_selection: false);
+
+            Debug.Assert(this._caret_offs == save_offs);
+
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                SetCaretOffs(input_info.Caret);
+                //SetCaretOffs(input_info.Caret);
                 MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
             // 向前移动一次 Caret
             DeltaCaretOffsAndSelectionOffs(1);
+            //Debug.Assert(this._caretInfo.Offs == save_offs + 1);
+            //Debug.Assert(this._caret_offs == save_offs + 1);
             return true;
         }
 
@@ -671,6 +694,7 @@ namespace LibraryStudio.Forms
             public string Text { get; set; }
         }
 
+        // 观察插入点以后的新字段内容，如果不足 3 或 5 字符需要补齐
         PaddingInfo PaddingRight(int offs)
         {
             var test_length = 5;    // 测试用字符串的最小长度
@@ -780,7 +804,7 @@ namespace LibraryStudio.Forms
             else
             {
                 var offs = this._record.TextLength;
-                this.SetCaretOffs(offs);
+                //this.SetCaretOffs(offs);
                 MoveCaret(HitByCaretOffs(offs, 0));
                 return true;
             }
@@ -794,7 +818,7 @@ namespace LibraryStudio.Forms
             else
                 start += 5;
             start = Math.Min(end, start);
-            this.SetCaretOffs(start);
+            //this.SetCaretOffs(start);
             MoveCaret(HitByCaretOffs(start, 0));
             return true;
         }

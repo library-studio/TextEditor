@@ -2200,7 +2200,7 @@ out int max_pixel_width)
                     // 替换字符
                     return new InputInfo
                     {
-                        Text = padding_char != 0 ? " " : new string(padding_char, 1),
+                        Text = padding_char == 0 ? " " : new string(padding_char, 1),
                         Start = caret_offs_in_field,
                         End = caret_offs_in_field + 1
                     };
@@ -2209,6 +2209,7 @@ out int max_pixel_width)
 
             InputInfo Build24()
             {
+                Debug.Assert(padding_char != 0);
                 var content = field.MergeFullText() + new string(padding_char, 24 - end);
                 // 替换一个字符以后的全部文字
                 content = content.Substring(0, caret_offs_in_field) + padding_char + content.Substring(caret_offs_in_field + 1);
@@ -2226,6 +2227,7 @@ out int max_pixel_width)
             //      length  试图要达到的字段全部文字长度。不包括结束符
             InputInfo Build(int length)
             {
+                Debug.Assert(padding_char != 0);
                 // 字段结束符左边的位置
                 var pure_end = end - 1;
                 // 填充后要达到的全部文字，注意排除了结束符。因为结束符本来就具备，替换和插入均不影响到它
@@ -2289,7 +2291,7 @@ out int max_pixel_width)
                     // 填充
                     return new InputInfo
                     {
-                        Text = padding_char != 0 ? " " : new string(padding_char, 1),
+                        Text = padding_char == 0 ? " " : new string(padding_char, 1),
                         Start = start + caret_offs_in_field,
                         End = start + caret_offs_in_field + 1
                     };

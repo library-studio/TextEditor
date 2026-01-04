@@ -20,6 +20,8 @@ namespace LibraryStudio.Forms
         // 开始监视插入符可见性，尽可能卷动内容让插入符可见
         void BeginMonitorCaretVisible()
         {
+            return;
+
             if (_mouseTimer == null)
             {
                 CreateMouseTimer();
@@ -209,8 +211,8 @@ Rectangle rect)
                     DetectSelectionChange1(_selectOffs1, _selectOffs2);
                     var old_offs = _caret_offs;
 
-                    if (old_offs != result.Offs)
-                        SetCaretOffs(result.Offs); // _record.GetGlobalOffs(result);
+                    //if (old_offs != result.Offs)
+                    //    SetCaretOffs(result.Offs); // _record.GetGlobalOffs(result);
 
                     {
                         MoveCaret(result, true, true/*有条件地触发事件*/);
@@ -275,7 +277,7 @@ e.Y + this.VerticalScroll.Value);
                         AdjustFieldSelect(result.ChildIndex);
                     }
 
-                    SetCaretOffs(result.Offs);
+                    //SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
@@ -289,7 +291,7 @@ e.Y + this.VerticalScroll.Value);
                     && IsCursorInsideSelectionRegion(e))
                 {
                     BeginDragSelectionText(2);
-                    SetCaretOffs(result.Offs);
+                    //SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
@@ -309,19 +311,20 @@ e.Y + this.VerticalScroll.Value);
                         // Cursor = GetMoveCursor();
                     }
 
-                    SetCaretOffs(result.Offs);
+                    //SetCaretOffs(result.Offs);
                     MoveCaret(result);
                     base.OnMouseMove(e);
                     return;
                 }
 
                 // 按下鼠标左键，拖动定义文字块
-                SetCaretOffs(result.Offs);
+                //SetCaretOffs(result.Offs);
+                MoveCaret(result);
 
                 if (_selectOffs2 != _caret_offs)
                 {
-                    SetCaretOffs(result.Offs);
-                    MoveCaret(result);
+                    //SetCaretOffs(result.Offs);
+                    // MoveCaret(result);
 
                     ChangeSelection(() =>
                     {

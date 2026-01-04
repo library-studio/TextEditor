@@ -30,7 +30,7 @@ namespace LibraryStudio.Forms
         void SetCaret(HitInfo result,
             bool reset_selection = true)
         {
-            SetCaretOffs(result.Offs);
+            //SetCaretOffs(result.Offs);
 
             Debug.Assert(_caret_offs <= _content_length);
 
@@ -133,6 +133,9 @@ namespace LibraryStudio.Forms
             bool ensure_caret_visible = true,
             bool conditional_trigger = false)
         {
+            this._caret_offs = result.Offs; // 2026/1/4
+            Debug.Assert(result.Offs == this._caret_offs, "caretInfo.Offs 和 _caret_offs 未能同步");
+
             var old_offs = _caretInfo?.Offs ?? 0;
             var old_field_index = _caretInfo.ChildIndex;
             /*
@@ -181,6 +184,7 @@ namespace LibraryStudio.Forms
             get { return _caret_offs; }
         }
 
+#if REMOVED
         void SetCaretOffs(int offs)
         {
             if (_caret_offs != offs)
@@ -199,7 +203,7 @@ namespace LibraryStudio.Forms
                 // this.CaretMoved?.Invoke(this, new EventArgs());
             }
         }
-
+#endif
 
         // TODO: 名字叫 offset... 比较好
         // 平移全局偏移量，和平移块范围
@@ -221,7 +225,7 @@ namespace LibraryStudio.Forms
             }
             else
                 info = HitByCaretOffs(_caret_offs, delta);
-            SetCaretOffs(info.Offs); // 更新 _global_offs
+            //SetCaretOffs(info.Offs); // 更新 _global_offs
             MoveCaret(info);
 
             _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标

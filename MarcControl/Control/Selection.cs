@@ -49,7 +49,7 @@ namespace LibraryStudio.Forms
                 if (caret_offs + caret_delta != _caret_offs)
                 {
                     // _global_offs = caret_offs + caret_delta;
-                    SetCaretOffs(caret_offs + caret_delta);
+                    //SetCaretOffs(caret_offs + caret_delta);
                     MoveCaret(HitByCaretOffs(caret_offs, caret_delta), false);
                 }
             }
@@ -126,18 +126,20 @@ namespace LibraryStudio.Forms
                 start + length,
                 "",
                 delay_update: false,
-                false);
+                auto_adjust_caret_and_selection:false);
 
             {
                 ChangeSelection(start);
             }
 
+#if REMOVED
             if (_caret_offs > start)
             {
                 // DeltaGlobalOffs(-length); // 调整 _global_offs
                 AdjustGlobalOffs(-(length - 1));
                 DeltaCaretOffsAndSelectionOffs(-1);
             }
+#endif
             return true;
         }
 
