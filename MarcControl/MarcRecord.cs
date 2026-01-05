@@ -1286,7 +1286,7 @@ namespace LibraryStudio.Forms
             {
                 lines = SplitLines_v2(content,
         Metrics.FieldEndCharDefault,
-        contain_return:false).ToList();
+        contain_return: false).ToList();
             }
 
             if (start < 24 && header != null)
@@ -1714,22 +1714,30 @@ namespace LibraryStudio.Forms
 
                 // 绘制提示文字区的底色
                 {
-                    var left_rect = new Rectangle(
-                            x,
-                            y,
-                            _fieldProperty.CaptionPixelWidth,
-                            height);
-                    MarcField.PaintBack(hdc, left_rect, clipRect, _fieldProperty?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor);
+                    var color = _fieldProperty?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor;
+                    if (color != Color.Transparent)
+                    {
+                        var left_rect = new Rectangle(
+                                x,
+                                y,
+                                _fieldProperty.CaptionPixelWidth,
+                                height);
+                        MarcField.PaintBack(hdc, left_rect, clipRect, color);
+                    }
                 }
 
                 // Solid 区
                 {
-                    var left_rect = new Rectangle(
-                        x + _fieldProperty.CaptionPixelWidth,
-                        y,
-                        _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
-                        height);
-                    MarcField.PaintBack(hdc, left_rect, clipRect, _fieldProperty?.SolidColor ?? Metrics.DefaultSolidColor);
+                    var color = _fieldProperty?.SolidColor ?? Metrics.DefaultSolidColor;
+                    if (color != Color.Transparent)
+                    {
+                        var left_rect = new Rectangle(
+                            x + _fieldProperty.CaptionPixelWidth,
+                            y,
+                            _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
+                            height);
+                        MarcField.PaintBack(hdc, left_rect, clipRect, color);
+                    }
                 }
 
                 /*
@@ -1752,13 +1760,16 @@ namespace LibraryStudio.Forms
                     MarcField.DrawSolidRectangle(hdc, rect, backColor);
                     */
                     var backColor = _fieldProperty.BorderColor;
-                    var x0 = x + _fieldProperty.SolidX + _fieldProperty.SolidPixelWidth;
-                    var line_rect = new Rectangle(x0, y, _fieldProperty.BorderThickness, height);
-                    if (line_rect.IntersectsWith(clipRect))
+                    if (backColor != Color.Transparent)
                     {
-                        MarcField.DrawVertLine(hdc,
-    line_rect,
-    (COLORREF)backColor);
+                        var x0 = x + _fieldProperty.SolidX + _fieldProperty.SolidPixelWidth;
+                        var line_rect = new Rectangle(x0, y, _fieldProperty.BorderThickness, height);
+                        if (line_rect.IntersectsWith(clipRect))
+                        {
+                            MarcField.DrawVertLine(hdc,
+        line_rect,
+        (COLORREF)backColor);
+                        }
                     }
                 }
             }
@@ -2644,7 +2655,7 @@ out int max_pixel_width)
             out Rectangle update_rect)
         {
             update_rect = System.Drawing.Rectangle.Empty;
-
+            int y = 0;
             foreach (MarcField field in _fields)
             {
                 field.RefreshCaptionText(
@@ -2652,8 +2663,9 @@ out int max_pixel_width)
                     dc,
                     out Rectangle update_rect_caption);
 
-                Utility.Offset(ref update_rect_caption, _fieldProperty.CaptionX, 0);
+                Utility.Offset(ref update_rect_caption, _fieldProperty.CaptionX, y);
                 update_rect = Utility.Union(update_rect, update_rect_caption);
+                y += field.GetPixelHeight();
             }
         }
 

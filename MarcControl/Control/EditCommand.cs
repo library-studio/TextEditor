@@ -1425,9 +1425,23 @@ namespace LibraryStudio.Forms
                 },
                 new CommandItem() { Caption="-" },
 
+                // 
                 new CommandItem()
                 {
-                    Caption="属性(&P)",
+                    Caption="视觉风格(&V) ...",
+                    Handler=(s,e) => SettingVisualStyle(),
+                    CanExecute=()=> true,
+                },
+                new CommandItem()
+                {
+                    Caption="字体(&F) ...",
+                    Handler=(s,e) => SettingFont(),
+                    CanExecute=()=> true,
+                },
+
+                new CommandItem()
+                {
+                    Caption="属性(&P) ...",
                     KeyData=Keys.Control | Keys.P,
                     Handler=(s,e) => {
                         using(var dlg = new MarcControlDialog.PropertyDialog())
@@ -1504,20 +1518,29 @@ namespace LibraryStudio.Forms
             };
         }
 
+        /*
+        public virtual bool AfterProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            return true;
+        }
+        */
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             // Debug.WriteLine($"keyData={keyData.ToString()}");
-
             var ret = KeyTriggerCommand(keyData);
             if (ret == true)
             {
+                // return AfterProcessCmdKey(ref msg, keyData);
                 return ret;
             }
+
             // 返回结果:
             //     true if the character was processed by the control; otherwise, false.
             return base.ProcessCmdKey(ref msg, keyData);
         }
+
+        public event KeyEventHandler KeyTrigger;
 
         // 前一次命中(双键) CommandItem 的击键
         // 如果为 None，表示没有处于等待第二个键的状态
@@ -1526,6 +1549,14 @@ namespace LibraryStudio.Forms
         // 键盘触发命令
         public virtual bool KeyTriggerCommand(Keys keyData)
         {
+            if (KeyTrigger != null)
+            {
+                var e = new KeyEventArgs(keyData);
+                KeyTrigger(this, e);
+                if (e.Handled)
+                    return true;
+            }
+
             var commands = this.Commands;
             if (commands == null)
             {

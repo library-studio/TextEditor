@@ -83,6 +83,12 @@
       <DependentUpon>PropertyDialog.cs</DependentUpon>
     </Compile>
     <Compile Include="Dialog\ViewModel.cs" />
+    <Compile Include="Dialog\VisualStyleDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialog\VisualStyleDialog.Designer.cs">
+      <DependentUpon>VisualStyleDialog.cs</DependentUpon>
+    </Compile>
     <Compile Include="DOM\DomField.cs" />
     <Compile Include="DOM\DomRecord.cs" />
     <Compile Include="Control\DelayUpdate.cs">
@@ -150,6 +156,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Dialog\PropertyDialog.resx">
       <DependentUpon>PropertyDialog.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialog\VisualStyleDialog.resx">
+      <DependentUpon>VisualStyleDialog.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

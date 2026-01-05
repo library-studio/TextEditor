@@ -6,6 +6,8 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
+using LibraryStudio.Forms.MarcControlDialog;
 
 namespace LibraryStudio.Forms
 {
@@ -20,6 +22,34 @@ namespace LibraryStudio.Forms
         // Metrics 是 MarcRecord 和 MarcField 才有的特殊的，针对 MARC 结构的风格参数
         // TODO: 建议将 _fieldProperty 更名为 _marcMetrics
         Metrics _fieldProperty = new Metrics();
+
+        public Metrics Metrics { get { return _fieldProperty; } }
+
+        string _theme = null;
+        public string ColorThemeName
+        {
+            get
+            {
+                return _theme;
+            }
+            set
+            {
+                _fieldProperty.UseColorTheme(value);
+                if (value == "default"
+                    || string.IsNullOrEmpty(value))
+                {
+                    _theme = null;
+                }
+                else
+                {
+                    _theme = value;
+                }
+
+                // 确保新的颜色可以显示出来
+                // TODO: IBox 实现 ClearCache() 接口，可以清除各个部分缓存的颜色
+                Relayout(this._record.MergeText(), false);
+            }
+        }
 
         public IContext GetDefaultContext()
         {
@@ -122,5 +152,60 @@ namespace LibraryStudio.Forms
             };
         }
 
+        // 设置视觉风格
+        public bool SettingVisualStyle()
+        {
+            using (var dlg = new VisualStyleDialog())
+            {
+                dlg.RefControl = this;
+                dlg.ColorThemeName = this.ColorThemeName;
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    this.ColorThemeName = dlg.ColorThemeName;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // 设置字体和字体颜色
+        public bool SettingFont()
+        {
+            // TODO: “微软雅黑 light”字体为何在打开的 FontDialog 中不能正确定位字体名
+            using (FontDialog dlg = new FontDialog())
+            {
+                //dlg.ShowColor = true;
+                //dlg.Color = this._fieldProperty?.ForeColor ?? Color.Black;
+                dlg.Font = this.Font;
+                dlg.ShowApply = true;
+                dlg.ShowHelp = true;
+                dlg.AllowVerticalFonts = false;
+
+                dlg.Apply += (s, e) =>
+                {
+                    this.Font = dlg.Font;
+                    SetColor();
+                };
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                {
+                    return false;
+                }
+
+                this.Font = dlg.Font;
+                SetColor();
+                return true;
+
+                void SetColor()
+                {
+                    return;
+                    if (this._fieldProperty != null)
+                    {
+                        this._fieldProperty.ForeColor = dlg.Color;
+                        this.Relayout(this._record.MergeText(), false);
+                    }
+                }
+            }
+        }
     }
 }

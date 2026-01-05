@@ -24,7 +24,7 @@ namespace LibraryStudio.Forms
 
         public new event EventHandler TextChanged;
 
-        History _history = new History();
+        History _history = new History(10 * 1024);
 
         // 客户区限制宽度。
         // -1 表示不限制宽度，也就是说宽度倾向于无限大

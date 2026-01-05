@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,10 +11,16 @@ namespace LibraryStudio.Forms
     public class History
     {
         List<EditAction> _actions = new List<EditAction>();
+        int _maxItems = 10 * 1024;
 
         // 当前位置
         // 指向下次可新增的一个 index 位置
         int _currentIndex = 0;
+
+        public History(int maxItems)
+        {
+            _maxItems = maxItems;
+        }
 
         public void Clear()
         {
@@ -25,6 +32,13 @@ namespace LibraryStudio.Forms
         {
             if (_actions.Count > _currentIndex)
                 _actions.RemoveRange(_currentIndex, _actions.Count - _currentIndex);
+
+            // 防止元素数超过限额
+            if (_actions.Count > _maxItems)
+            {
+                _actions.RemoveRange(0, _actions.Count - _maxItems);
+                Debug.Assert(_actions.Count <= _maxItems);
+            }
             _actions.Add(action);
             _currentIndex++;
         }

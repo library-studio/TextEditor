@@ -28,11 +28,16 @@ namespace LibraryStudio.Forms
 
         // public new event EventHandler TextChanged;
 
-        History _history = new History();
+        History _history = new History(10*1024);
 
         public string DumpHistory()
         {
             return _history.ToString();
+        }
+
+        public void ClearHistory()
+        {
+            this._history?.Clear();
         }
 
         // 客户区限制宽度。
@@ -594,34 +599,39 @@ namespace LibraryStudio.Forms
             get { return _fieldProperty.GetFieldCaption; }
             set
             {
-                Rectangle update_rect = System.Drawing.Rectangle.Empty;
                 _fieldProperty.GetFieldCaption = value;
-                if (_disableUpdate == 0)
-                {
-                    using (var g = this.CreateGraphics())
-                    {
-                        var handle = g.GetHdc();
-                        using (var dc = new SafeHDC(handle))
-                        {
-                            _record.UpdateAllCaption(
-                                _context,
-                                dc,
-                                out update_rect);
-                        }
-                        int x = -this.HorizontalScroll.Value;
-                        int y = -this.VerticalScroll.Value;
-                        if (update_rect != System.Drawing.Rectangle.Empty)
-                        {
-                            update_rect.Offset(x, y);
-                            this.Invalidate(update_rect);
-                        }
-                    }
+                InvalidateCaptionArea();
+            }
+        }
 
-                }
-                else
+        public void InvalidateCaptionArea()
+        {
+            if (_disableUpdate == 0)
+            {
+                using (var g = this.CreateGraphics())
                 {
-                    _invalidateCount++;
+                    Rectangle update_rect = System.Drawing.Rectangle.Empty;
+
+                    var handle = g.GetHdc();
+                    using (var dc = new SafeHDC(handle))
+                    {
+                        _record.UpdateAllCaption(
+                            _context,
+                            dc,
+                            out update_rect);
+                    }
+                    int x = -this.HorizontalScroll.Value;
+                    int y = -this.VerticalScroll.Value;
+                    if (update_rect != System.Drawing.Rectangle.Empty)
+                    {
+                        update_rect.Offset(x, y);
+                        this.Invalidate(update_rect);
+                    }
                 }
+            }
+            else
+            {
+                _invalidateCount++;
             }
         }
 
@@ -722,7 +732,7 @@ namespace LibraryStudio.Forms
                 0,
                 -1,
                 text,
-                _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
+                GetLimitWidth()    //_clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
                 /*,
                 out string _,
                 out Rectangle update_rect,
@@ -1048,6 +1058,11 @@ out long left_width);
             }
         }
 
+        int GetLimitWidth()
+        {
+            return _clientBoundsWidth == 0 ? Math.Max(this.ClientSize.Width - _fieldProperty.GapThickness, 0) : _clientBoundsWidth;   // Math.Max(this.ClientSize.Width, 30),
+        }
+
         // parameters:
         //      delay_update    希望延迟更新。方法是先更新一个小的区域，延迟更新原本大的区域
         public ReplaceTextResult ReplaceText(int start,
@@ -1069,7 +1084,7 @@ out long left_width);
                         start,
                         end,
                         text,
-                        _clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
+                        GetLimitWidth()
                         );
 
                 }
@@ -1356,7 +1371,7 @@ out long left_width);
                                 _selectOffs2 = offs;
                                 //SetCaretOffs(offs);
 
-                                ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Left ? 1 : -1),
+                                ret = _record.MoveByOffs(offs + (e.KeyCode == Keys.Left ? 1 : -1),
                                     e.KeyCode == Keys.Left ? -1 : 1,
                                     out info);
                             }
@@ -1771,11 +1786,8 @@ out long left_width);
             {
                 case (char)Keys.Escape:
                     break;
-                /*
-            case '\r':
-            case '\n':
-                break;
-                */
+                case '\b':
+                    break;
                 default:
                     {
                         if (this._readonly)

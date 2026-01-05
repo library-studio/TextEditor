@@ -20,8 +20,6 @@ namespace LibraryStudio.Forms
         // 开始监视插入符可见性，尽可能卷动内容让插入符可见
         void BeginMonitorCaretVisible()
         {
-            return;
-
             if (_mouseTimer == null)
             {
                 CreateMouseTimer();

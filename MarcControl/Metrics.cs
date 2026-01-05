@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms.VisualStyles;
 
 namespace LibraryStudio.Forms
 {
@@ -244,11 +245,179 @@ namespace LibraryStudio.Forms
         public Color BorderColor { get; set; } = DefaultBorderColor;
         public static Color DefaultBorderColor = SystemColors.ControlDark;
 
-        public Color FocuseColor { get; set; } = DefaultFocuseColor;
+        public Color FocusColor { get; set; } = DefaultFocuseColor;
         public static Color DefaultFocuseColor = SystemColors.MenuHighlight;
 
         public Color BlankCharForeColor { get; set; } = DefaultBlankCharForeColor;
         public static Color DefaultBlankCharForeColor = Color.Blue;
+
+        #region 颜色主题
+
+        public static IEnumerable<string> ColorThemeNames
+        {
+            get
+            {
+                return new string[] {
+                    "默认",
+                    "简约",
+                    "暗黑",
+                    "深蓝",
+                    "绿色",
+                    "极简",
+                };
+            }
+        }
+
+        public void UseColorTheme(string theme)
+        {
+            switch(theme)
+            {
+                case null:
+                case "":
+                case "default":
+                case "默认":
+                    SetTheme(ThemeDefault());
+                    return;
+                case "simple":
+                case "简约":
+                    SetTheme(ThemeSimple());
+                    return;
+                case "dark":
+                case "暗黑":
+                    SetTheme(ThemeDark());
+                    return;
+                case "dark_blue":
+                case "深蓝":
+                    SetTheme(ThemeDarkBlue());
+                    return;
+                case "spring":
+                case "绿色":
+                case "春天":
+                    SetTheme(ThemeSpring());
+                    return;
+                case "simplest":
+                case "极简":
+                    SetTheme(ThemeSimplest());
+                    return;
+            }
+        }
+
+        public void SetTheme(Metrics metrics)
+        {
+            this.ForeColor = metrics.ForeColor;
+            this.BackColor = metrics.BackColor;
+            this.ReadOnlyForeColor = metrics.ReadOnlyForeColor;
+            this.ReadOnlyBackColor = metrics.ReadOnlyBackColor;
+            this.HightlightForeColor = metrics.HightlightForeColor;
+            this.HighlightBackColor = metrics.HighlightBackColor;
+            this.DelimeterForeColor = metrics.DelimeterForeColor;
+            this.DelimeterBackColor = metrics.DelimeterBackColor;
+            this.CaptionForeColor = metrics.CaptionForeColor;
+            this.CaptionBackColor = metrics.CaptionBackColor;
+            this.SolidColor = metrics.SolidColor;
+            this.BorderColor = metrics.BorderColor;
+            this.FocusColor = metrics.FocusColor;
+            this.BlankCharForeColor = metrics.BlankCharForeColor;
+        }
+
+        public static Metrics ThemeDefault()
+        {
+            return new Metrics();
+        }
+
+        // 子字段符号和子字段名不要突出显示，和普通字符一样颜色
+        public static Metrics ThemeSimple()
+        {
+            var metrics = new Metrics();
+            metrics.DelimeterBackColor = Color.Transparent;
+            metrics.DelimeterForeColor = metrics.ForeColor;
+            metrics.CaptionForeColor = Color.FromArgb(160, 160, 160);
+            metrics.CaptionBackColor = Color.FromArgb(250, 250, 250);
+            metrics.SolidColor = /*Color.Transparent; //*/  Color.FromArgb(240, 240, 240);
+            metrics.BorderColor = /*Color.Transparent; //*/  Color.FromArgb(220, 220, 220);
+            return metrics;
+        }
+
+        // 极简
+        public static Metrics ThemeSimplest()
+        {
+            var metrics = new Metrics();
+            metrics.DelimeterBackColor = Color.Transparent;
+            metrics.DelimeterForeColor = metrics.ForeColor;
+            metrics.CaptionForeColor = Color.FromArgb(160, 160, 160);
+            metrics.CaptionBackColor = Color.Transparent; // Color.FromArgb(250, 250, 250);
+            metrics.SolidColor = Color.Transparent;
+            metrics.BorderColor = Color.Transparent;
+            return metrics;
+        }
+
+        // TODO: 高对比度
+
+        public static Metrics ThemeDark()
+        {
+            var metrics = new Metrics();
+            metrics.ForeColor = Color.FromArgb(230, 230, 230);
+            metrics.BackColor = Color.Black;
+            metrics.ReadOnlyForeColor = Color.Gray;
+            metrics.ReadOnlyBackColor = Color.Black;
+            metrics.HightlightForeColor = Color.Black;
+            metrics.HighlightBackColor = Color.FromArgb(180, 180, 180);
+            metrics.DelimeterForeColor = Color.White;
+            metrics.DelimeterBackColor = Color.Transparent; //  Color.FromArgb(50, 50, 50);
+            metrics.CaptionForeColor = Color.FromArgb(180, 180, 180);
+            metrics.CaptionBackColor = Color.FromArgb(70, 70, 70);
+            metrics.SolidColor = Color.FromArgb(60,60,60);
+            metrics.BorderColor = Color.DarkGray;
+            metrics.FocusColor = Color.DarkGray;
+            metrics.BlankCharForeColor = Color.DarkGray;
+            return metrics;
+        }
+
+        public static Metrics ThemeDarkBlue()
+        {
+            var metrics = new Metrics();
+            metrics.ForeColor = Color.FromArgb(250, 250, 200);
+            metrics.BackColor = Color.FromArgb(0, 0, 60);
+            metrics.ReadOnlyForeColor = Color.Gray;
+            metrics.ReadOnlyBackColor = Color.Black;
+            metrics.HightlightForeColor = Color.White;
+            metrics.HighlightBackColor = Color.FromArgb(70, 70, 200);
+            metrics.DelimeterForeColor = Color.FromArgb(255, 230, 0);
+            metrics.DelimeterBackColor = Color.FromArgb(0, 0, 0);
+            metrics.CaptionForeColor = Color.FromArgb(160, 160, 180);
+            metrics.CaptionBackColor = Color.FromArgb(70, 70, 100);
+            metrics.SolidColor = Color.FromArgb(50, 50, 90);
+            metrics.BorderColor = Color.DarkGray;
+            metrics.FocusColor = Color.FromArgb(160, 160, 255);
+            metrics.BlankCharForeColor = Color.DarkGray;
+            return metrics;
+        }
+
+        public static Metrics ThemeSpring()
+        {
+            var metrics = new Metrics();
+            metrics.ForeColor = Color.FromArgb(10, 10, 10);
+            metrics.BackColor = Color.FromArgb(255, 255, 255);
+            metrics.ReadOnlyForeColor = Color.Gray;
+            metrics.ReadOnlyBackColor = Color.FromArgb(200, 200, 200);
+            metrics.HightlightForeColor = Color.White;
+            metrics.HighlightBackColor = Color.FromArgb(200, 0, 0);
+            metrics.DelimeterForeColor = Color.FromArgb(30, 80, 0);
+            metrics.DelimeterBackColor = Color.Transparent;
+            /*
+            metrics.CaptionForeColor = Color.FromArgb(190, 190, 210);
+            metrics.CaptionBackColor = Color.FromArgb(90, 100, 90);
+            */
+            metrics.CaptionForeColor = Color.FromArgb(60, 220, 0);
+            metrics.CaptionBackColor = Color.FromArgb(240, 255, 240);
+            metrics.SolidColor = Color.FromArgb(150, 190, 150);
+            metrics.BorderColor = Color.FromArgb(130, 170, 130);
+            metrics.FocusColor = Color.FromArgb(160, 255, 160);
+            metrics.BlankCharForeColor = Color.DarkGray;
+            return metrics;
+        }
+
+        #endregion
     }
 
     public delegate string GetFieldCaptionFunc(MarcField field);

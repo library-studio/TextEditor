@@ -888,8 +888,13 @@ COLORREF border_color)
             var hBrush = Gdi32.CreateSolidBrush(back_color);
             var oldBrush = Gdi32.SelectObject(hdc, hBrush);
 
-            var hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_SOLID,
-                border_thickness, border_color);
+            SafeHPEN hPen;
+            if (border_color == Color.Transparent)
+                hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL,
+    0, border_color);
+            else
+                hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_SOLID,
+                    border_thickness, border_color);
             var hOldPen = Gdi32.SelectObject(hdc, hPen);
 
             try
@@ -1014,7 +1019,7 @@ bool focused = false)
                     */
                     DrawSolidRectangle(hdc,
                         line_rect,
-                        _fieldProperty.FocuseColor);
+                        _fieldProperty.FocusColor);
                 }
             }
 
@@ -1062,6 +1067,7 @@ bool focused = false)
                 */
             }
 
+#if REMOVED
             void PaintSolid(int x0, int y0, int width0, int height0)
             {
                 var rect = new Rectangle(x0, y0, width0, height0);
@@ -1079,6 +1085,7 @@ bool focused = false)
                 }
                 */
             }
+#endif
 
             void PaintWindow(Rectangle rect00)
             {
@@ -1089,6 +1096,7 @@ bool focused = false)
                     back_color = _fieldProperty?.ReadOnlyBackColor ?? SystemColors.Control;
                 else
                     back_color = _fieldProperty?.BackColor ?? SystemColors.Window;
+
                 PaintEdit(hdc,
 rect00,
 clipRect,
@@ -1861,12 +1869,21 @@ clipRect);
                     // 所以 update_rect 上边沿要依然为 0，但高度要加大 y0 那么多。相当于下移以后再调整 Y 为 0
                     var y0 = GetContentY();
                     var rect = ret.UpdateRect;
-                    rect.Height += y0;
-                    
+                    if (rect.Y == 0)
+                    {
+                        // 如果 updateRect 包含第一行
+                        rect.Height += y0;  // 增加 Height
+                        y0 = 0; // 垂直方向不 Offset
+                    }
+                    else
+                    {
+                        // 如果 updateRect 不包含第一行，则水平和垂直方向都要 Offset
+                    }
+
                     var update_rect_content = Utility.Offset(
                         rect,
                         GetContentX(),
-                        0/*y0*/);
+                        y0);
                     /*
                     // 注: 右侧加上虚拟回车符号的宽度。避免失效区域不足
                     if (update_rect_content.IsEmpty == false)
