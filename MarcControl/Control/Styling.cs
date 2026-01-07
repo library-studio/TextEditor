@@ -25,12 +25,12 @@ namespace LibraryStudio.Forms
 
         public Metrics Metrics { get { return _fieldProperty; } }
 
-        string _theme = null;
+        string _theme_name = null;
         public string ColorThemeName
         {
             get
             {
-                return _theme;
+                return _theme_name;
             }
             set
             {
@@ -38,17 +38,65 @@ namespace LibraryStudio.Forms
                 if (value == "default"
                     || string.IsNullOrEmpty(value))
                 {
-                    _theme = null;
+                    _theme_name = null;
                 }
                 else
                 {
-                    _theme = value;
+                    _theme_name = value;
                 }
 
-                // 确保新的颜色可以显示出来
-                // TODO: IBox 实现 ClearCache() 接口，可以清除各个部分缓存的颜色
-                Relayout(this._record.MergeText(), false);
+                OnColorChanged(new EventArgs());
             }
+        }
+
+        public const string CUSTOM_THEME_CAPTION = "[定制]";
+
+        // 定制颜色主题被改变，的事件。
+        // 通过它可以得知定制颜色主题被首次配置或者被修改
+        public EventHandler CustomThemeChanged;
+
+        public bool IsCustomColorTheme()
+        {
+            if (_theme_name == CUSTOM_THEME_CAPTION)
+                return true;
+            return false;
+        }
+
+        public ColorTheme GetCustomColorTheme()
+        {
+            return (this._fieldProperty as ColorTheme)?.Clone();
+        }
+
+        public void SetCustomColorTheme(ColorTheme theme)
+        {
+            if (theme != null)
+            {
+                this._fieldProperty.ApplyColorTheme(theme);
+                this._theme_name = "[定制]";
+                OnColorChanged(new EventArgs());
+                OnCustomColorThemeChanged(new EventArgs());
+            }
+            else
+            {
+                // 恢复默认主题
+                this._fieldProperty.ApplyColorTheme(ColorTheme.ThemeDefault());
+                this._theme_name = "默认";
+                OnColorChanged(new EventArgs());
+            }
+        }
+
+        public virtual void OnCustomColorThemeChanged(EventArgs e)
+        {
+            this.CustomThemeChanged?.Invoke(this, e);
+        }
+
+        public virtual void OnColorChanged(EventArgs e)
+        {
+            // 确保新的颜色可以显示出来
+            // TODO: IBox 实现 ClearCache() 接口，可以清除各个部分缓存的颜色
+            Relayout(this._record.MergeText(), false);
+            // 底部有部分空白不属于任何字段，也要 Invalidate()
+            this.Invalidate();
         }
 
         public IContext GetDefaultContext()
@@ -159,9 +207,19 @@ namespace LibraryStudio.Forms
             {
                 dlg.RefControl = this;
                 dlg.ColorThemeName = this.ColorThemeName;
+                if (IsCustomColorTheme())
+                    dlg.CustomColorTheme = this.Metrics;
+                dlg.StartPosition = FormStartPosition.CenterParent;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
-                    this.ColorThemeName = dlg.ColorThemeName;
+                    if (dlg.CustomColorTheme != null)
+                    {
+                        this.SetCustomColorTheme(dlg.CustomColorTheme);
+                    }
+                    else
+                    {
+                        this.ColorThemeName = dlg.ColorThemeName;
+                    }
                     return true;
                 }
             }

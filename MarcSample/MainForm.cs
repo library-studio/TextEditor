@@ -37,7 +37,7 @@ namespace MarcSample
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            this.marcControl1.ColorThemeName = "暗黑";
+            this.marcControl1.ColorThemeName = "simplest";
 
             this.marcControl1.ClientBoundsWidth = 0;
             // this.marcControl1.ClientBoundsWidth = 800;
