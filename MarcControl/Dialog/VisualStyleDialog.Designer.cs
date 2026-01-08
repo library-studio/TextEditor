@@ -40,6 +40,11 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.columnHeader_button = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.button_clearDelimeterColor = new System.Windows.Forms.Button();
             this.marcControl_preview = new LibraryStudio.Forms.MarcControl();
+            this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
+            this.splitContainer1.Panel1.SuspendLayout();
+            this.splitContainer1.Panel2.SuspendLayout();
+            this.splitContainer1.SuspendLayout();
             this.SuspendLayout();
             // 
             // label1
@@ -63,9 +68,8 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // 
             // label2
             // 
-            this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(6, 620);
+            this.label2.Location = new System.Drawing.Point(-6, 0);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(159, 36);
             this.label2.TabIndex = 3;
@@ -106,11 +110,11 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.columnHeader_button});
             this.listView_colors.FullRowSelect = true;
             this.listView_colors.HideSelection = false;
-            this.listView_colors.Location = new System.Drawing.Point(12, 137);
+            this.listView_colors.Location = new System.Drawing.Point(0, 0);
             this.listView_colors.MultiSelect = false;
             this.listView_colors.Name = "listView_colors";
             this.listView_colors.OwnerDraw = true;
-            this.listView_colors.Size = new System.Drawing.Size(1394, 445);
+            this.listView_colors.Size = new System.Drawing.Size(1394, 327);
             this.listView_colors.TabIndex = 6;
             this.listView_colors.UseCompatibleStateImageBehavior = false;
             this.listView_colors.View = System.Windows.Forms.View.Details;
@@ -143,7 +147,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // button_clearDelimeterColor
             // 
             this.button_clearDelimeterColor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button_clearDelimeterColor.Location = new System.Drawing.Point(1001, 588);
+            this.button_clearDelimeterColor.Location = new System.Drawing.Point(989, 331);
             this.button_clearDelimeterColor.Name = "button_clearDelimeterColor";
             this.button_clearDelimeterColor.Size = new System.Drawing.Size(405, 53);
             this.button_clearDelimeterColor.TabIndex = 7;
@@ -153,7 +157,8 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // 
             // marcControl_preview
             // 
-            this.marcControl_preview.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
+            this.marcControl_preview.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.marcControl_preview.AutoScroll = true;
             this.marcControl_preview.AutoScrollMinSize = new System.Drawing.Size(1381, 0);
@@ -166,25 +171,45 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.marcControl_preview.DeleteKeyStyle = LibraryStudio.Forms.DeleteKeyStyle.DeleteFieldTerminator;
             this.marcControl_preview.FixedSizeFont = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Bold);
             this.marcControl_preview.HighlightBlankChar = ' ';
-            this.marcControl_preview.Location = new System.Drawing.Point(12, 668);
+            this.marcControl_preview.Location = new System.Drawing.Point(0, 39);
             this.marcControl_preview.Name = "marcControl_preview";
             this.marcControl_preview.PaddingChar = ' ';
             this.marcControl_preview.PadWhileEditing = false;
             this.marcControl_preview.ReadOnly = false;
-            this.marcControl_preview.Size = new System.Drawing.Size(1394, 288);
+            this.marcControl_preview.Size = new System.Drawing.Size(1394, 385);
             this.marcControl_preview.TabIndex = 2;
+            // 
+            // splitContainer1
+            // 
+            this.splitContainer1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.splitContainer1.Location = new System.Drawing.Point(12, 137);
+            this.splitContainer1.Name = "splitContainer1";
+            this.splitContainer1.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            // 
+            // splitContainer1.Panel1
+            // 
+            this.splitContainer1.Panel1.Controls.Add(this.listView_colors);
+            this.splitContainer1.Panel1.Controls.Add(this.button_clearDelimeterColor);
+            // 
+            // splitContainer1.Panel2
+            // 
+            this.splitContainer1.Panel2.Controls.Add(this.marcControl_preview);
+            this.splitContainer1.Panel2.Controls.Add(this.label2);
+            this.splitContainer1.Size = new System.Drawing.Size(1394, 819);
+            this.splitContainer1.SplitterDistance = 387;
+            this.splitContainer1.SplitterWidth = 8;
+            this.splitContainer1.TabIndex = 8;
             // 
             // VisualStyleDialog
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(18F, 36F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1418, 1057);
-            this.Controls.Add(this.button_clearDelimeterColor);
-            this.Controls.Add(this.listView_colors);
+            this.Controls.Add(this.splitContainer1);
             this.Controls.Add(this.button_cancel);
             this.Controls.Add(this.button_ok);
-            this.Controls.Add(this.label2);
-            this.Controls.Add(this.marcControl_preview);
             this.Controls.Add(this.comboBox_colorTheme);
             this.Controls.Add(this.label1);
             this.MinimizeBox = false;
@@ -193,6 +218,11 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.ShowInTaskbar = false;
             this.Text = "视觉风格";
             this.Load += new System.EventHandler(this.VisualStyleDialog_Load);
+            this.splitContainer1.Panel1.ResumeLayout(false);
+            this.splitContainer1.Panel2.ResumeLayout(false);
+            this.splitContainer1.Panel2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
+            this.splitContainer1.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -212,5 +242,6 @@ namespace LibraryStudio.Forms.MarcControlDialog
         private System.Windows.Forms.ColumnHeader columnHeader_button;
         private System.Windows.Forms.ColumnHeader columnHeader_color;
         private System.Windows.Forms.Button button_clearDelimeterColor;
+        private System.Windows.Forms.SplitContainer splitContainer1;
     }
 }

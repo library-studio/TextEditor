@@ -73,11 +73,14 @@ namespace LibraryStudio.Forms.MarcControlDialog
                     return $"字段 '{field.FieldName}' 的名称";
                 };
 
+                /*
                 var content = MarcRecord.BuildContent(@"012345678901234567890123
 001000000000
 2001 $aAAA$fFFFFF
 300  $a选择文字没有被选择的文字
 801  $aCN");
+                */
+                string content = @"01317nam0 2200277   450 00101201808143100520180814925326.0010  a978-7-02-014453-2dCNY42.00100  a20181221d2018    cemy0chiy50      ea1011 achiceng102  aCNb110000105  aa   z   000ay106  ar2001 a哈利·波特与魔法石Aha li· bo te yu mo fa shif(英)J.K.罗琳著g苏农译205  a2版210  a北京c人民文学出版社d2018.10215  a241页c图d24cm330  a本书讲述：哈利·波特的人生中没有魔法。他和一点都不友善的德思礼夫妇，还有他们令人厌恶的儿子达力住在一起。哈利的房间是一个窄小的储物间，就在楼梯下面，而且十一年来他从未有过生日派对。 但是有一天，猫头鹰信使突然送来一封神秘的信件，令人不敢相信的是，信里附着一张来自霍格沃茨魔法学校的录取哈利入学的通知书。 哈利于九月一日带着他的猫头鹰乘着特快列车来到魔法学校。在学校里，他遇到了他一生中两个最好的朋友，体验了骑着飞天扫帚打球的运动，从课堂上和生活中的所有事物里学到了魔法。不仅如此，他还得知自己将有一个伟大而不可思议的命运……333  a本书为儿童读物5101 aHarry Potter and the philosopher's stonezeng6060 a儿童小说x长篇小说y英国z现代690  aI561.84v5701 0c(英)a罗琳Aluo linc(Rowling, J. K)4著702 0a苏农Asu nong4译801 0aCNb百万庄c20181221";
                 this.marcControl_preview.Content = content;
                 /*
                 var start = content.IndexOf("选择文字");
@@ -95,8 +98,13 @@ namespace LibraryStudio.Forms.MarcControlDialog
             if (this.marcControl_preview.HasSelection() == false)
             {
                 var content = this.marcControl_preview.Content;
+                /*
                 var start = content.IndexOf("选择文字");
                 this.marcControl_preview.Select(start, start + 4, 0);
+                */
+                var start = content.IndexOf("哈利·波特与魔法石");
+                this.marcControl_preview.Select(start, start + "哈利·波特与魔法石".Length, 0);
+
             }
         }
 
