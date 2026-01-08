@@ -2,12 +2,14 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using LibraryStudio.Forms.MarcControlDialog;
+using Newtonsoft.Json;
 
 namespace LibraryStudio.Forms
 {
@@ -208,7 +210,7 @@ namespace LibraryStudio.Forms
                 dlg.RefControl = this;
                 dlg.ColorThemeName = this.ColorThemeName;
                 if (IsCustomColorTheme())
-                    dlg.CustomColorTheme = this.Metrics;
+                    dlg.CustomColorTheme = this.GetCustomColorTheme();
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
@@ -265,5 +267,183 @@ namespace LibraryStudio.Forms
                 }
             }
         }
+
+        class UiState
+        {
+            // 提示区域像素宽度
+            public int CaptionPixelWidth { get; set; }
+
+            public char HighlightBlankChar { get; set; } = ' ';
+
+            public string ColorThemeName { get; set; }
+
+
+            public ColorTheme CustomColorTheme { get; set; }
+
+            public string Font { get; set; }
+
+            public static Font GetFont(string strFontString)
+            {
+                if (String.IsNullOrEmpty(strFontString) == false)
+                {
+                    var converter = TypeDescriptor.GetConverter(typeof(Font));
+
+                    return (Font)converter.ConvertFromString(strFontString);
+                }
+
+                return null;
+            }
+
+            public static string GetFontString(Font font)
+            {
+                var converter = TypeDescriptor.GetConverter(typeof(Font));
+                return converter.ConvertToString(font);
+            }
+        }
+
+        // 用于存储和恢复编辑器 UI 状态的 JSON 字符串
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public string UiStateJson
+        {
+            get
+            {
+                var state = new UiState
+                {
+                    CaptionPixelWidth = this.CaptionPixelWidth,
+                    HighlightBlankChar = this.HighlightBlankChar,
+                    ColorThemeName = this.ColorThemeName,
+                    CustomColorTheme = this.IsCustomColorTheme() ? (this.GetCustomColorTheme() ?? null) : null,
+                    Font = UiState.GetFontString(this.Font),
+                };
+                return JsonConvert.SerializeObject(state);
+            }
+            set
+            {
+                var state = JsonConvert.DeserializeObject<UiState>(value);
+                if (state != null)
+                {
+                    this.BeginUpdate();
+                    try
+                    {
+                        this.CaptionPixelWidth = state.CaptionPixelWidth;
+                        this.HighlightBlankChar = state.HighlightBlankChar == 0 ? ' ' : state.HighlightBlankChar;
+                        if (state.ColorThemeName == MarcControl.CUSTOM_THEME_CAPTION)
+                        {
+                            this.SetCustomColorTheme(state.CustomColorTheme);
+                        }
+                        else
+                        {
+                            this.ColorThemeName = state.ColorThemeName;
+                        }
+                        var font = UiState.GetFont(state.Font);
+                        if (font != null)
+                        {
+                            this.Font = font;
+                        }
+                    }
+                    finally
+                    {
+                        this.EndUpdate();
+                    }
+                }
+            }
+        }
+
+
+
+#if REMOVED
+        class UiState
+        {
+            public int CaptionPixelWidth { get; set; }
+
+            public char HighlightBlankChar { get; set; } = ' ';
+
+            public string ColorThemeName { get; set; }
+
+
+            public string CustomColorThemeJson { get; set; }
+
+            public string Font { get; set; }
+
+            public static Font GetFont(string strFontString)
+            {
+                if (String.IsNullOrEmpty(strFontString) == false)
+                {
+                    var converter = TypeDescriptor.GetConverter(typeof(Font));
+
+                    return (Font)converter.ConvertFromString(strFontString);
+                }
+
+                return null;
+            }
+
+            public static string GetFontString(Font font)
+            {
+                var converter = TypeDescriptor.GetConverter(typeof(Font));
+                return converter.ConvertToString(font);
+            }
+        }
+
+        // 用于存储和恢复编辑器 UI 状态的 JSON 字符串
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public string UiStateJson
+        {
+            get
+            {
+                var state = new UiState
+                {
+                    CaptionPixelWidth = this.CaptionPixelWidth,
+                    HighlightBlankChar = this.HighlightBlankChar,
+                    ColorThemeName = this.ColorThemeName,
+                    CustomColorThemeJson = this.IsCustomColorTheme() ? (this.GetCustomColorTheme()?.ToJson() ?? string.Empty) : string.Empty,
+                    Font = UiState.GetFontString(this.Font),
+                };
+                return JsonConvert.SerializeObject(state);
+            }
+            set
+            {
+                var state = JsonConvert.DeserializeObject<UiState>(value);
+                if (state != null)
+                {
+                    this.BeginUpdate();
+                    try
+                    {
+                        this.CaptionPixelWidth = state.CaptionPixelWidth;
+                        this.HighlightBlankChar = state.HighlightBlankChar == 0 ? ' ' : state.HighlightBlankChar;
+                        if (state.ColorThemeName == MarcControl.CUSTOM_THEME_CAPTION)
+                        {
+                            try
+                            {
+                                var theme = ColorTheme.FromJson(state.CustomColorThemeJson);
+                                this.SetCustomColorTheme(theme);
+                            }
+                            catch
+                            {
+
+                            }
+                        }
+                        else
+                        {
+                            this.ColorThemeName = state.ColorThemeName;
+                        }
+                        var font = UiState.GetFont(state.Font);
+                        if (font != null)
+                        {
+                            this.Font = font;
+                        }
+                    }
+                    finally
+                    {
+                        this.EndUpdate();
+                    }
+                }
+            }
+        }
+#endif
+
     }
 }

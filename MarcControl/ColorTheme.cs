@@ -268,6 +268,33 @@ namespace LibraryStudio.Forms
             return theme;
         }
 
+#if REMOVED
+        [ThemeName("test", "en")]
+        [ThemeName("测试", "zh")]
+        public static ColorTheme ThemeTest()
+        {
+            var json = @"
+{
+  ""ForeColor"": ""230, 230, 230"",
+  ""BackColor"": ""0, 64, 128"",
+  ""ReadOnlyForeColor"": ""Gray"",
+  ""ReadOnlyBackColor"": ""Black"",
+  ""HightlightForeColor"": ""Black"",
+  ""HighlightBackColor"": ""180, 180, 180"",
+  ""DelimeterForeColor"": ""White"",
+  ""DelimeterBackColor"": ""Transparent"",
+  ""CaptionForeColor"": ""180, 180, 180"",
+  ""CaptionBackColor"": ""70, 70, 70"",
+  ""SolidColor"": ""60, 60, 60"",
+  ""BorderColor"": ""DarkGray"",
+  ""FocusColor"": ""DarkGray"",
+  ""BlankCharForeColor"": ""DarkGray""
+}
+";
+            return FromJson(json);
+        }
+#endif
+
         // 获得若干颜色属性的 PropertyInfo
         public IEnumerable<PropertyInfo> GetColorProperties()
         {

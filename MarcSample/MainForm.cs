@@ -26,11 +26,13 @@ namespace MarcSample
                     return $"头标区";
                 return $"获得 '{field.FieldName}' 的值";
             };
-            this.marcControl1.CaretMoved += (s, e) => {
+            this.marcControl1.CaretMoved += (s, e) =>
+            {
                 toolStripStatusLabel_caretOffs.Text = $"Caret:{this.marcControl1.CaretOffset}";
                 toolStripStatusLabel_caretFieldRegion.Text = "FieldRegion:" + this.marcControl1.CaretFieldRegion.ToString();
             };
-            this.marcControl1.SelectionChanged += (s, e) => {
+            this.marcControl1.SelectionChanged += (s, e) =>
+            {
                 toolStripStatusLabel_selectionRange.Text = $"Block:{this.marcControl1.SelectionStart}-{this.marcControl1.SelectionEnd}";
             };
         }
@@ -56,6 +58,7 @@ namespace MarcSample
 
             this.marcControl1.HighlightBlankChar = '·';  // '◌'; // '▪';// '▫'; // '□'; // '⸗';
 
+            LoadState();
             LoadMarc();
         }
 
@@ -181,6 +184,7 @@ namespace MarcSample
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             SaveMarc();
+            SaveState();
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
@@ -188,12 +192,44 @@ namespace MarcSample
 
         }
 
+        void LoadState()
+        {
+            try
+            {
+                var path = GetStateFileName();
+                if (File.Exists(path))
+                {
+                    var content = File.ReadAllText(path);
+                    this.marcControl1.UiStateJson = content;
+                }
+            }
+            catch (FileNotFoundException)
+            {
+            }
+        }
+
+        void SaveState()
+        {
+            var path = GetStateFileName();
+            File.WriteAllText(path, this.marcControl1.UiStateJson);
+        }
+
+        string GetMarcFileName()
+        {
+            return Path.Combine(GetBinDirectory(), "marc.txt");
+        }
+
+        string GetStateFileName()
+        {
+            return Path.Combine(GetBinDirectory(), "state.txt");
+        }
+
         void LoadMarc()
         {
             //return;
             try
             {
-                var path = Path.Combine(GetBinDirectory(), "marc.txt");
+                var path = GetMarcFileName();
                 if (File.Exists(path))
                 {
                     var content = File.ReadAllText(path);
@@ -209,7 +245,7 @@ namespace MarcSample
         void SaveMarc()
         {
             //return;
-            var path = Path.Combine(GetBinDirectory(), "marc.txt");
+            var path = GetMarcFileName();
             File.WriteAllText(path, this.marcControl1.Content);
         }
     }

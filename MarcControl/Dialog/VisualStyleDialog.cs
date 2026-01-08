@@ -15,9 +15,29 @@ namespace LibraryStudio.Forms.MarcControlDialog
     /// </summary>
     public partial class VisualStyleDialog : Form
     {
+        ColorTheme _theme = null;
         // 用户订制的颜色主题。如果为 null，表示不使用任何定制的颜色主题，而是
         // 使用了 ColorThemeName 为名字的系统内置主题
-        public ColorTheme CustomColorTheme { get; set; }
+        public ColorTheme CustomColorTheme
+        {
+            get
+            {
+                return _theme;
+            }
+            set
+            {
+                if (value is Metrics)
+                {
+                    throw new ArgumentException("set CustomColorTheme 之 value 不应为 Metrics 类型");
+                }
+
+                _theme = value;
+                if (_theme != null)
+                {
+                    FillColors(_theme);
+                }
+            }
+        }
 
         public MarcControl RefControl { get; set; }
 
@@ -145,12 +165,17 @@ namespace LibraryStudio.Forms.MarcControlDialog
         // 填充颜色样本 list
         void FillColors(string theme_name)
         {
-            this.listView_colors.Items.Clear();
             ColorTheme theme = null;
             if (theme_name == MarcControl.CUSTOM_THEME_CAPTION)
             {
                 if (this.CustomColorTheme == null)
-                    this.CustomColorTheme = ColorTheme.ThemeDefault();
+                {
+                    // 参考基于当前正在观察的一个 ColorTheme
+                    var ref_theme = this.listView_colors.Tag as ColorTheme;
+                    this.CustomColorTheme = ref_theme == null ? ColorTheme.ThemeDefault() : ref_theme.Clone();
+
+                    // this.CustomColorTheme = ColorTheme.ThemeDefault();
+                }
                 theme = this.CustomColorTheme;
             }
             else
@@ -158,10 +183,13 @@ namespace LibraryStudio.Forms.MarcControlDialog
                 theme = ColorTheme.GetTheme(theme_name);
                 if (theme == null)
                 {
+                    this.listView_colors.Items.Clear();
                     return;
                 }
             }
 
+            FillColors(theme);
+#if REMOVED
             this.listView_colors.Tag = theme;
             foreach (var info in theme.GetColorProperties())
             {
@@ -177,6 +205,36 @@ namespace LibraryStudio.Forms.MarcControlDialog
                 item.SubItems.Add(new ListViewItem.ListViewSubItem { Tag = color_value });
                 // 按钮
                 item.SubItems.Add(new ListViewItem.ListViewSubItem { Text = "修改..." });
+            }
+#endif
+        }
+
+        void FillColors(ColorTheme theme)
+        {
+            this.listView_colors.BeginUpdate();
+            try
+            {
+                this.listView_colors.Items.Clear();
+                this.listView_colors.Tag = theme;
+                foreach (var info in theme.GetColorProperties())
+                {
+                    Debug.Assert(theme != null);
+
+                    var color_value = GetColor(info, theme);
+                    var item = new ListViewItem(ColorTheme.GetNameCaption(info, "zh"));
+                    this.listView_colors.Items.Add(item);
+                    item.Tag = info;
+                    // 颜色名
+                    item.SubItems.Add(new ListViewItem.ListViewSubItem());
+                    // 样本
+                    item.SubItems.Add(new ListViewItem.ListViewSubItem { Tag = color_value });
+                    // 按钮
+                    item.SubItems.Add(new ListViewItem.ListViewSubItem { Text = "修改..." });
+                }
+            }
+            finally
+            {
+                this.listView_colors.EndUpdate();
             }
         }
 
@@ -227,7 +285,9 @@ namespace LibraryStudio.Forms.MarcControlDialog
             {
                 if (this.CustomColorTheme == null)
                 {
-                    this.CustomColorTheme = new ColorTheme();
+                    // 参考基于当前正在观察的一个 ColorTheme
+                    var ref_theme = this.listView_colors.Tag as ColorTheme;
+                    this.CustomColorTheme = ref_theme == null ? ColorTheme.ThemeDefault() : ref_theme.Clone();
                 }
 
                 this.marcControl_preview.SetCustomColorTheme(this.CustomColorTheme);
@@ -278,7 +338,11 @@ namespace LibraryStudio.Forms.MarcControlDialog
 
             var info = e.Item.Tag as PropertyInfo;
             var theme = this.listView_colors.Tag as ColorTheme;
-
+            if (theme == null)
+            {
+                e.DrawDefault = true;
+                return;
+            }
             if (column_index == COLUMN_COLOR_NAME)
             {
                 var color_name = GetColor(info, theme).ToString().Replace("Color ", "").Replace("[", "").Replace("]", "");
@@ -396,20 +460,28 @@ namespace LibraryStudio.Forms.MarcControlDialog
         }
 
         // 清除分隔符背景色为 Transparent，并且把分隔符前景色设置为和 ForeColor 一样
-        void ClearDelimeterColor()
+        bool ClearDelimeterColor()
         {
+            if (this.CustomColorTheme == null)
+                return false;
             this.CustomColorTheme.DelimeterBackColor = Color.Transparent;
             this.CustomColorTheme.DelimeterForeColor = this.CustomColorTheme.ForeColor;
 
             this.marcControl_preview.SetCustomColorTheme(this.CustomColorTheme);
             SampleSelect();
             this.listView_colors.Invalidate();
+            return true;
         }
 
-        void CopyJson()
+        bool CopyJson()
         {
             var theme = this.listView_colors.Tag as ColorTheme;
+            if (theme == null)
+                return false;
+            if (theme is Metrics)
+                throw new ArgumentException("this.listView_colors.Tag 不应为 Metrics 类型");
             Clipboard.SetText(theme.ToJson());
+            return true;
         }
 
         void PasteJson()
@@ -477,7 +549,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
                 var menu = new ToolStripMenuItem
                 {
                     Text = "清除分隔符颜色",
-                    Enabled = true,
+                    Enabled = IsCustom(),
                 };
                 menu.Click += (s1, e1) =>
                 {

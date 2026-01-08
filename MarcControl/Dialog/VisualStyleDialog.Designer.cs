@@ -187,6 +187,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.Controls.Add(this.marcControl_preview);
             this.Controls.Add(this.comboBox_colorTheme);
             this.Controls.Add(this.label1);
+            this.MinimizeBox = false;
             this.Name = "VisualStyleDialog";
             this.ShowIcon = false;
             this.ShowInTaskbar = false;
