@@ -1169,16 +1169,16 @@ IContext context)
         public static void ShapeAndPlace(
             GetFontFunc func_getfont,
             SafeHDC dc,
-ref SCRIPT_ANALYSIS sa,
-SafeSCRIPT_CACHE cache,
-string str,
-out ushort[] glfs,
-out int[] piAdvance,
-out GOFFSET[] pGoffset,
-out ABC pABC,
-out SCRIPT_VISATTR[] sva,
-out ushort[] log,
-ref Font used_font)
+            ref SCRIPT_ANALYSIS sa,
+            SafeSCRIPT_CACHE cache,
+            string str,
+            out ushort[] glfs,
+            out int[] piAdvance,
+            out GOFFSET[] pGoffset,
+            out ABC pABC,
+            out SCRIPT_VISATTR[] sva,
+            out ushort[] log,
+            ref Font used_font)
         {
             var max = (int)Math.Round(str.Length * 1.5m + 16);
             glfs = new ushort[max];
@@ -1203,6 +1203,13 @@ ref Font used_font)
 
             foreach (var font in fonts)
             {
+                // Основний курс української мови 中的 ї 是乌克兰语中特有的字符，基里尔文字中没有这个字符
+                // 如果宋体遇到 e.Script = 8 的，因为宋体里面包含了俄文字符但不包含
+                // 乌克兰文字符，所以这里要让给 MS Sans Serif 字体来渲染
+                // TODO: 假设机器上没有 MS Sans Serif 这样的包含乌克兰文的字体怎么办呢？
+                if (FontContext.CheckSupporting(font, sa.eScript) == false)
+                    continue;
+
                 var font_handle = font.ToHfont();
                 try
                 {

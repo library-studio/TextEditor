@@ -488,7 +488,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
                 return false;
             if (theme is Metrics)
                 throw new ArgumentException("this.listView_colors.Tag 不应为 Metrics 类型");
-            Clipboard.SetText(theme.ToJson());
+            MarcControl.ClipboardSetText(theme.ToJson());
             return true;
         }
 

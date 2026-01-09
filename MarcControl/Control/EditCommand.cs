@@ -4,10 +4,11 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using LibraryStudio.Forms.MarcControlDialog;
-
+using NUnit.Framework.Constraints;
 using static LibraryStudio.Forms.MarcField;
 using static LibraryStudio.Forms.MarcRecord;
 using static Vanara.PInvoke.Gdi32;
@@ -977,7 +978,7 @@ namespace LibraryStudio.Forms
             var start = Math.Min(this.SelectionStart, this.SelectionEnd);
             var length = Math.Abs(this.SelectionEnd - this.SelectionStart);
             var text = this.Content.Substring(start, length);
-            Clipboard.SetText(text);
+            ClipboardSetText(text);
             RawRemoveBolckText();
             return true;
         }
@@ -995,7 +996,7 @@ namespace LibraryStudio.Forms
             var text = _record.MergeText(start, start + length);
             */
 
-            Clipboard.SetText(GetSelectedContent());
+            ClipboardSetText(GetSelectedContent());
             SoftlyRemoveSelectionText();
             return true;
         }
@@ -1012,8 +1013,26 @@ namespace LibraryStudio.Forms
             // RawRemoveBolckText();
             return true;
             */
-            Clipboard.SetText(GetSelectedContent());
+            ClipboardSetText(GetSelectedContent());
             return true;
+        }
+
+        // 设置文字到 Windows 剪贴板。具有失败后自动重试能力
+        public static bool ClipboardSetText(string text)
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                try
+                {
+                    Clipboard.SetText(text);
+                    return true;
+                }
+                catch
+                {
+                    Thread.Sleep(20);
+                }
+            }
+            return false;
         }
 
         // 获得文字块中的文字
@@ -1363,7 +1382,19 @@ namespace LibraryStudio.Forms
                     CanExecute=()=> this.CanPaste(),
                 },
                 new CommandItem() { Caption="-" },
-
+                new CommandItem()
+                {
+                    Caption="归一化(&N)",
+                    KeyData=Keys.Control | Keys.N,
+                    Handler=(s,e) => this.NormalizeSelectedText(),
+                    CanExecute=()=> this.HasSelection(),
+                },
+                new CommandItem()
+                {
+                    Caption="显示十六进制",
+                    Handler=(s,e) => this.DisplayHex(),
+                    CanExecute=()=> this.HasSelection(),
+                },
                 new CommandItem()
                 {
                     Caption="原始剪切",
@@ -2009,6 +2040,82 @@ namespace LibraryStudio.Forms
                 errors.AddRange(field.Verify(func));
             }
             return result.ToString();
+        }
+
+        public static string ConvertGbkBytesToNormalizedRussian(byte[] gbkBytes)
+        {
+            if (gbkBytes == null) throw new ArgumentNullException(nameof(gbkBytes));
+
+            // 推荐使用 GB18030（兼容 GBK）；在 Windows 下也可使用 codepage 936 ("GBK")
+            Encoding gbk;
+            try
+            {
+                gbk = Encoding.GetEncoding("GB18030");
+            }
+            catch
+            {
+                // 兜底尝试 codepage 936
+                gbk = Encoding.GetEncoding(936);
+            }
+
+            // 将 GBK 字节解码为 Unicode 字符串
+            string decoded = gbk.GetString(gbkBytes);
+
+            // 先做兼容性归一化（把很多“全角/兼容字符”映射为常规字符）
+            string normalized = decoded.Normalize(NormalizationForm.FormKC);
+            return normalized;
+        }
+
+
+        public virtual bool NormalizeSelectedText()
+        {
+            var text = GetSelectedContent();
+            if (string.IsNullOrEmpty(text))
+                return false;
+            string normalized = text.Normalize(NormalizationForm.FormKC);
+            if (normalized == text)
+                return false;
+            return this.SoftlyPaste(normalized);
+        }
+
+        public bool DisplayHex()
+        {
+            var text = GetSelectedContent();
+            if (string.IsNullOrEmpty(text))
+                return false;
+            MessageBox.Show(this, ToHex(text, " "));
+            return true;
+        }
+
+        public static string ToHex(string text, string sep = "")
+        {
+            var result = new StringBuilder();
+            foreach(var ch in text)
+            {
+                if (text.Length > 0 && string.IsNullOrEmpty(sep) == false)
+                    result.Append(sep);
+                result.Append(Convert.ToString(ch, 16).PadLeft(4, '0'));
+            }
+
+            return result.ToString();
+        }
+
+        public static string ToDBC(string input)
+        {
+            char[] c = input.ToCharArray();
+            for (int i = 0; i < c.Length; i++)
+            {
+                if (c[i] == 12288)
+                {
+                    c[i] = (char)32;
+                    continue;
+                }
+                if (c[i] > 65280 && c[i] < 65375)
+                {
+                    c[i] = (char)(c[i] - 65248);
+                }
+            }
+            return new string(c);
         }
     }
 

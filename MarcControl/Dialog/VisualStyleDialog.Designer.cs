@@ -39,18 +39,24 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.columnHeader_sample = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.columnHeader_button = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.button_clearDelimeterColor = new System.Windows.Forms.Button();
-            this.marcControl_preview = new LibraryStudio.Forms.MarcControl();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.marcControl_preview = new LibraryStudio.Forms.MarcControl();
+            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
+            this.panel_ok_cancel = new System.Windows.Forms.Panel();
+            this.panel_color_theme_list = new System.Windows.Forms.Panel();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
+            this.tableLayoutPanel1.SuspendLayout();
+            this.panel_ok_cancel.SuspendLayout();
+            this.panel_color_theme_list.SuspendLayout();
             this.SuspendLayout();
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(6, 63);
+            this.label1.Location = new System.Drawing.Point(-6, 6);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(231, 36);
             this.label1.TabIndex = 0;
@@ -58,10 +64,12 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // 
             // comboBox_colorTheme
             // 
+            this.comboBox_colorTheme.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.comboBox_colorTheme.FormattingEnabled = true;
-            this.comboBox_colorTheme.Location = new System.Drawing.Point(279, 60);
+            this.comboBox_colorTheme.Location = new System.Drawing.Point(240, 3);
             this.comboBox_colorTheme.Name = "comboBox_colorTheme";
-            this.comboBox_colorTheme.Size = new System.Drawing.Size(638, 44);
+            this.comboBox_colorTheme.Size = new System.Drawing.Size(1172, 44);
             this.comboBox_colorTheme.TabIndex = 1;
             this.comboBox_colorTheme.SelectedIndexChanged += new System.EventHandler(this.comboBox_colorTheme_SelectedIndexChanged);
             this.comboBox_colorTheme.TextChanged += new System.EventHandler(this.comboBox_colorTheme_TextChanged);
@@ -79,7 +87,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // 
             this.button_cancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.button_cancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.button_cancel.Location = new System.Drawing.Point(1166, 975);
+            this.button_cancel.Location = new System.Drawing.Point(1172, 1);
             this.button_cancel.Name = "button_cancel";
             this.button_cancel.Size = new System.Drawing.Size(240, 70);
             this.button_cancel.TabIndex = 5;
@@ -90,7 +98,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // button_ok
             // 
             this.button_ok.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button_ok.Location = new System.Drawing.Point(920, 975);
+            this.button_ok.Location = new System.Drawing.Point(926, 0);
             this.button_ok.Name = "button_ok";
             this.button_ok.Size = new System.Drawing.Size(240, 70);
             this.button_ok.TabIndex = 4;
@@ -114,7 +122,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.listView_colors.MultiSelect = false;
             this.listView_colors.Name = "listView_colors";
             this.listView_colors.OwnerDraw = true;
-            this.listView_colors.Size = new System.Drawing.Size(1394, 327);
+            this.listView_colors.Size = new System.Drawing.Size(1412, 372);
             this.listView_colors.TabIndex = 6;
             this.listView_colors.UseCompatibleStateImageBehavior = false;
             this.listView_colors.View = System.Windows.Forms.View.Details;
@@ -147,7 +155,7 @@ namespace LibraryStudio.Forms.MarcControlDialog
             // button_clearDelimeterColor
             // 
             this.button_clearDelimeterColor.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.button_clearDelimeterColor.Location = new System.Drawing.Point(989, 331);
+            this.button_clearDelimeterColor.Location = new System.Drawing.Point(1007, 376);
             this.button_clearDelimeterColor.Name = "button_clearDelimeterColor";
             this.button_clearDelimeterColor.Size = new System.Drawing.Size(405, 53);
             this.button_clearDelimeterColor.TabIndex = 7;
@@ -155,13 +163,34 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.button_clearDelimeterColor.UseVisualStyleBackColor = true;
             this.button_clearDelimeterColor.Click += new System.EventHandler(this.button_clearDelimeterColor_Click);
             // 
+            // splitContainer1
+            // 
+            this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer1.Location = new System.Drawing.Point(3, 59);
+            this.splitContainer1.Name = "splitContainer1";
+            this.splitContainer1.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            // 
+            // splitContainer1.Panel1
+            // 
+            this.splitContainer1.Panel1.Controls.Add(this.listView_colors);
+            this.splitContainer1.Panel1.Controls.Add(this.button_clearDelimeterColor);
+            // 
+            // splitContainer1.Panel2
+            // 
+            this.splitContainer1.Panel2.Controls.Add(this.marcControl_preview);
+            this.splitContainer1.Panel2.Controls.Add(this.label2);
+            this.splitContainer1.Size = new System.Drawing.Size(1412, 915);
+            this.splitContainer1.SplitterDistance = 432;
+            this.splitContainer1.SplitterWidth = 8;
+            this.splitContainer1.TabIndex = 8;
+            // 
             // marcControl_preview
             // 
             this.marcControl_preview.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.marcControl_preview.AutoScroll = true;
-            this.marcControl_preview.AutoScrollMinSize = new System.Drawing.Size(1381, 0);
+            this.marcControl_preview.AutoScrollMinSize = new System.Drawing.Size(1399, 0);
             this.marcControl_preview.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink;
             this.marcControl_preview.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
             this.marcControl_preview.CaptionFont = new System.Drawing.Font("宋体", 9F);
@@ -176,42 +205,54 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.marcControl_preview.PaddingChar = ' ';
             this.marcControl_preview.PadWhileEditing = false;
             this.marcControl_preview.ReadOnly = false;
-            this.marcControl_preview.Size = new System.Drawing.Size(1394, 385);
+            this.marcControl_preview.Size = new System.Drawing.Size(1412, 432);
             this.marcControl_preview.TabIndex = 2;
             // 
-            // splitContainer1
+            // tableLayoutPanel1
             // 
-            this.splitContainer1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.splitContainer1.Location = new System.Drawing.Point(12, 137);
-            this.splitContainer1.Name = "splitContainer1";
-            this.splitContainer1.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            this.tableLayoutPanel1.ColumnCount = 1;
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel1.Controls.Add(this.panel_ok_cancel, 0, 2);
+            this.tableLayoutPanel1.Controls.Add(this.splitContainer1, 0, 1);
+            this.tableLayoutPanel1.Controls.Add(this.panel_color_theme_list, 0, 0);
+            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
+            this.tableLayoutPanel1.Name = "tableLayoutPanel1";
+            this.tableLayoutPanel1.RowCount = 3;
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(1418, 1057);
+            this.tableLayoutPanel1.TabIndex = 9;
             // 
-            // splitContainer1.Panel1
+            // panel_ok_cancel
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.listView_colors);
-            this.splitContainer1.Panel1.Controls.Add(this.button_clearDelimeterColor);
+            this.panel_ok_cancel.AutoSize = true;
+            this.panel_ok_cancel.Controls.Add(this.button_cancel);
+            this.panel_ok_cancel.Controls.Add(this.button_ok);
+            this.panel_ok_cancel.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel_ok_cancel.Location = new System.Drawing.Point(3, 980);
+            this.panel_ok_cancel.Name = "panel_ok_cancel";
+            this.panel_ok_cancel.Size = new System.Drawing.Size(1412, 74);
+            this.panel_ok_cancel.TabIndex = 0;
             // 
-            // splitContainer1.Panel2
+            // panel_color_theme_list
             // 
-            this.splitContainer1.Panel2.Controls.Add(this.marcControl_preview);
-            this.splitContainer1.Panel2.Controls.Add(this.label2);
-            this.splitContainer1.Size = new System.Drawing.Size(1394, 819);
-            this.splitContainer1.SplitterDistance = 387;
-            this.splitContainer1.SplitterWidth = 8;
-            this.splitContainer1.TabIndex = 8;
+            this.panel_color_theme_list.AutoSize = true;
+            this.panel_color_theme_list.Controls.Add(this.comboBox_colorTheme);
+            this.panel_color_theme_list.Controls.Add(this.label1);
+            this.panel_color_theme_list.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel_color_theme_list.Location = new System.Drawing.Point(3, 3);
+            this.panel_color_theme_list.Name = "panel_color_theme_list";
+            this.panel_color_theme_list.Size = new System.Drawing.Size(1412, 50);
+            this.panel_color_theme_list.TabIndex = 9;
             // 
             // VisualStyleDialog
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(18F, 36F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1418, 1057);
-            this.Controls.Add(this.splitContainer1);
-            this.Controls.Add(this.button_cancel);
-            this.Controls.Add(this.button_ok);
-            this.Controls.Add(this.comboBox_colorTheme);
-            this.Controls.Add(this.label1);
+            this.Controls.Add(this.tableLayoutPanel1);
             this.MinimizeBox = false;
             this.Name = "VisualStyleDialog";
             this.ShowIcon = false;
@@ -223,8 +264,12 @@ namespace LibraryStudio.Forms.MarcControlDialog
             this.splitContainer1.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
+            this.tableLayoutPanel1.ResumeLayout(false);
+            this.tableLayoutPanel1.PerformLayout();
+            this.panel_ok_cancel.ResumeLayout(false);
+            this.panel_color_theme_list.ResumeLayout(false);
+            this.panel_color_theme_list.PerformLayout();
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
 
@@ -243,5 +288,8 @@ namespace LibraryStudio.Forms.MarcControlDialog
         private System.Windows.Forms.ColumnHeader columnHeader_color;
         private System.Windows.Forms.Button button_clearDelimeterColor;
         private System.Windows.Forms.SplitContainer splitContainer1;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
+        private System.Windows.Forms.Panel panel_ok_cancel;
+        private System.Windows.Forms.Panel panel_color_theme_list;
     }
 }
