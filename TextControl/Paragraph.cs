@@ -15,7 +15,7 @@ namespace LibraryStudio.Forms
     /// 一个自然段结构
     /// 由若干 Line 构成
     /// </summary>
-    public class Paragraph : IBox
+    public class Paragraph : IBox, IDisposable
     {
         public string Name { get; set; }
 
@@ -200,24 +200,24 @@ namespace LibraryStudio.Forms
                 if (index < old_lines.Count && index < new_lines.Count)
                     offs += SameChars(old_lines[index], new_lines[index]);
                 old_lines.RemoveRange(0, index);
-                new_lines.RemoveRange(0, index);
+                RemoveLines(new_lines, 0, index);   // 刚创建的 field 要删除必须要 Dispose()
                 first_line_index += index;
             }
 
             // TODO: 修改前的最后一个 Line 末尾的回车换行符号区域。
             // 修改后的最后一个 Line 末尾的回车换行符号区域，都应包含到失效区中
 
+            int max = old_lines.Count == 0 ? 0 : old_lines.Max(p => p.GetPixelWidth());
+            if (max > max_pixel_width)
+                max_pixel_width = max;
+
             if (old_lines.Count > 0)
-                _lines.RemoveRange(first_line_index, old_lines.Count);
+                RemoveLines(_lines, first_line_index, old_lines.Count);
             if (new_lines.Count > 0)
             {
                 Debug.Assert(first_line_index >= 0);
                 _lines.InsertRange(first_line_index, new_lines);
             }
-
-            int max = old_lines.Count == 0 ? 0 : old_lines.Max(p => p.GetPixelWidth());
-            if (max > max_pixel_width)
-                max_pixel_width = max;
 
             // update_rect 用 old_lines 和 new_lines 两个矩形的较大一个算出
             // 矩形宽度最后用 max_pixel_width 矫正一次
@@ -693,6 +693,7 @@ out int new_width);
                             {
                                 return context?.GetFont?.Invoke(parent, tag);
                             },
+                            context,
                             dc,
                             item,
         context?.ConvertText?.Invoke(text) ?? text,
@@ -789,6 +790,7 @@ out int new_width);
                     {
                         return context?.GetFont?.Invoke(current_line, current_line.Tag);
                     },
+                    context,
                     dc,
                     current_line,
                     line_width);
@@ -944,6 +946,7 @@ out int new_width);
         //      返回 text 中可以切割的 index 位置。如果为 -1，表示没有找到可以切割的位置。
         static int BreakItem(
             GetFontFunc func_getfont,
+            IContext context,
             SafeHDC dc,
             SCRIPT_ITEM item,
             string str,
@@ -961,6 +964,7 @@ out int new_width);
             var a = item.a;
             Line.ShapeAndPlace(
                 func_getfont,
+                context,
                 dc,
                 ref a,
                 cache,
@@ -1152,7 +1156,7 @@ ref used_font);
 
         public void Clear()
         {
-            _lines.Clear();
+            DisposeLines();
             ColorCache?.Clear();
         }
 
@@ -1701,10 +1705,36 @@ ref used_font);
             if (_lines == null)
                 return;
             this.ColorCache?.Clear();
-            foreach(var line in _lines)
+            foreach (var line in _lines)
             {
                 line.ClearCache();
             }
+        }
+
+        public void Dispose()
+        {
+            DisposeLines();
+        }
+
+        void DisposeLines()
+        {
+            if (_lines == null)
+                return;
+            foreach (var line in _lines)
+            {
+                line?.Dispose();
+            }
+
+            _lines.Clear();
+        }
+
+        static void RemoveLines(List<Line> lines, int start, int count)
+        {
+            for (int i = start; i < start + count; i++)
+            {
+                lines[i]?.Dispose();
+            }
+            lines.RemoveRange(start, count);
         }
 
         public int TextLength

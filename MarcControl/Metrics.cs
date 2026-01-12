@@ -12,7 +12,7 @@ namespace LibraryStudio.Forms
         public GetFieldCaptionFunc GetFieldCaption { get; set; }
 
         // 字段名称注释的像素宽度
-        public int CaptionPixelWidth { get; set; } = DefaultSplitterPixelWidth;
+        public int CaptionPixelWidth { get; set; } = DefaultSplitterPixelWidth + DefaultCaptionPixelWidth;
 
         // 字段名称的像素宽度
         public int NamePixelWidth { get; set; }
@@ -60,11 +60,18 @@ namespace LibraryStudio.Forms
         public const char RecordEndCharDefault = (char)29;  // 记录结束符
 
         // 动态适应 client_width 的像素宽度
-        public void Refresh(Font default_font)
+        public void Refresh(Font default_font,
+            Font fixed_font = null)
         {
-            var averageCharWidth = (int)FontContext.ComputeAverageWidth(default_font, out _);
+            var averageContentCharWidth = (int)FontContext.ComputeAverageWidth(default_font, out _);
 
-            // var averageCharWidth = Line.GetAverageCharWidth();
+            // 如果用了 fixed_font，则要考虑两者较大的一个
+            var averageFixedCharWidth = fixed_font == null ?
+                averageContentCharWidth :
+                (int)FontContext.ComputeAverageWidth(fixed_font, out _);
+            averageContentCharWidth = Math.Max(averageFixedCharWidth, averageContentCharWidth);
+
+            var averageCharWidth = averageFixedCharWidth;
 
             // 可编辑区域和边框之间的空白
             BlankUnit = averageCharWidth / 2;
@@ -83,13 +90,8 @@ namespace LibraryStudio.Forms
                 + this.GapThickness;
             // 字段内容最小宽度为 5 个平均字符宽度
             MinFieldContentWidth = averageCharWidth * 5;
-            CaptionPixelWidth = averageCharWidth * 12;
-            /*
-            var maxCharWidth = Line.GetMaxCharWidth();
-            BlankUnit = maxCharWidth / 6;
-            NamePixelWidth = maxCharWidth * 3 + BlankUnit * 2; // 默认 60 像素宽度
-            IndicatorPixelWidth = maxCharWidth * 2 + BlankUnit * 2; // 默认 30 像素宽度
-            */
+
+            // CaptionPixelWidth = averageCharWidth * 12;
         }
 
         // 检测分割条和 Caption 区域
@@ -113,6 +115,8 @@ namespace LibraryStudio.Forms
         }
 
         public static int DefaultSplitterPixelWidth = 8;
+
+        public static int DefaultCaptionPixelWidth = 100;
 
         public int SplitterPixelWidth = DefaultSplitterPixelWidth;
 

@@ -82,28 +82,6 @@ namespace LibraryStudio.Forms
                 delay_update: false,
                 auto_adjust_caret_and_selection:true);
 
-#if REMOVED
-            {
-                ChangeSelection(start);
-                /*
-                DetectBlockChange1(_blockOffs1, _blockOffs2);
-
-                _blockOffs1 = start;
-                _blockOffs2 = start;
-
-                // 块定义发生刷新才有必要更新变化的区域
-                InvalidateBlockRegion();
-                */
-            }
-
-            if (_global_offs > start)
-            {
-                // DeltaGlobalOffs(-length); // 调整 _global_offs
-                AdjustGlobalOffs(-(length - 1));
-                // 这里面已经有更新块显示的动作
-                MoveGlobalOffsAndBlock(-1);
-            }
-#endif
             return true;
         }
 
@@ -229,6 +207,11 @@ namespace LibraryStudio.Forms
             if (_oldOffs1 == _oldOffs2
                 && _selectOffs1 == _selectOffs2)
                 return;
+
+            // testing
+            //this.Invalidate();
+            //return;
+
             bool changed = false;
             if (InvalidateSelectionRegion(_oldOffs1, _selectOffs1))
                 changed = true;

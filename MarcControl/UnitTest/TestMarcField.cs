@@ -681,17 +681,16 @@ namespace LibraryStudio.Forms
 
             using (var font = new Font("宋体", 12))
             using (var fonts = new FontContext(font))
-            using (var bitmap = new Bitmap(1, 1))
-            using (Graphics g = Graphics.FromImage(bitmap))
-            {
-                IContext context = new Context()
+            using (IContext context = new Context()
                 {
                     GetFont = (p, o) =>
                     {
                         return fonts.Fonts;
                     }
-                };
-
+                })
+            using (var bitmap = new Bitmap(1, 1))
+            using (Graphics g = Graphics.FromImage(bitmap))
+            {
                 var handle = g.GetHdc();
                 var dc = new SafeHDC(handle);
 

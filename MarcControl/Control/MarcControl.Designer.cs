@@ -1,4 +1,4 @@
-﻿using LibraryStudio.Forms;
+using LibraryStudio.Forms;
 
 namespace LibraryStudio.Forms
 {
@@ -20,6 +20,8 @@ namespace LibraryStudio.Forms
                 components.Dispose();
             }
             DisposeFonts();
+            _record?.Dispose();
+            _context?.Dispose();
             base.Dispose(disposing);
         }
 

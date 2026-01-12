@@ -1,4 +1,4 @@
-﻿
+
 https://learn.microsoft.com/en-us/globalization/fonts-layout/fonts
 Font fallback
 One benefit of Unicode is the ability to represent many languages without additional data specifying script. However, the broad glyph and script support in Unicode is also a problem, since few fonts support more than a few scripts. Indeed, it's difficult to do a good job of making fonts with glyphs for different scripts such that all conform to one set of vertical metrics. To overcome this limitation, and to accommodate complex scripts, most rendering systems (the technology for displaying the font onto the screen) include functionality to detect if the currently selected font doesn't support a particular script and can automatically switch (fall back) to a predefined font that has appropriate glyphs for the desired script. All these operations are transparent to the user.
@@ -142,3 +142,527 @@ MarcField 对象可以考虑增设一些成员，方便探知字段名。这样�
 这里，利用 is Paragraph 判断，是比较脆弱的做法，可以考虑为所有 IBox 对象
 增设一个接口 Name，这样就可以预先为 _content 准备好一个 Name，就方便用来
 随时判断对象类型名字了。
+
+
+~~~
+        // parameters:
+        //      block_start     选中范围的开始偏移量。
+        //                      以当前 line 的左边界为 0
+        //                      如果大于本行文字长度，表示未选中本行     
+        //      block_end       选中范围的结束偏移量
+        //                      以当前 line 的左边界为 0
+        //                      如果小于 0，表示未选中本行     
+        //      virtual_tail_length 行末虚拟尾部字符个数。如果这个尾部处在选择范围，需要显示为选择背景色
+        public void Paint(
+            IContext context,
+            SafeHDC hdc,
+            int x,
+            int y,
+            Rectangle clipRect,
+            int blockOffs1,
+            int blockOffs2,
+            int virtual_tail_length)
+        {
+            Line line = this;
+
+
+            int line_height = this.GetPixelHeight();
+            // 代表回车换行符号字符的像素宽度
+            // int _average_char_width = Line.GetAverageCharWidth();
+
+            var block_start = Math.Min(blockOffs1, blockOffs2);
+            var block_end = Math.Max(blockOffs1, blockOffs2);
+
+            block_start = Math.Max(0, block_start);
+            block_end = Math.Min(line.TextLength + virtual_tail_length, block_end);
+
+            //block_start = 0;
+            //block_end = 100;
+
+            // 绘制 Range 特定的背景色。指非 highlight 背景色
+            foreach (var range in line.Ranges)   // piVisualToLogical
+            {
+                // 绘制普通背景色
+                // 如果 .GetBackColor() 返回 Color.Transparent 则不进行绘制，保持背景透明
+                {
+                    // var bk_color = context.GetBackColor?.Invoke(range, false) ?? Color.Transparent;
+                    var bk_color = range.ColorCache
+                        .GetBackColor(context.GetBackColor,
+                        range,
+                        false);
+                    if (bk_color != Color.Transparent)
+                    {
+                        var rect = GetBlockRect(range,
+x + range.Left,
+y,
+line_height,
+0,
+range.Text.Length);
+                        // var larger = ((Rectangle)(rect)).Larger();
+                        if (clipRect.IntersectsWith((Rectangle)rect))
+                        {
+                            DrawSolidRectangle(hdc,
+                            rect,
+                            bk_color,
+                            clipRect);
+                        }
+                    }
+                }
+            }
+
+            // 块的背景矩形数组
+            /*
+            PRECT[] block_rects = new PRECT[line.Ranges.Count];
+            PRECT[] block_bounds = new PRECT[line.Ranges.Count];
+            */
+            // 每个 range 的矩形
+            // Rectangle[] range_rects = new Rectangle[line.Ranges.Count];
+
+            // 块矩形。null 表示不在块内
+            Rectangle[] block_rects = new Rectangle[line.Ranges.Count];
+            // abc 调整后的块矩形。null 表示不在块内
+            Rectangle[] block_abc_rects = new Rectangle[line.Ranges.Count];
+            // 块邻接的 range 要参与的 rect。null 表示不是邻接的 range
+            Rectangle[] neighbor_rects = new Rectangle[line.Ranges.Count];
+
+
+            // 块是否包含全部文字的标志
+            bool[] full_flags = new bool[line.Ranges.Count];
+
+            // 先绘制行和块背景
+            // 以逻辑顺序遍历 Ranges。注意显示位置 x 可能是跳动的
+            // 每个 Range 的块背景色不能在分散到每个 Range 的处理中绘制，因为那样可能会擦掉 Range 伸出去的笔画(例如 Italic 风格的 'f')。
+            if (block_start != block_end)
+            {
+                int i = 0;
+                int tail_range_index = 0;
+                if (line.Ranges.Count > 0 && line.piLogicalToVisual.Length > line.Ranges.Count - 1)
+                    tail_range_index = line.piVisualToLogical[line.Ranges.Count - 1];
+                foreach (var range in line.Ranges)   // piVisualToLogical
+                {
+                    var is_tail_in_line = i == tail_range_index;
+
+                    // 绘制选中范围的背景色
+                    if (block_start <= range.DisplayText.Length && block_end >= 0)
+                    {
+                        var tail_in_block = is_tail_in_line
+                            && virtual_tail_length > 0
+                            && block_start < range.DisplayText.Length + virtual_tail_length
+                            && block_end > range.DisplayText.Length;
+                        var block_rect = GetBlockRect(range,
+                            x + range.Left,
+                            y,
+                            line_height,
+                            block_start,
+                            block_end);
+
+                        // 如果当前 range 正巧是视觉上最右边一个 range，那么可以加宽宽度即可。
+                        // 但如果不是最右边的，则要另外专门绘制一次最右边的这个代表回车的块
+                        if (tail_in_block)
+                        {
+                            if (i == this.piLogicalToVisual[i])
+                                block_rect.Width += FontContext.DefaultReturnWidth;
+                            else
+                            {
+                                PaintReturnSelectedBack(
+                                    context,
+                                    hdc,
+                                    x,
+                                    y,
+                                    clipRect);
+                            }
+                        }
+
+                        if (block_rect.Width == 0)
+                            goto SKIP;
+                        Debug.Assert(block_rect.Width > 0);
+
+
+                        // var larger = ((Rectangle)(block_rect)).Larger();
+
+                        if (clipRect.IntersectsWith((Rectangle)block_rect))
+                        {
+                            // var back_color = context?.GetBackColor?.Invoke(range, true) ?? SystemColors.Highlight;
+                            var back_color = range.ColorCache
+                                .GetBackColor(context?.GetBackColor,
+                                range,
+                                true);
+
+                            if (back_color != Color.Transparent)
+                            {
+                                DrawSolidRectangle(hdc,
+                                block_rect,
+                                back_color,
+                                clipRect);
+                            }
+                        }
+
+                        /*
+                        // clipping 矩形的左右进行微调。避免斜体字的某些笔画伸出去的部分被显示成不同的颜色
+                        var left_delta = range.pABC.abcA;
+                        var right_delta = range.pABC.abcC;
+                        if (block_start <= 0 && left_delta < 0)
+                            block_rect.left -= -left_delta + 1; // 左侧空白
+                        if (block_end >= range.DisplayText.Length && right_delta < 0)
+                            block_rect.right += -right_delta + 1; // 右侧空白
+                        */
+                        /*
+                        AdjustRect(ref block_bound,
+    range,
+    block_start <= 0,
+    block_end >= range.DisplayText.Length);
+                        */
+
+                        block_rects[i] = block_rect; // 记录块背景矩形
+
+                        {
+                            var block_bound = AdjustRect((Rectangle)block_rect,
+                                range,
+                                true, //block_start <= 0,
+                                true/*block_end >= range.DisplayText.Length*/);
+                            block_abc_rects[i] = block_bound;
+                        }
+
+                        full_flags[i] = (block_start <= 0 && block_end >= range.DisplayText.Length); // 标记本 Range 是否全选
+
+                        // 设置邻接标志
+                        if (Utility.InRange(0, block_start, block_end)
+                            && i > 0)
+                            neighbor_rects[i - 1] = block_rect;
+                        if (Utility.InRange(range.TextLength, block_start, block_end)
+                            && i < this.Ranges.Count - 1)
+                            neighbor_rects[i + 1] = block_rect;
+
+                    }
+
+                SKIP:
+
+                    block_start -= range.DisplayText.Length;
+                    block_end -= range.DisplayText.Length;
+
+                    i++;
+                }
+
+                // 没有任何 Range 的情况，依然要显示 tail char
+                if (i == 0 && virtual_tail_length > 0)
+                {
+                    // 绘制选中范围的背景色
+                    if (block_start <= 0 && block_end >= virtual_tail_length)
+                    {
+                        /*
+                        var block_rect = new PRECT(x, y,
+                            x + FontContext.DefaultReturnWidth,
+                            y + line_height);
+                        */
+                        var block_rect = new Rectangle(x,
+                            y,
+                            FontContext.DefaultReturnWidth,
+                            line_height);
+
+                        // var larger = ((Rectangle)(block_rect)).Larger();
+                        if (clipRect.IntersectsWith(block_rect))
+                        {
+                            // var back_color = context?.GetBackColor?.Invoke(null, true) ?? SystemColors.Highlight;
+                            var back_color = line.ColorCache
+                                .GetBackColor(
+                                context?.GetBackColor,
+                                null,
+                                true);
+                            if (back_color != Color.Transparent)
+                            {
+                                DrawSolidRectangle(hdc,
+                                        block_rect,
+                                        back_color,
+                                        clipRect);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 绘制普通文本
+            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = line.Ranges[index];
+
+                if (string.IsNullOrEmpty(range.DisplayText))
+                    continue;
+
+                var block_rect = block_rects[index]; // 获取块背景矩形
+                var block_bound = block_abc_rects[index];
+                var full_block = full_flags[index]; // 获取是否全选标志
+
+                Font used_font = range.Font;
+                var cache = new SafeSCRIPT_CACHE();
+                int iReserved = 0;
+
+                // Range 的主体矩形。斜体情况可能会有部分笔画伸出这个矩形之外
+                Rectangle item_rect = new Rectangle(
+                    x + range.Left,
+                    y,
+                    range.PixelWidth,   // (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+                    line_height);
+
+                // Range 的外围包围矩形。可能比 item_rect 宽度更大(比如斜体情况)
+                // 用于判断 Clip 交叉
+                var item_bounds = AdjustRect(item_rect,
+                    range,
+                    true,
+                    true);
+
+                var font_handle = used_font.ToHfont();
+                try
+                {
+                    using (var dc_context = hdc.SelectObject(font_handle))
+                    {
+                        // 第一次显示 Range 内全部文字，用 Text Color
+                        // 如果是全部属于块，这样的第一次显示正常文字可以省略
+                        // (如果是斜体，虽然全部属于块，这里也不能省略)
+                        if ((/*full_block == false*/ true || block_rect == null)
+                            && clipRect.IntersectsWith((Rectangle)(item_bounds)))
+                        {
+                            // var text_color = context?.GetForeColor?.Invoke(range, false) ?? SystemColors.WindowText;
+                            var text_color = range.ColorCache
+                                .GetForeColor(
+                                context?.GetForeColor,
+                                range,
+                                false);
+
+                            var old_color = Gdi32.SetTextColor(hdc, new COLORREF(text_color)); // 设置文本颜色为黑色
+                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+
+                            try
+                            {
+                                var result = ScriptTextOut(hdc,
+                                            cache,
+                                            x + range.Left,
+                                            y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
+                                            (int)Gdi32.ETO.ETO_CLIPPED, // fuOptions,
+                                            Intersect(item_bounds, clipRect),   // [In, Optional] PRECT lprc,
+                                            range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
+                                            range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
+                                            iReserved,  //  [Optional] int iReserved,
+                                            range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
+                                            range.glfs.Length,    // int cGlyphs,
+                                            range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
+                                            null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
+                                            range.pGoffset[0]); // in GOFFSET pGoffset); 
+                                result.ThrowIfFailed();
+                            }
+                            finally
+                            {
+                                Gdi32.SetBkMode(hdc, old_mode);
+                                Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
+                            }
+                        }
+
+#if REMOVED
+                        // 第二次显示块部分文字，用 Highlight Color
+                        if (block_rect != null
+                            && clipRect.IntersectsWith((Rectangle)(block_bound)))
+                        {
+                            /*
+                            //testing
+                            DrawSolidRectangle(hdc,
+block_rect,
+Color.Green,
+clipRect);
+                            */
+
+                            // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                            var highlight_text_color = range.ColorCache
+                                .GetForeColor(
+                                context?.GetForeColor,
+                                range,
+                                true);
+                            var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+                            /*
+                            Gdi32.IntersectClipRect(hdc, block_rect.left + 10,
+                                block_rect.top,
+                                block_rect.right + 10,
+                                block_rect.bottom);
+                            */
+                            //var old_bk_color = Gdi32.SetBkColor(hdc, new COLORREF((uint)SystemColors.Highlight.ToArgb())); // 设置文本颜色为黑色
+                            try
+                            {
+                                var ret = ScriptTextOut(hdc,
+                cache,
+                x + range.Left,
+                y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
+                (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
+                Intersect(block_rect, clipRect),   // [In, Optional] PRECT lprc,
+                range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
+                range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
+                iReserved,  //  [Optional] int iReserved,
+                range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
+                range.glfs.Length,    // int cGlyphs,
+                range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
+                null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
+                range.pGoffset[0]); // in GOFFSET pGoffset); 
+                                ret.ThrowIfFailed();
+                            }
+                            finally
+                            {
+                                Gdi32.SetBkMode(hdc, old_mode);
+                                Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
+                                /*
+                                var region = Gdi32.CreateRectRgn(clipRect.Left, clipRect.Top, clipRect.Right, clipRect.Bottom);
+                                Gdi32.SelectClipRgn(hdc, region);
+                                region.Dispose();
+                                */
+                            }
+                        }
+
+#endif
+                    }
+                    // x_offset += line.PixelWidth;    // pABC.abcA + pABC.abcB + pABC.abcC;
+                }
+                finally
+                {
+                    Gdi32.DeleteFont(font_handle);
+                }
+            }
+
+            // 绘制块内文本
+            // 第一步把 rect 拼接起来
+            Rectangle line_rect = System.Drawing.Rectangle.Empty;
+            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = line.Ranges[index];
+
+                var block_rect = block_rects[index]; // 获取块背景矩形
+                var block_abc_rect = block_abc_rects[index];
+                var neightbor_rect = neighbor_rects[index];
+                var full_block = full_flags[index]; // 获取是否全选标志
+
+                if (block_rect != null)
+                    line_rect = Utility.Union(line_rect, block_rect);
+                else if (neightbor_rect != null)
+                    line_rect = Utility.Union(line_rect, neightbor_rect);
+            }
+
+            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = line.Ranges[index];
+
+                if (string.IsNullOrEmpty(range.DisplayText))
+                    continue;
+
+                var block_rect = block_rects[index]; // 获取块背景矩形
+                var block_abc_rect = block_abc_rects[index];
+                var neightbor_rect = neighbor_rects[index];
+                var full_block = full_flags[index]; // 获取是否全选标志
+
+                Font used_font = range.Font;
+                var cache = new SafeSCRIPT_CACHE();
+                int iReserved = 0;
+
+                // Range 的主体矩形。斜体情况可能会有部分笔画伸出这个矩形之外
+                Rectangle item_rect = new Rectangle(
+                    x + range.Left,
+                    y,
+                    range.PixelWidth,   // (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+                    line_height);
+
+                // Range 的外围包围矩形。可能比 item_rect 宽度更大(比如斜体情况)
+                // 用于判断 Clip 交叉
+                var item_bounds = AdjustRect(item_rect,
+                    range,
+                    true,
+                    true);
+
+                var font_handle = used_font.ToHfont();
+                try
+                {
+                    using (var dc_context = hdc.SelectObject(font_handle))
+                    {
+                        // 第二次显示块部分文字，用 Highlight Color
+                        if ((block_rect != null && clipRect.IntersectsWith(block_rect))
+                            || (neightbor_rect != null && clipRect.IntersectsWith(neightbor_rect))
+                            )
+                        {
+                            /*
+                            //testing
+                            DrawSolidRectangle(hdc,
+block_rect,
+Color.Green,
+clipRect);
+                            */
+
+                            // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                            var highlight_text_color = range.ColorCache
+                                .GetForeColor(
+                                context?.GetForeColor,
+                                range,
+                                true);
+                            var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+                            /*
+                            Gdi32.IntersectClipRect(hdc, block_rect.left + 10,
+                                block_rect.top,
+                                block_rect.right + 10,
+                                block_rect.bottom);
+                            */
+                            //var old_bk_color = Gdi32.SetBkColor(hdc, new COLORREF((uint)SystemColors.Highlight.ToArgb())); // 设置文本颜色为黑色
+                            try
+                            {
+                                var ret = ScriptTextOut(hdc,
+                cache,
+                x + range.Left,
+                y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
+                (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
+                Intersect(line_rect, clipRect),   // [In, Optional] PRECT lprc,
+                range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
+                range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
+                iReserved,  //  [Optional] int iReserved,
+                range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
+                range.glfs.Length,    // int cGlyphs,
+                range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
+                null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
+                range.pGoffset[0]); // in GOFFSET pGoffset); 
+                                ret.ThrowIfFailed();
+                            }
+                            finally
+                            {
+                                Gdi32.SetBkMode(hdc, old_mode);
+                                Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
+                                /*
+                                var region = Gdi32.CreateRectRgn(clipRect.Left, clipRect.Top, clipRect.Right, clipRect.Bottom);
+                                Gdi32.SelectClipRgn(hdc, region);
+                                region.Dispose();
+                                */
+                            }
+                        }
+                    }
+                    // x_offset += line.PixelWidth;    // pABC.abcA + pABC.abcB + pABC.abcC;
+                }
+                finally
+                {
+                    Gdi32.DeleteFont(font_handle);
+                }
+            }
+        }
+
+        static Rectangle AdjustRect(Rectangle block_rect,
+    RangeWrapper range,
+    bool adjust_left,
+    bool adjust_right)
+        {
+            // clipping 矩形的左右进行微调。避免斜体字的某些笔画伸出去的部分被显示成不同的颜色
+            var left_delta = range.pABC.abcA;
+            var right_delta = range.pABC.abcC;
+            if (adjust_left && left_delta < 0)
+            {
+                block_rect.X -= -left_delta + 1; // 左侧空白
+                block_rect.Width += -left_delta + 1;
+            }
+            if (adjust_right && right_delta < 0)
+            {
+                block_rect.Width += -right_delta + 1; // 右侧空白
+            }
+
+            return block_rect;
+        }
+
+

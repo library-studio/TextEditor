@@ -508,6 +508,7 @@ SetContent() 函数内部可以考虑实现一种算法，把新旧两个字符�
 
 
 ~~~
+(已经解决)
 Undo() 以后要 EnsureCaretVisible() 让插入符所在位置卷滚出现到可见位置。
 
 ~~~
@@ -542,3 +543,66 @@ MarcControl 中可以考虑提供两个函数，一个是检查字符串内容�
 
 ~~~
 当光标到达分割条上方时，分割条要亮起来。光标移走以后，再自动恢复不显眼的状态。
+
+~~~
+为了测试 Clipboard.SetText() 偶尔抛出 System.Runtime.InteropServices.ExternalException
+异常(所请求的剪贴板操作失败)的问题是否得到解决，需要编写一段故意频繁
+密集访问 Clipboard 的代码，用来进行测试验证。
+
+发生未捕获的界面线程异常:
+Type: System.Runtime.InteropServices.ExternalException
+Message: 所请求的剪贴板操作失败。
+Stack:
+在 System.Windows.Forms.Clipboard.ThrowIfFailed(Int32 hr)
+在 System.Windows.Forms.Clipboard.SetDataObject(Object data, Boolean copy, Int32 retryTimes, Int32 retryDelay)
+在 System.Windows.Forms.Clipboard.SetText(String text, TextDataFormat format)
+在 LibraryStudio.Forms.MarcControl.Copy()
+在 LibraryStudio.Forms.MarcControl.<KeyTriggerCommand>g__Trigger|295_0(CommandItem item)
+在 LibraryStudio.Forms.MarcControl.KeyTriggerCommand(Keys keyData)
+在 LibraryStudio.Forms.MarcControl.ProcessCmdKey(Message& msg, Keys keyData)
+在 System.Windows.Forms.Control.PreProcessMessage(Message& msg)
+在 System.Windows.Forms.Control.PreProcessControlMessageInternal(Control target, Message& msg)
+在 System.Windows.Forms.Application.ThreadContext.PreTranslateMessage(MSG& msg)
+
+~~~
+字段名提示文字可增加一种新风格，放在字段名上方作为单独的一行显示。默认字体的字号可以设置小一些。
+
+~~~
+(已经实现)
+视觉风格对话框要增加对三种字体的独立设置功能。
+字体名 TextBox 本身也要使用相应的字体
+
+~~~
+(已经解决)
+字段名和指示符区域的宽度应该按照 FixedSizeFont 的平均宽度来计算。而不是按照内容字体。
+注意两类字体的字号可能完全不同。
+
+~~~
+(已经实现)
+字体配置界面应该有设置为默认字体的按钮。可以三个按钮。
+
+(尚未实现)
+另外可以有字体主题的 ComboBox 列表供选用。但字体大小需要另外给一个列表，每次都统一修改
+三个字体的大小。
+
+字体定义的 JSON 代码可以复制粘贴。
+
+~~~
+(已经解决)
+视觉风格对话框打开后如果没有任何修改，确定按钮应该发灰。即便这时点确定按钮可以关闭对话框，
+那对话框关闭以后也不应该感觉到 MarcControl 画面抖动了一下。
+
+~~~
+Shift+左右方向键定义文字块，在阿拉伯文上偶尔有字符显示空心的问题。
+
+斜体字体，在 Block Region 失效的时候，每个 Range 左右要略大一点范围，不然会留下残影。
+
+~~~
+01317nam0 2200277   450 22222$$d= Основний курс української мови$$hⅠ Частина$$dОсновной курс украинского языка$$hⅠ Частина01317nam0 2200277   450 00101201808143100520180814925326.0010  a978-7-02-014453-2dCNY42.00100  a20181221d2018    cemy0chiy50      ea1011 achiceng102  aCNb110000105  aa   z   000ay106  ar2001 a哈利·波特与魔法石Aha li· bo te yu mo fa shif(英)J.K.罗琳著g苏农译205  a2版输入中文测试文字位置     0شلاؤيثبفaلاؤيثبلاهتنمةىenglish test 345210  a北京c人民文学出版社d2018.10215  a241页c图d24cm330  a本书讲述：哈利·波特的人生中没有魔法。他和一点都不友善的德思礼夫妇，还有他们令人厌恶的儿子达力住在一起。哈利的房间是一个窄小的储物间，就在楼梯下面，而且十一年来他从未有过生日派对。 但是有一天，猫头鹰信使突然送来一封神秘的信件，令人不敢相信的是，信里附着一张来自霍格沃茨魔法学校的录取哈利入学的通知书。 哈利于九月一日带着他的猫头鹰乘着特快列车来到魔法学校。在学校里，他遇到了他一生中两个最好的朋友，体验了骑着飞天扫帚打球的运动，从课堂上和生活中的所有事物里学到了魔法。不仅如此，他还得知自己将有一个伟大而不可思议的命运……333  a本书为儿童读物5101 aHarry Potter and the philosopher's stonezeng6060 a儿童小说x长篇小说y英国z现代111690  aI561.84v511111111111111111111111a11中文701 0c(英)a罗琳Aluo linc(Rowling, J. K)4著702 0a苏农Asu nong4译801 0aCNb百万庄c20181221
+
+~~~
+在从右向左书写顺序的 Range 下方显示波浪线，表明其特殊性
+
+~~~
+context.ClearFontCache() 可以适当延长时间再清除。
+有几个情况下是必须立即清除。1) 字体改变。2) 发现包含的句柄数量超过一个阈值。

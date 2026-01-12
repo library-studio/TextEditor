@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
+using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms.MarcControlDialog
 {
@@ -57,20 +58,32 @@ namespace LibraryStudio.Forms.MarcControlDialog
             FillColorThemeList();
 
             {
-                // 参考 RefControl 设置字体
+                // 参考 RefControl 设置字体、空格突出显示和提示区宽度
                 if (this.RefControl != null)
                 {
                     this.marcControl_preview.Font = RefControl.Font;
                     this.marcControl_preview.FixedSizeFont = RefControl.FixedSizeFont;
                     this.marcControl_preview.CaptionFont = RefControl.CaptionFont;
                     this.marcControl_preview.HighlightBlankChar = RefControl.HighlightBlankChar;
+
+                    this.marcControl_preview.CaptionPixelWidth = RefControl.CaptionPixelWidth;
                 }
 
                 this.marcControl_preview.GetFieldCaption += (field) =>
                 {
-                    if (field.IsHeader)
-                        return $"头标区";
-                    return $"字段 '{field.FieldName}' 的名称";
+                    if (RefControl != null)
+                    {
+                        return RefControl.GetFieldCaption(field);
+                    }
+                    else
+                    {
+                        if (field.IsHeader)
+                        {
+                            return $"头标区";
+                        }
+
+                        return $"字段 '{field.FieldName}' 的名称";
+                    }
                 };
 
                 /*
@@ -599,6 +612,193 @@ namespace LibraryStudio.Forms.MarcControlDialog
         private void button_clearDelimeterColor_Click(object sender, EventArgs e)
         {
             ClearDelimeterColor();
+        }
+
+        private void button_font_content_Click(object sender, EventArgs e)
+        {
+            var result = SettingFont(this.ContentFontString);
+            if (result != null)
+            {
+                //ChangeTextBoxFont(this.textBox_font_content, result);
+                this.ContentFontString = result;
+                this.marcControl_preview.Font = MarcControl.GetFont(result);
+                this.FontsChanged = true;
+            }
+        }
+
+        private void button_font_fixed_Click(object sender, EventArgs e)
+        {
+            var result = SettingFont(this.FixedFontString);
+            if (result != null)
+            {
+                //ChangeTextBoxFont(this.textBox_font_fixed, result);
+                this.FixedFontString = result;
+                this.marcControl_preview.FixedSizeFont = MarcControl.GetFont(result);
+                this.FontsChanged = true;
+            }
+        }
+
+        private void button_font_caption_Click(object sender, EventArgs e)
+        {
+            var result = SettingFont(this.CaptionFontString);
+            if (result != null)
+            {
+                //ChangeTextBoxFont(this.textBox_font_caption, result);
+                this.CaptionFontString = result;
+                this.marcControl_preview.CaptionFont = MarcControl.GetFont(result);
+                this.FontsChanged = true;
+            }
+        }
+
+        // 改变 textBox 的字体。不改变字号。
+        void ChangeTextBoxFont(TextBox textbox, string font_string)
+        {
+            var old_font = textbox.Font;
+            using (var ref_font = MarcControl.GetFont(font_string))
+            {
+                if (ref_font != null)
+                {
+                    textbox.Font = new Font(ref_font.FontFamily,
+                        old_font.SizeInPoints,
+                        ref_font.Style,
+                        GraphicsUnit.Point);
+                }
+            }
+        }
+
+        string SettingFont(string font_string)
+        {
+            using (FontDialog dlg = new FontDialog())
+            {
+                dlg.Font = MarcControl.GetFont(font_string);
+                dlg.AllowVerticalFonts = false;
+
+                if (dlg.ShowDialog(this) != DialogResult.OK)
+                {
+                    return null;
+                }
+
+                return MarcControl.GetFontString(dlg.Font);
+            }
+        }
+
+        public string ContentFontString
+        {
+            get
+            {
+                return this.textBox_font_content.Text;
+            }
+            set
+            {
+                this.textBox_font_content.Text = value;
+            }
+        }
+
+        public string FixedFontString
+        {
+            get
+            {
+                return this.textBox_font_fixed.Text;
+            }
+            set
+            {
+                this.textBox_font_fixed.Text = value;
+            }
+        }
+
+        public string CaptionFontString
+        {
+            get
+            {
+                return this.textBox_font_caption.Text;
+            }
+            set
+            {
+                this.textBox_font_caption.Text = value;
+            }
+        }
+
+        // 将 MarcControl 中的字体装载到本对话框
+        public void LoadAllFont(MarcControl control)
+        {
+            this.ContentFontString = MarcControl.GetFontString(control.Font);
+            this.FixedFontString = MarcControl.GetFontString(control.FixedSizeFont);
+            this.CaptionFontString = MarcControl.GetFontString(control.CaptionFont);
+        }
+
+        public bool FontsChanged { get; set; }
+
+        // 将本对话框中的字体应用到指定的 MarcControl
+        public bool ApplyAllFont(MarcControl control)
+        {
+            if (FontsChanged == false)
+            {
+                return false;
+            }
+
+            control.BeginUpdate();
+            try
+            {
+                {
+                    var font = MarcControl.GetFont(this.ContentFontString);
+                    control.Font = font == null ? Control.DefaultFont : font;
+                }
+
+                {
+                    var font = MarcControl.GetFont(this.FixedFontString);
+                    control.FixedSizeFont = font == null ? Control.DefaultFont : font;
+                }
+
+                {
+                    var font = MarcControl.GetFont(this.CaptionFontString);
+                    control.CaptionFont = font == null ? Control.DefaultFont : font;
+                }
+                return true;
+            }
+            finally
+            {
+                control.EndUpdate();
+            }
+        }
+
+        private void textBox_font_content_TextChanged(object sender, EventArgs e)
+        {
+            var textbox = sender as TextBox;
+            if (textbox != null)
+                ChangeTextBoxFont(textbox, textbox.Text);
+        }
+
+        // 恢复默认字体
+        private void button_font_reset_Click(object sender, EventArgs e)
+        {
+            // TODO: 验证当前环境下这三个字体是否存在，如果不存在，用近似的字体替换
+
+            this.ContentFontString = _default_content_font_string;
+            this.marcControl_preview.Font = MarcControl.GetFont(_default_content_font_string);
+
+            this.FixedFontString = _default_fixed_font_string;
+            this.marcControl_preview.FixedSizeFont = MarcControl.GetFont(_default_fixed_font_string);
+
+            this.CaptionFontString = _default_caption_font_string;
+            this.marcControl_preview.CaptionFont = MarcControl.GetFont(_default_caption_font_string);
+
+            this.FontsChanged = true;
+        }
+
+        const string _default_content_font_string = "宋体, 10.5pt";
+        const string _default_fixed_font_string = "Courier New, 10.5pt, style=Bold";
+        const string _default_caption_font_string = "楷体, 10.5pt";
+
+        public int SelectedPageIndex
+        {
+            get
+            {
+                return this.tabControl_colorTheme.SelectedIndex;
+            }
+            set
+            {
+                this.tabControl_colorTheme.SelectedIndex = value;
+            }
         }
     }
 }

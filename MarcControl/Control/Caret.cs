@@ -32,7 +32,9 @@ namespace LibraryStudio.Forms
         {
             //SetCaretOffs(result.Offs);
 
-            Debug.Assert(_caret_offs <= _content_length);
+#if DEBUG
+            Debug.Assert(_caret_offs <= _record.TextLength);
+#endif
 
             MoveCaret(result);
 

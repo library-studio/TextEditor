@@ -76,6 +76,7 @@ namespace LibraryStudio.Forms
             this.UpdateStyles();
             this.DoubleBuffered = true; // 备份保证
             */
+            _context = GetDefaultContext();
 
             _fieldProperty = new Metrics()
             {
@@ -91,11 +92,10 @@ namespace LibraryStudio.Forms
 
             // _line_height = Line.InitialFonts(this.Font);
 
-            _fieldProperty.Refresh(this.Font);
+            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
 
             _dpiXY = DpiUtil.GetDpiXY(this);
 
-            _context = GetDefaultContext();
         }
 
         void _paintBackfunc(object o,
@@ -475,7 +475,7 @@ namespace LibraryStudio.Forms
                     _selectOffs1,
                     _selectOffs2,
                     0);
-
+                _context.ClearFontCache();
             }
             finally
             {
@@ -511,27 +511,16 @@ namespace LibraryStudio.Forms
         }
 
 
-#if CONTENT_STRING
-        private string _content = string.Empty;
-#else
-        private int _content_length = 0;
-#endif
+        // private int _content_length = 0;
 
         public virtual string Content
         {
             get
             {
-#if CONTENT_STRING
-                return _content;
-#else
                 return _record.MergeText();
-#endif
             }
             set
             {
-#if CONTENT_STRING
-                _content = value;
-#endif
 
 #if REMOVED
                 // _initialized = false;
@@ -738,6 +727,8 @@ namespace LibraryStudio.Forms
                 out Rectangle update_rect,
                 out Rectangle scroll_rect,
                 out int scroll_distance*/);
+            _context?.ClearFontCache();
+
             var max_pixel_width = ret.MaxPixel;
             var update_rect = ret.UpdateRect;
             var scroll_rect = ret.ScrollRect;
@@ -769,11 +760,7 @@ namespace LibraryStudio.Forms
                 // ScheduleInvalidate(update_rect);
             }
 
-#if CONTENT_STRING
-            _content = _paragraph.MergeText();
-#else
-            _content_length = _record.TextLength;
-#endif
+            // _content_length = _record.TextLength;
 
             ChangeDocumentSize(max_pixel_width);
 
@@ -992,7 +979,7 @@ out long left_width);
         {
             ClearFontGroups();
 
-            _fieldProperty.Refresh(this.Font);
+            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
 
             var text = _record.MergeText();
             this._record.Clear();   // 清除所有 IBox 对象，释放所有对原有字体的引用
@@ -1086,7 +1073,7 @@ out long left_width);
                         text,
                         GetLimitWidth()
                         );
-
+                    _context.ClearFontCache();
                 }
             }
 
@@ -1145,12 +1132,7 @@ out long left_width);
                     ScheduleInvalidate(update_rect);
             }
 
-#if CONTENT_STRING
-                        // TODO: 这里值得改进加速速度。可以考虑仅仅保留一个 content length 即可
-                        _content = _paragraph.MergeText();
-#else
-            _content_length = _record.TextLength;
-#endif
+            // _content_length = _record.TextLength;
 
             /*
             // TODO: SetAutoSizeMode() 放到一个统一的初始化代码位置即可
@@ -1181,7 +1163,9 @@ out long left_width);
                     v += delta;  // 插入符在块尾部以右的，向左移动
                 else if (v >= s)
                     v = s;   // 插入符在块中间的，归为块首
-                Debug.Assert(v >= 0 && v <= _content_length);
+#if DEBUG
+                Debug.Assert(v >= 0 && v <= _record.TextLength);
+#endif
                 return v;
             }
 
@@ -1756,7 +1740,10 @@ out long left_width);
                     return;
 #endif
                     if (ProcessBackspaceKey(_caretInfo) == true)
+                    {
                         e.Handled = true;
+                    }
+
                     break;
             }
             base.OnKeyDown(e);
@@ -1892,7 +1879,7 @@ out long left_width);
         {
             hIMC = Imm32.ImmGetContext(this.Handle);
             // _line_height = Line.InitialFonts(this.Font);
-            _fieldProperty.Refresh(this.Font);
+            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
             SetCompositionWindowPos();
             base.OnLoad(e);
         }
@@ -1943,8 +1930,12 @@ out long left_width);
                 Imm32.ImmSetCompositionFont(hIMC, logFont);
 
                 var cf = new Imm32.COMPOSITIONFORM();
-                cf.ptCurrentPos.x = _caretInfo.X;
-                cf.ptCurrentPos.y = _caretInfo.Y;
+
+                int x = -this.HorizontalScroll.Value;
+                int y = -this.VerticalScroll.Value;
+
+                cf.ptCurrentPos.x = x + _caretInfo.X;
+                cf.ptCurrentPos.y = y + _caretInfo.Y;
                 cf.dwStyle = CFS.CFS_POINT;
 
                 Imm32.ImmSetCompositionWindow(hIMC, cf);

@@ -19,7 +19,7 @@ namespace LibraryStudio.Forms
     /// MARC 字段编辑区域
     /// 由一个 Line(字段名)，一个 Line(字段指示符)，一个 Paragraph (字段内容) 构成
     /// </summary>
-    public class MarcField : IBox
+    public class MarcField : IBox, IDisposable
     {
         public string Name { get; set; }
 
@@ -1940,9 +1940,16 @@ clipRect);
                 {
                     if (indicator_value.Length < 2
                         && this.IsControlField == false /*控制字段保留 _content，可避免向右移动到不了 content 的尴尬效果*/)
+                    {
+                        _content?.Dispose();
                         _content = null;
+                    }
+
                     if (string.IsNullOrEmpty(indicator_value))
+                    {
+                        _indicator?.Dispose();
                         _indicator = null;
+                    }
                 }
 
                 this.ClearCacheHeight();
@@ -2232,7 +2239,7 @@ clipRect);
             GetControl().ReplaceText(field_start + name_start,
                 field_start + name_end,
                 name,
-                false);
+                delay_update: false);
             return old_name;
         }
 
@@ -2263,7 +2270,7 @@ clipRect);
             GetControl().ReplaceText(field_start + indicator_start,
                 field_start + indicator_end,
                 indicator,
-                false);
+                delay_update: false);
             return old_indicator;
         }
 
@@ -2289,7 +2296,7 @@ clipRect);
             GetControl().ReplaceText(field_start + content_start,
                 field_start + content_end,
                 content,
-                false);
+                delay_update: false);
             return old_content;
         }
 
@@ -2316,7 +2323,7 @@ clipRect);
             GetControl().ReplaceText(field_start,
                 field_end,
                 text,
-                false);
+                delay_update: false);
             return old_content;
         }
 
@@ -2850,6 +2857,23 @@ clipRect);
             _name?.ClearCache();
             _indicator?.ClearCache();
             _content?.ClearCache();
+        }
+
+        public void Dispose()
+        {
+            DisposeBoxes();
+        }
+
+        void DisposeBoxes()
+        {
+            _name?.Dispose();
+            _name = null;
+            _indicator?.Dispose();
+            _indicator = null;
+            _content?.Dispose();
+            _content = null;
+            _caption?.Dispose();
+            _caption = null;
         }
     }
 

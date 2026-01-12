@@ -36,18 +36,21 @@ namespace LibraryStudio.Forms
             }
             set
             {
-                _fieldProperty.UseColorTheme(value);
-                if (value == "default"
-                    || string.IsNullOrEmpty(value))
+                if (_theme_name != value)
                 {
-                    _theme_name = null;
-                }
-                else
-                {
-                    _theme_name = value;
-                }
+                    _fieldProperty.UseColorTheme(value);
+                    if (value == "default"
+                        || string.IsNullOrEmpty(value))
+                    {
+                        _theme_name = null;
+                    }
+                    else
+                    {
+                        _theme_name = value;
+                    }
 
-                OnColorChanged(new EventArgs());
+                    OnColorChanged(new EventArgs());
+                }
             }
         }
 
@@ -73,10 +76,14 @@ namespace LibraryStudio.Forms
         {
             if (theme != null)
             {
-                this._fieldProperty.ApplyColorTheme(theme);
                 this._theme_name = "[定制]";
-                OnColorChanged(new EventArgs());
-                OnCustomColorThemeChanged(new EventArgs());
+                // 比较新旧两套 Theme 有无实质性变化
+                if (this._fieldProperty.Clone().ToJson() != theme.ToJson())
+                {
+                    this._fieldProperty.ApplyColorTheme(theme);
+                    OnColorChanged(new EventArgs());
+                    OnCustomColorThemeChanged(new EventArgs());
+                }
             }
             else
             {
@@ -203,17 +210,22 @@ namespace LibraryStudio.Forms
         }
 
         // 设置视觉风格
-        public bool SettingVisualStyle()
+        // parameters:
+        //      active_page 0:颜色主题 1:字体
+        public bool SettingVisualStyle(int active_page = 0)
         {
             using (var dlg = new VisualStyleDialog())
             {
                 dlg.RefControl = this;
+                dlg.LoadAllFont(this);
                 dlg.ColorThemeName = this.ColorThemeName;
                 if (IsCustomColorTheme())
                     dlg.CustomColorTheme = this.GetCustomColorTheme();
+                dlg.SelectedPageIndex = active_page;
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
+                    dlg.ApplyAllFont(this);
                     if (dlg.CustomColorTheme != null)
                     {
                         this.SetCustomColorTheme(dlg.CustomColorTheme);
@@ -232,6 +244,8 @@ namespace LibraryStudio.Forms
         // 设置字体和字体颜色
         public bool SettingFont()
         {
+            return SettingVisualStyle(1);
+#if REMOVED
             // TODO: “微软雅黑 light”字体为何在打开的 FontDialog 中不能正确定位字体名
             using (FontDialog dlg = new FontDialog())
             {
@@ -266,6 +280,7 @@ namespace LibraryStudio.Forms
                     }
                 }
             }
+#endif
         }
 
         class UiState
@@ -282,23 +297,9 @@ namespace LibraryStudio.Forms
 
             public string Font { get; set; }
 
-            public static Font GetFont(string strFontString)
-            {
-                if (String.IsNullOrEmpty(strFontString) == false)
-                {
-                    var converter = TypeDescriptor.GetConverter(typeof(Font));
+            public string FixedSizeFont { get; set; }
 
-                    return (Font)converter.ConvertFromString(strFontString);
-                }
-
-                return null;
-            }
-
-            public static string GetFontString(Font font)
-            {
-                var converter = TypeDescriptor.GetConverter(typeof(Font));
-                return converter.ConvertToString(font);
-            }
+            public string CaptionFont { get; set; }
         }
 
         // 用于存储和恢复编辑器 UI 状态的 JSON 字符串
@@ -315,7 +316,9 @@ namespace LibraryStudio.Forms
                     HighlightBlankChar = this.HighlightBlankChar,
                     ColorThemeName = this.ColorThemeName,
                     CustomColorTheme = this.IsCustomColorTheme() ? (this.GetCustomColorTheme() ?? null) : null,
-                    Font = UiState.GetFontString(this.Font),
+                    Font = GetFontString(this.Font),
+                    FixedSizeFont = GetFontString(this.FixedSizeFont),
+                    CaptionFont = GetFontString(this.CaptionFont),
                 };
                 return JsonConvert.SerializeObject(state);
             }
@@ -337,10 +340,29 @@ namespace LibraryStudio.Forms
                         {
                             this.ColorThemeName = state.ColorThemeName;
                         }
-                        var font = UiState.GetFont(state.Font);
-                        if (font != null)
+
                         {
-                            this.Font = font;
+                            var font = GetFont(state.Font);
+                            if (font != null)
+                            {
+                                this.Font = font;
+                            }
+                        }
+
+                        {
+                            var font = GetFont(state.FixedSizeFont);
+                            if (font != null)
+                            {
+                                this.FixedSizeFont = font;
+                            }
+                        }
+
+                        {
+                            var font = GetFont(state.CaptionFont);
+                            if (font != null)
+                            {
+                                this.CaptionFont = font;
+                            }
                         }
                     }
                     finally
@@ -351,7 +373,23 @@ namespace LibraryStudio.Forms
             }
         }
 
+        public static Font GetFont(string strFontString)
+        {
+            if (String.IsNullOrEmpty(strFontString) == false)
+            {
+                var converter = TypeDescriptor.GetConverter(typeof(Font));
 
+                return (Font)converter.ConvertFromString(strFontString);
+            }
+
+            return null;
+        }
+
+        public static string GetFontString(Font font)
+        {
+            var converter = TypeDescriptor.GetConverter(typeof(Font));
+            return converter.ConvertToString(font);
+        }
 
 #if REMOVED
         class UiState

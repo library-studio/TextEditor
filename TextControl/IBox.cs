@@ -175,7 +175,7 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 用于定制效果的上下文接口
     /// </summary>
-    public interface IContext
+    public interface IContext : IDisposable
     {
         /// <summary>
         /// 预先切割文字为分离的片段
@@ -204,6 +204,10 @@ namespace LibraryStudio.Forms
 
         // 获得可用字体集合
         GetFontFunc GetFont { get; set; }
+
+        IntPtr GetFontHandle(Font font);
+
+        void ClearFontCache();
     }
 
     // 用于预先切割文字为更小段落的函数

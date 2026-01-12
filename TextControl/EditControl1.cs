@@ -141,6 +141,7 @@ namespace LibraryStudio.Forms
                     _blockOffs1,
                     _blockOffs2,
                     0);
+                _context.ClearFontCache();
 #if REMOVED
                 int current_start_offs = 0;
                 var block_start = Math.Min(_blockOffs1, _blockOffs2);
@@ -333,6 +334,9 @@ namespace LibraryStudio.Forms
                 out Rectangle update_rect,
                 out Rectangle scroll_rect,
                 out int scroll_distance*/);
+
+            _context.ClearFontCache();
+
             max_pixel_width = ret.MaxPixel;
             var update_rect = ret.UpdateRect;
             var scroll_rect = ret.ScrollRect;
@@ -624,6 +628,9 @@ out long left_width);
                             out Rectangle update_rect,
             out Rectangle scroll_rect,
             out int scroll_distance*/);
+
+                        _context.ClearFontCache();
+
                         max_pixel_width = ret.MaxPixel;
                         var replaced_text = ret.ReplacedText;
                         var update_rect = ret.UpdateRect;

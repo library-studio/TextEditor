@@ -6,7 +6,9 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -183,6 +185,7 @@ namespace MarcSample
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
+            StopClipboardStressTest();
             SaveMarc();
             SaveState();
         }
@@ -248,5 +251,91 @@ namespace MarcSample
             var path = GetMarcFileName();
             File.WriteAllText(path, this.marcControl1.Content);
         }
+
+
+        private void MenuItem_startStressTest_Click(object sender, EventArgs e)
+        {
+            StartClipboardStressTest();
+        }
+
+        private void MenuItem_stopStressTest_Click(object sender, EventArgs e)
+        {
+            StopClipboardStressTest();
+        }
+
+        #region Clipboard Stress Testing
+
+        CancellationTokenSource _cancelStress = null;
+
+        void StartClipboardStressTest()
+        {
+            StopClipboardStressTest();
+            _cancelStress = new CancellationTokenSource();
+            var token = _cancelStress.Token;
+            var task = Task.Factory.StartNew((o) =>
+            {
+                try
+                {
+                    for (int i = 0; ; i++)
+                    {
+                        if (token.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
+                        // TODO: 为了加大压力，是否应该用复制图像进入 Clipboard 来测试
+                        var ret = CopyTextToClipboard($"test {i}");
+                        /*
+                        this.Invoke(new Action(() =>
+                        {
+                            Clipboard.SetText($"test {i}");
+                        }));
+                        */
+                        Thread.Sleep(20);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    int k = 0;
+                    k++;
+                }
+            },
+            null,
+            default,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+        }
+
+        void StopClipboardStressTest()
+        {
+            if (_cancelStress != null)
+            {
+                _cancelStress.Cancel();
+                _cancelStress.Dispose();
+                _cancelStress = null;
+            }
+        }
+
+
+        [DllImport("user32.dll")]
+        private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+        [DllImport("user32.dll")]
+        private static extern bool CloseClipboard();
+        [DllImport("user32.dll")]
+        private static extern bool SetClipboardData(uint uFormat, IntPtr data);
+        private const uint CF_UNICODETEXT = 13;
+        public static bool CopyTextToClipboard(string text)
+        {
+            if (!OpenClipboard(IntPtr.Zero))
+            {
+                return false;
+            }
+            var global = Marshal.StringToHGlobalUni(text);
+            var ret = SetClipboardData(CF_UNICODETEXT, global);
+            CloseClipboard();
+            return ret;
+        }
+
+        #endregion
     }
 }

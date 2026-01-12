@@ -7,10 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+
 using LibraryStudio.Forms.MarcControlDialog;
-using NUnit.Framework.Constraints;
 using static LibraryStudio.Forms.MarcField;
-using static LibraryStudio.Forms.MarcRecord;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -106,6 +105,12 @@ namespace LibraryStudio.Forms
             MoveCaret(info);
             _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
 
+            // 2026/1/11
+            ChangeSelection(() =>
+            {
+                this._selectOffs1 = info.Offs;
+                this._selectOffs2 = info.Offs;
+            });
             return true;
 #if OLD
             // TODO: 改写函数，单独执行 back space 功能
@@ -222,7 +227,7 @@ namespace LibraryStudio.Forms
 
             var delay = _keySpeedDetector.Detect();
             // TODO: 可以考虑增加一个功能，Ctrl+Delete 删除一个 char。而不是删除一个不可分割的 cluster(cluster 可能包含若干个 char)
-            if (info.Offs < _content_length)
+            if (info.Offs < _record.TextLength/*_content_length*/)
             {
                 if (style.HasFlag(DeleteKeyStyle.DeleteKeyAsDeleteField))
                 {
@@ -314,6 +319,13 @@ namespace LibraryStudio.Forms
                 MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
+            // 2026/1/11
+            // 把 selection start end 设置为 _caretInfo.CaretOffs
+            ChangeSelection(() =>
+            {
+                this._selectOffs1 = _caretInfo.Offs;
+                this._selectOffs2 = _caretInfo.Offs;
+            });
             return true;
 #if OLD
             // TODO: 改写函数，单独执行 delete char 功能
@@ -552,9 +564,6 @@ namespace LibraryStudio.Forms
     new string(PaddingChar, 5) + ch.ToString(),
     delay_update: delay,
     auto_adjust_caret_and_selection: false);
-                        // 修改后，插入符定位到头标区下一字段的开头
-                        //SetCaretOffs(24);
-                        MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
                     else
                     {
@@ -564,10 +573,19 @@ namespace LibraryStudio.Forms
                             ch.ToString(),
                             delay_update: delay,
                             auto_adjust_caret_and_selection: false);
-                        // 修改后，插入符定位到头标区下一字段的开头
-                        //SetCaretOffs(24);
-                        MoveCaret(HitByCaretOffs(24 + 1, -1));
                     }
+
+                    // 修改后，插入符定位到头标区下一字段的开头
+                    //SetCaretOffs(24);
+                    MoveCaret(HitByCaretOffs(24 + 1, -1));
+
+                    // 2026/1/11
+                    // 把 selection start end 设置为 _caretInfo.CaretOffs
+                    ChangeSelection(() =>
+                    {
+                        this._selectOffs1 = _caretInfo.Offs;
+                        this._selectOffs2 = _caretInfo.Offs;
+                    });
                 }
                 else if (info.ChildIndex == 0 && info.TextIndex < 24)
                 {
@@ -601,6 +619,14 @@ namespace LibraryStudio.Forms
 
                     //SetCaretOffs(24);
                     MoveCaret(HitByCaretOffs(24 + 1, -1));
+
+                    // 2026/1/11
+                    // 把 selection start end 设置为 _caretInfo.CaretOffs
+                    ChangeSelection(() =>
+                    {
+                        this._selectOffs1 = _caretInfo.Offs;
+                        this._selectOffs2 = _caretInfo.Offs;
+                    });
                 }
                 else
                 {
@@ -1250,6 +1276,7 @@ namespace LibraryStudio.Forms
                 auto_adjust_caret_and_selection: true,   // 这里必须要自动调整选择范围，因为这一次 undo 插入的内容可能会把原有的 selection range 挤到后面。如果不自动调整，当后面 InvalidateSelectionRegion() 的时候就会造成刷新不干净，会残留 selection 图像
                 add_history: false);
             Select(start, start + action.OldText.Length, start);
+            EnsureCaretVisible();
             return true;
         }
 
@@ -1384,19 +1411,6 @@ namespace LibraryStudio.Forms
                 new CommandItem() { Caption="-" },
                 new CommandItem()
                 {
-                    Caption="归一化(&N)",
-                    KeyData=Keys.Control | Keys.N,
-                    Handler=(s,e) => this.NormalizeSelectedText(),
-                    CanExecute=()=> this.HasSelection(),
-                },
-                new CommandItem()
-                {
-                    Caption="显示十六进制",
-                    Handler=(s,e) => this.DisplayHex(),
-                    CanExecute=()=> this.HasSelection(),
-                },
-                new CommandItem()
-                {
                     Caption="原始剪切",
                     // 不设置快捷键（若需要可添加）
                     Handler=(s,e) => this.RawCut(),
@@ -1407,6 +1421,21 @@ namespace LibraryStudio.Forms
                     Caption="原始粘贴",
                     Handler=(s,e) => this.RawPaste(),
                     CanExecute=()=> this.CanPaste(),
+                },
+
+                new CommandItem() { Caption="-" },
+                new CommandItem()
+                {
+                    Caption="归一化(&N)",
+                    KeyData=Keys.Control | Keys.N,
+                    Handler=(s,e) => this.NormalizeSelectedText(),
+                    CanExecute=()=> this.HasSelection(),
+                },
+                new CommandItem()
+                {
+                    Caption="显示十六进制",
+                    Handler=(s,e) => this.DisplayHex(),
+                    CanExecute=()=> this.HasSelection(),
                 },
                 new CommandItem() { Caption="-" },
 
@@ -1455,7 +1484,26 @@ namespace LibraryStudio.Forms
                     CanExecute=()=> true,
                 },
                 new CommandItem() { Caption="-" },
+                // 突出显示空格
 
+                new CommandItem()
+                {
+                    Refresh = (o)=>{
+                        o.Checked = this.HighlightBlankChar != ' ';
+                        return null;
+                    },
+                    Caption="突出显示空格",
+                    Handler= (s, e)=>{
+                        if (this.HighlightBlankChar == ' ')
+                        {
+                            this.HighlightBlankChar = '·';
+                        }
+                        else
+                        {
+                            this.HighlightBlankChar =' ';
+                        }
+                    },
+                },
                 // 
                 new CommandItem()
                 {
@@ -2090,7 +2138,7 @@ namespace LibraryStudio.Forms
         public static string ToHex(string text, string sep = "")
         {
             var result = new StringBuilder();
-            foreach(var ch in text)
+            foreach (var ch in text)
             {
                 if (text.Length > 0 && string.IsNullOrEmpty(sep) == false)
                     result.Append(sep);

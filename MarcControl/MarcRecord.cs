@@ -14,7 +14,7 @@ namespace LibraryStudio.Forms
     /// 一个 MARC 记录编辑区域
     /// 由若干 MarcField 构成
     /// </summary>
-    public class MarcRecord : IBox, IEnumerable<MarcField>
+    public class MarcRecord : IBox, IEnumerable<MarcField>, IDisposable
     {
         public string Name { get; set; }
 
@@ -240,7 +240,7 @@ namespace LibraryStudio.Forms
 
         public void Clear()
         {
-            _fields.Clear();
+            DisposeFields();
         }
 
         int _blankLineHeigh = 0;
@@ -927,6 +927,7 @@ namespace LibraryStudio.Forms
                 && old_fields.Count == 1)
             {
                 first_paragraph_index++;
+                // old_fields[0]?.Dispose();
                 old_fields.RemoveAt(0);
                 left_text = "";
                 right_text = "";
@@ -1104,6 +1105,8 @@ namespace LibraryStudio.Forms
             int old_max = old_fields.Count == 0 ? 0 : old_fields.Max(p => p.GetPixelWidth());
             if (old_max > max_update_width)
                 max_update_width = old_max;
+
+            RemoveFields(old_fields, 0, old_fields.Count);
 
             new_h = new_fields.Sum(p => p.GetPixelHeight());
 
@@ -1924,7 +1927,7 @@ i == caret_field_index);
             }
 
             if (old_lines.Count > 0)
-                _fields.RemoveRange(first_line_index, old_lines.Count);
+                RemoveFields(first_line_index, old_lines.Count);
             if (new_fields.Count > 0)
             {
                 Debug.Assert(first_line_index >= 0);
@@ -2716,19 +2719,6 @@ out int max_pixel_width)
             }
         }
 
-        /*
-        public void RemoveField(int index)
-        {
-            _fields.RemoveAt(index);
-
-            // TODO: 更新显示
-        }
-
-        public void RemoveField(MarcField field)
-        {
-            _fields.Remove(field);
-        }
-        */
 
         // 获得一个字段的 offs 起止范围
         public bool GetFieldOffsRange(MarcField field,
@@ -3076,6 +3066,34 @@ out int count)
             temp.AddRange(list.Select(o => o.Item2));
             _fields = temp;
             return true;
+        }
+
+        public void Dispose()
+        {
+            DisposeFields();
+        }
+
+        void DisposeFields()
+        {
+            if (_fields == null)
+                return;
+            foreach(var field in _fields)
+            {
+                field?.Dispose();
+            }
+
+            _fields.Clear();
+        }
+
+        // 避免 field 没有 Dispose() 就删除
+        static void RemoveFields(List<MarcField> fields, int start, int count)
+        {
+            for(int i=start; i<start+count; i++)
+            {
+                fields[i]?.Dispose();
+            }
+
+            fields.RemoveRange(start, count);
         }
     }
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-
+using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Usp10;
 
@@ -11,7 +11,7 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 一个最小文字单元
     /// </summary>
-    public class Range : IBox
+    public class Range : IBox, IDisposable
     {
         public string Name { get; set; }
 
@@ -23,7 +23,33 @@ namespace LibraryStudio.Forms
         public SCRIPT_ANALYSIS a;   // 从 this.Item.a 复制过来
 
         // 记载 ScriptShape() 实际用到的字体
-        public Font Font { get; set; }
+        Font _font = null;
+        public Font Font
+        {
+            get
+            {
+                return _font;
+            }
+            set
+            {
+                _font = value;
+            }
+        }
+
+        IntPtr _font_handle = IntPtr.Zero;
+        /*
+        public IntPtr FontHandle
+        {
+            get
+            {
+                if (_font_handle == IntPtr.Zero)
+                {
+                    _font_handle = _font?.ToHfont() ?? IntPtr.Zero;
+                }
+                return _font_handle;
+            }
+        }
+        */
 
         private string _text;
         public string Text
@@ -189,6 +215,7 @@ namespace LibraryStudio.Forms
                     {
                         return context?.GetFont?.Invoke(this, this.Tag);
                     },
+                    context,
                     dc,
                     pixel_width);
             }
@@ -215,6 +242,7 @@ namespace LibraryStudio.Forms
 
         void Refresh(
     GetFontFunc func_getfont,
+    IContext context,
     SafeHDC hdc,
     int pixel_width)
         {
@@ -226,6 +254,7 @@ namespace LibraryStudio.Forms
                 var a = range.a;
                 Line.ShapeAndPlace(
                     func_getfont,
+                    context,
                     hdc,
                     ref a,
                     cache,
@@ -547,7 +576,7 @@ namespace LibraryStudio.Forms
                 Debug.Assert(rect.IsEmpty == false);
                 // TODO: 移入 Metrics 中
                 // 代表回车换行符号字符的像素宽度
-                
+
                 rect.Width += FontContext.DefaultReturnWidth;
             }
 
@@ -588,7 +617,16 @@ namespace LibraryStudio.Forms
 
         public virtual void ClearCache()
         {
-            
+
+        }
+
+        public void Dispose()
+        {
+            if (_font_handle != IntPtr.Zero)
+            {
+                Gdi32.DeleteObject(_font_handle);
+                _font_handle = IntPtr.Zero;
+            }
         }
 
         public float BaseLine
