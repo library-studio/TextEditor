@@ -4,10 +4,11 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-
 using Vanara.PInvoke;
 using static System.Windows.Forms.LinkLabel;
 using static Vanara.PInvoke.Gdi32;
+using static Vanara.PInvoke.Imm32;
+using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
@@ -1169,8 +1170,86 @@ IContext context)
             //return RefreshLine(dc, this, pixel_width);
         }
 
+#if REF
+        public static string ReplaceMissingGlyphs(
+            string text,
+            ushort[] glfs)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < glfs.Length; i++)
+            {
+                if (glfs[i] == 0)
+                    sb.Append('\uFFFD'); // 替代字符
+                else
+                    sb.Append(text[i]);
+            }
+            return sb.ToString();
+        }
+#endif
 
-        public static void ShapeAndPlace(
+        public static int[] CodePoints(/*this*/ string s)
+        {
+            var codePoints = new List<int>();
+            for (int i = 0; i < s.Length; i += char.IsSurrogatePair(s, i) ? 2 : 1)
+            {
+                codePoints.Add(char.ConvertToUtf32(s, i));
+            }
+
+            return codePoints.ToArray();
+        }
+
+        // 将字符串中缺失字形的字符替换为替代字符 '�'
+        public static string ReplaceMissingGlyphs(
+            SafeHDC dc,
+            Font font,
+            string text)
+        {
+            if (font == null)
+                return new string('�', text.Length);
+            var font_handle = font.ToHfont();
+            try
+            {
+                var result = new StringBuilder();
+                // var handle = Gdi32.SelectObject(dc, font.ToHfont());
+                using (var dc_context = dc.SelectObject(font_handle))
+                {
+                    int[] cps = CodePoints(text);
+                    foreach (int cp in cps)
+                    {
+                        // GetGlyphIndices: maps characters to glyph indices for the selected HFONT
+                        ushort[] outGlyphs = new ushort[1];
+                        uint res = GetGlyphIndices(dc, char.ConvertFromUtf32(cp), 1, outGlyphs, 0);
+                        // According to MSDN: returns GDI_ERROR (0xFFFFFFFF) on failure. outGlyphs contains glyph indices; 0xFFFF (65535) may indicate missing.
+                        bool glyphAvailable = true;
+                        if (res == 0xFFFFFFFF) glyphAvailable = false;
+                        else
+                        {
+                            // If glyph index equals 0xFFFF, treat as missing per common practice.
+                            if (outGlyphs[0] == 0xFFFF) glyphAvailable = false;
+                            // Some fonts may map missing glyph to 0 (glyph 0 usually .notdef); treat 0 as missing as well.
+                            if (outGlyphs[0] == 0) glyphAvailable = false;
+                        }
+
+                        if (glyphAvailable)
+                            result.Append(char.ConvertFromUtf32(cp));
+                        else
+                            result.Append('�'); // 替代字符
+
+                    }
+                    return result.ToString();
+                }
+            }
+            finally
+            {
+                Gdi32.DeleteFont(font_handle);
+            }
+        }
+
+        // return:
+        //      0   成功
+        //      1   发现部分字符缺乏字形。需要调主把这些字符替换以后，重新执行 ScriptItemize()，有可能切割为多个 Range，再来调用本函数
+        //          此时如果 used_font 不为 null，则表明 used_font 中返回了缺乏字形最少的一个字体
+        public static int ShapeAndPlace(
             GetFontFunc func_getfont,
             IContext context,
             SafeHDC dc,
@@ -1185,7 +1264,9 @@ IContext context)
             out ushort[] log,
             ref Font used_font)
         {
-            var max = (int)Math.Round(str.Length * 1.5m + 16);
+            var max = (int)Math.Round(str.Length * 1.5m + 16);  // 1.5m
+            int redo_count = 0;
+        REDO:
             glfs = new ushort[max];
             log = new ushort[str.Length];
             sva = new SCRIPT_VISATTR[max];
@@ -1206,6 +1287,8 @@ IContext context)
                 */
             }
 
+            var partial_fonts = new List<Tuple<Font, int>>();
+
             foreach (var font in fonts)
             {
                 // Основний курс української мови 中的 ї 是乌克兰语中特有的字符，基里尔文字中没有这个字符
@@ -1215,8 +1298,8 @@ IContext context)
                 if (FontContext.CheckSupporting(font, sa.eScript) == false)
                     continue;
 
-                IntPtr font_handle = context.GetFontHandle(font);
-                // var font_handle = font.ToHfont();
+                // IntPtr font_handle = context.GetFontHandle(font);
+                var font_handle = font.ToHfont();
                 try
                 {
                     // var handle = Gdi32.SelectObject(dc, font.ToHfont());
@@ -1237,14 +1320,30 @@ IContext context)
                         if (result == USP_E_SCRIPT_NOT_IN_FONT)
                             continue;
 
+                        if (result == HRESULT.E_OUTOFMEMORY)
+                        {
+                            if (redo_count < 10)
+                            {
+                                max += str.Length;
+                                redo_count++;
+                                goto REDO;
+                            }
+                        }
                         result.ThrowIfFailed();
 
                         Array.Resize(ref glfs, c);
 
                         // 检查是否有空的字形
                         // TODO: 记下最少空字形的一轮，以便最后采纳
-                        if (glfs.Where(g => g == 0).Any())
+                        var null_count = glfs.Where(g => g == 0).Count();
+                        if (null_count > 0)
+                        {
+                            if (null_count < str.Length)
+                            {
+                                partial_fonts.Add(new Tuple<Font, int>(font, null_count));
+                            }
                             continue;
+                        }
 
                         if (used_font == null)
                             used_font = font; // 记录实际使用的字体
@@ -1264,16 +1363,46 @@ IContext context)
                             out pABC);
                         result.ThrowIfFailed();
 
-                        return;
+                        return 0;
                     }
                 }
                 finally
                 {
-                    // Gdi32.DeleteFont(font_handle);
+                    Gdi32.DeleteFont(font_handle);
                 }
             }
 
-            throw new Exception($"字符串 '{str}' 中出现了无法显示的字形");
+            if (partial_fonts.Count > 0)
+            {
+                partial_fonts.Sort((a, b) => a.Item2 - b.Item2);    // 排序，数量少的在前
+                var temp_font = partial_fonts[0].Item1;
+                if (used_font == null)
+                    used_font = temp_font; // 记录实际使用的字体
+            }
+            else
+            {
+                used_font = null;
+            }
+
+            piAdvance = null;
+            pABC = new ABC();
+            pGoffset = null;
+            return 1;
+            // 显示为替代字符
+
+            /*
+•	首选：U+FFFD REPLACEMENT CHARACTER（字符：�）——标准、跨平台、语义明确，操作系统/工具链通常也用它表示“无法解码/缺失字形”。
+•	备选：U+25A1 WHITE SQUARE / U+25A0 BLACK SQUARE（□/■）或字体“tofu”空心方框 —— 在视觉上更醒目，便于快速定位。
+•	空白类（仅针对空格不可显示）：U+2423 OPEN BOX（␣）或 U+00B7 MIDDLE DOT（·）。（但空格可视化建议与正文“渲染层替换”分开处理）
+            * */
+            string Replace(string t)
+            {
+                return new string(' ', t.Length);
+
+                return new string('�', t.Length);
+            }
+
+            // throw new Exception($"字符串 '{str}' 中出现了无法显示的字形");
         }
 
 
@@ -1320,7 +1449,7 @@ IContext context)
                 Font used_font = range.Font;
                 var cache = new SafeSCRIPT_CACHE();
                 var a = range.a;
-                ShapeAndPlace(
+                var ret = ShapeAndPlace(
                     func_getfont,
                     context,
                     hdc,
@@ -1334,6 +1463,13 @@ IContext context)
                     out SCRIPT_VISATTR[] sva,
                     out ushort[] log,
                     ref used_font);
+                if (ret == 1)
+                {
+                    // ScriptItemize()
+                    // TODO: 这里会返回 1 么?
+                    throw new NotImplementedException();
+                }
+
                 if (range.Font == null)
                     range.Font = used_font; // 记录实际使用的字体
 
@@ -2576,7 +2712,7 @@ clipRect);
         {
             if (Ranges == null)
                 return;
-            foreach(var range in Ranges)
+            foreach (var range in Ranges)
             {
                 range.Dispose();
             }

@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 
 using Vanara.PInvoke;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Usp10;
 
@@ -403,6 +405,7 @@ namespace LibraryStudio.Forms
                 return new List<Line> { new Line(parent) };
             }
 
+#if REMOVED
             var contents = context?.SplitRange?.Invoke(parent, content)
                 ?? new Segment[] {
                     new Segment
@@ -488,6 +491,21 @@ tags,
 pixel_width,
 parent,
 out int new_width);
+
+#endif
+            var items = Itemize(
+    context,
+    dc,
+    content,
+    parent,
+    true,
+    null);
+            var lines = SplitLines(dc,// e.Graphics.GetHdc(),
+    context,
+items,
+pixel_width,
+parent,
+out int new_width);
             if (new_width > max_pixel_width)
                 max_pixel_width = new_width;
             return lines;
@@ -497,6 +515,117 @@ out int new_width);
                 return context?.ConvertText?.Invoke(t) ?? t;
             }
         }
+
+        class ScriptItem
+        {
+            public SCRIPT_ITEM Item { get; set; }
+            public string Chunk { get; set; }
+
+            public object Tag { get; set; }
+        }
+
+        static List<ScriptItem> Itemize(
+            IContext context,
+            SafeHDC dc,
+            string content,
+            IBox parent,
+            bool split_range,
+            object default_tag)
+        {
+            // InitializeUspEnvironment();
+            if (content == null)
+            {
+                return new List<ScriptItem>();
+            }
+
+            if (string.IsNullOrEmpty(content))
+            {
+                return new List<ScriptItem>();
+            }
+
+            var contents = split_range && context?.SplitRange != null ? context?.SplitRange?.Invoke(parent, content)
+                : new Segment[] {
+                    new Segment
+                    {
+                        Text = content,
+                        Tag = default_tag
+                    }
+                };
+
+            var result_items = new List<ScriptItem>();
+            foreach (var seg in contents)
+            {
+                var segment = seg.Text;
+                int cMaxItems = segment.Length + 1;
+                var pItems = new SCRIPT_ITEM[cMaxItems + 1];
+
+                /*
+                 * 
+
+    返回值
+    如果成功，则返回 0。 如果函数不成功，则返回非零 HRESULT 值。
+
+    如果 pwcInChars 设置为 NULL、 cInChars 为 0、 pItems 设置为 NULL 或 cMaxItems< 2，则该函数将返回E_INVALIDARG。
+
+    如果 cMaxItems 的值不足，函数将返回E_OUTOFMEMORY。 与所有错误情况一样，不会完全处理任何项，并且输出数组中没有任何部分包含定义的值。 如果函数返回E_OUTOFMEMORY，则应用程序可以使用更大的 pItems 缓冲区再次调用它。
+                * */
+                var result = ScriptItemize(convertText(segment),
+                    segment.Length,
+                    cMaxItems,
+                    sc,
+                    ss,
+                    pItems,
+                    out int pcItems);
+                result.ThrowIfFailed();
+
+                Array.Resize(ref pItems, pcItems);
+                /*
+                for (int i = 0; i < pcItems; i++)
+                {
+                    var item = pItems[i];
+                    if (sp[item.a.eScript].fComplex)
+                    {
+                        // requiring glyph shaping
+                    }
+                    else
+                    {
+
+                    }
+                }
+                */
+
+                int start_index = 0;
+                for (int i = 0; i < pItems.Length; i++)
+                {
+                    var item = pItems[i];
+
+                    // 析出本 item 的文字
+                    string str = "";
+                    if (i >= pItems.Length - 1)
+                        str = segment.Substring(start_index);
+                    else
+                    {
+                        int length = pItems[i + 1].iCharPos - item.iCharPos;
+                        str = segment.Substring(start_index, length);
+                    }
+
+                    result_items.Add(new ScriptItem {
+                        Item = item,
+                        Chunk = str,
+                        Tag = seg.Tag
+                    });
+                    start_index += str.Length;
+                }
+            }
+
+            return result_items;
+
+            string convertText(string t)
+            {
+                return context?.ConvertText?.Invoke(t) ?? t;
+            }
+        }
+
 
         float _baseLine;
         float _below;
@@ -552,6 +681,7 @@ out int new_width);
                 return 0;
             }
 
+#if REMOVED
             Segment[] contents = context?.SplitRange?.Invoke(this, content)
                 ?? new Segment[] {
                     new Segment
@@ -643,6 +773,25 @@ out int new_width);
                     max_pixel_width = new_width;
                 _lines.AddRange(lines);
             }
+#endif
+            int max_pixel_width = 0;
+
+            var items = Itemize(
+context,
+dc,
+content,
+this,
+true,
+null);
+            var lines = SplitLines(dc,// e.Graphics.GetHdc(),
+    context,
+items,
+pixel_width,
+this,
+out int new_width);
+            if (new_width > max_pixel_width)
+                max_pixel_width = new_width;
+            _lines.AddRange(lines);
 
             ProcessBaseline();
             return max_pixel_width;
@@ -653,12 +802,11 @@ out int new_width);
             }
         }
 
+        // parameters:
+        //      chunkes 分片的原始文字
         static List<Line> SplitLines(SafeHDC dc,
             IContext context,
-            // GetFontFunc func_getfont,
-            SCRIPT_ITEM[] pItems,
-            List<string> chunks,
-            List<object> tags,
+            List<ScriptItem> items,
             int line_width,
             IBox parent,
             out int max_pixel_width)
@@ -671,37 +819,60 @@ out int new_width);
             Line line = new Line(parent);
             long start_pixel = 0;
 
-            for (int i = 0; i < pItems.Length; i++)
+            for (int i = 0; i < items.Count; i++)
             {
-                var item = pItems[i];
+                var data = items[i];
+                var item = data.Item;
 
                 // 析出本 item 的文字
-                string str = chunks[i];
-                var tag = tags[i];
+                string str = data.Chunk;
+                var tag = data.Tag;
 
                 {
                     Font used_font = null;
                     string text = str;
+                    var replaced = context?.ConvertText?.Invoke(text) ?? text;
                     for (; ; )
                     {
-
                         // 寻找可以 break 的位置
                         // return:
-                        //      返回 text 中可以切割的 index 位置。如果为 -1，表示没有找到可以切割的位置。
+                        //      返回 text 中可以切割的 index 位置。如果为 -1，表示 str 中发现了无法显示的字符。
                         var pos = BreakItem(
-                            (p, o) =>
-                            {
-                                return context?.GetFont?.Invoke(parent, tag);
-                            },
-                            context,
-                            dc,
-                            item,
-        context?.ConvertText?.Invoke(text) ?? text,
-        (line_width == -1 ? int.MaxValue : line_width) - start_pixel,
-        start_pixel == 0,
-        out int left_width,
-        out int abcC,
-        ref used_font);
+                        (p, o) =>
+                        {
+                            return context?.GetFont?.Invoke(parent, tag);
+                        },
+                        context,
+                        dc,
+                        item,
+    replaced,
+    (line_width == -1 ? int.MaxValue : line_width) - start_pixel,
+    start_pixel == 0,
+    out int left_width,
+    out int abcC,
+    ref used_font);
+                        if (pos == -1)
+                        {
+                            // s 需要替换无法显示的字符，并且重新 Itemize
+                            replaced = Line.ReplaceMissingGlyphs(
+            dc,
+            used_font,
+            replaced);
+                            // TODO: 重新 Itemize，修改 pItems
+                            var new_items = Itemize(
+context,
+dc,
+replaced,
+parent,
+false,
+tag);
+                            // TODO: 要把 new_item.Chunk 重新设置回原始内容
+                            items.RemoveAt(i);
+                            items.InsertRange(i, new_items);
+                            i--;
+                            break;
+                        }
+
 
                         // 从 pos 位置开始切割
                         Debug.Assert(pos >= 0 && pos <= text.Length, "pos must be within the bounds of the text string.");
@@ -731,10 +902,13 @@ out int new_width);
                                 line = new Line(parent);
                                 // line.ConvertText = func_convertText;
                             }
-                            line.Ranges.Add(NewRange(text.Substring(0, pos), left_width));
+                            line.Ranges.Add(NewRange(text.Substring(0, pos),
+                                replaced.Substring(0, pos),
+                                left_width));
                             start_pixel += left_width;
 
                             text = text.Substring(pos);
+                            replaced = replaced.Substring(pos);
                             if (string.IsNullOrEmpty(text))
                                 break;
                         }
@@ -757,7 +931,10 @@ out int new_width);
                             */
                         }
 
-                        RangeWrapper NewRange(string t, int w)
+                        // t 是原始内容，r 是替换后的内容
+                        RangeWrapper NewRange(string t,
+                            string r,
+                            int w)
                         {
                             var range = new RangeWrapper
                             {
@@ -765,7 +942,191 @@ out int new_width);
                                 a = item.a,
                                 Font = used_font,
                                 Text = t,
-                                DisplayText = context?.ConvertText?.Invoke(t) ?? t,
+                                DisplayText = r,    // context?.ConvertText?.Invoke(t) ?? t,
+                                PixelWidth = w,
+                                Tag = tag,
+                            };
+                            return range;
+                        }
+                    }
+                }
+            }
+
+            if (line != null
+                && line.Ranges.Count > 0)
+            {
+                lines.Add(line);
+            }
+
+            max_pixel_width = 0;
+            foreach (var current_line in lines)
+            {
+                Line.LayoutLine(current_line);
+                // RefreshLine() 中不应该再出现缺失字形的情况了
+                var width = Line.RefreshLine(
+                    (p, o) =>
+                    {
+                        return context?.GetFont?.Invoke(current_line, current_line.Tag);
+                    },
+                    context,
+                    dc,
+                    current_line,
+                    line_width);
+                if (width > max_pixel_width)
+                    max_pixel_width = width;
+            }
+
+            /*
+            // _contentPixelWidth = pixel_width;
+            this.SetAutoSizeMode(AutoSizeMode.GrowAndShrink);
+            this.AutoScrollMinSize = new Size(pixel_width, line_height * lines.Count);
+            */
+            return lines;
+        }
+
+#if OLD
+        // parameters:
+        //      chunkes 分片的原始文字
+        static List<Line> SplitLines(SafeHDC dc,
+            IContext context,
+            // GetFontFunc func_getfont,
+            SCRIPT_ITEM[] pItems,
+            List<string> chunks,
+            List<object> tags,
+            int line_width,
+            IBox parent,
+            out int max_pixel_width)
+        {
+            if (sp == null)
+                throw new ArgumentException("Script properties not initialized.");
+
+            max_pixel_width = line_width;
+            List<Line> lines = new List<Line>();
+            Line line = new Line(parent);
+            long start_pixel = 0;
+
+            for (int i = 0; i < pItems.Length; i++)
+            {
+                var item = pItems[i];
+
+                // 析出本 item 的文字
+                string str = chunks[i];
+                var tag = tags[i];
+
+                {
+                    Font used_font = null;
+                    string text = str;
+                    var replaced = context?.ConvertText?.Invoke(text) ?? text;
+                    bool has_replaced = false;
+                    for (; ; )
+                    {
+                        // 只要发生过一次替换，那就表明多个 Range 无法共用同一个 font 了
+                        if (has_replaced)
+                            used_font = null;
+
+                        // 寻找可以 break 的位置
+                        // return:
+                        //      返回 text 中可以切割的 index 位置。如果为 -1，表示 str 中发现了无法显示的字符。
+                        var pos = BreakItem(
+                        (p, o) =>
+                        {
+                            return context?.GetFont?.Invoke(parent, tag);
+                        },
+                        context,
+                        dc,
+                        item,
+    replaced,
+    (line_width == -1 ? int.MaxValue : line_width) - start_pixel,
+    start_pixel == 0,
+    out int left_width,
+    out int abcC,
+    ref used_font);
+                        if (pos == -1)
+                        {
+                            // s 需要替换无法显示的字符，并且重新 Itemize
+                            replaced = Line.ReplaceMissingGlyphs(
+            dc,
+            used_font,
+            replaced);
+                            // TODO: 重新 Itemize，修改 pItems
+
+
+                            used_font = null;
+                            has_replaced = true;
+                            // TODO: 这里要检测和防止无限循环。同一个内容只允许 redo 一次
+                            continue;
+                        }
+
+
+                        // 从 pos 位置开始切割
+                        Debug.Assert(pos >= 0 && pos <= text.Length, "pos must be within the bounds of the text string.");
+
+                        // 剩下的右侧空位，连安放一个字符也不够，那么就先换行
+                        if (pos == 0 && line.Ranges.Count > 0)
+                        {
+                            // 折行
+                            lines.Add(line);
+                            line = new Line(parent);
+                            // line.ConvertText = func_convertText;
+                            start_pixel = 0;
+                            continue;
+                        }
+
+                        if (pos == 0)
+                        {
+                            // throw new Exception();
+                            pos = 1;
+                        }
+
+                        // 左边部分
+                        if (pos > 0)
+                        {
+                            if (line == null)
+                            {
+                                line = new Line(parent);
+                                // line.ConvertText = func_convertText;
+                            }
+                            line.Ranges.Add(NewRange(text.Substring(0, pos),
+                                replaced.Substring(0, pos),
+                                left_width));
+                            start_pixel += left_width;
+
+                            text = text.Substring(pos);
+                            replaced = replaced.Substring(pos);
+                            if (string.IsNullOrEmpty(text))
+                                break;
+                        }
+
+                        if (/*start_pixel >= line_width &&*/ line.Ranges.Count > 0)
+                        {
+                            // 折行
+                            lines.Add(line);
+                            line = new Line(parent);
+                            // line.ConvertText = func_convertText;
+                            start_pixel = 0;
+
+                            /*
+                            if (line == null)
+                                line = new Line { Ranges = new List<Range>() };
+
+                            line.Ranges.Add(NewRange(text, left_width));
+                            start_pixel += (int)left_width;
+                            break;
+                            */
+                        }
+
+                        // t 是原始内容，r 是替换后的内容
+                        RangeWrapper NewRange(string t,
+                            string r,
+                            int w)
+                        {
+                            var range = new RangeWrapper
+                            {
+                                Item = item,
+                                a = item.a,
+                                Font = used_font,
+                                Text = t,
+                                DisplayText = r,    // context?.ConvertText?.Invoke(t) ?? t,
                                 PixelWidth = w,
                                 Tag = tag,
                             };
@@ -805,7 +1166,7 @@ out int new_width);
             */
             return lines;
         }
-
+#endif
 
 #if REMOVED
         List<Line> SplitLines(SafeHDC dc,
@@ -943,7 +1304,7 @@ out int new_width);
 #endif
 
         // return:
-        //      返回 text 中可以切割的 index 位置。如果为 -1，表示没有找到可以切割的位置。
+        //      返回 text 中可以切割的 index 位置。如果为 -1，表示 str 中发现了无法显示的字符。
         static int BreakItem(
             GetFontFunc func_getfont,
             IContext context,
@@ -962,20 +1323,25 @@ out int new_width);
             used_font = null;
             var cache = new SafeSCRIPT_CACHE();
             var a = item.a;
-            Line.ShapeAndPlace(
+            var ret = Line.ShapeAndPlace(
                 func_getfont,
                 context,
                 dc,
                 ref a,
                 cache,
-str,
-out ushort[] glfs,
-out int[] piAdvance,
-out _, // GOFFSET[] pGoffset,
-out ABC pABC,
-out _,  //SCRIPT_VISATTR[] sva,   // 中间有关于 ZeroWidth 的信息
-out ushort[] log,
-ref used_font);
+                str,
+                out ushort[] glfs,
+                out int[] piAdvance,
+                out _, // GOFFSET[] pGoffset,
+                out ABC pABC,
+                out _,  //SCRIPT_VISATTR[] sva,   // 中间有关于 ZeroWidth 的信息
+                out ushort[] log,
+                ref used_font);
+            if (ret == 1)
+            {
+                return -1;
+            }
+
             //    item.a = a;
             left_width = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
             if (is_left_most && pABC.abcA < 0)

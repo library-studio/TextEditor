@@ -53,8 +53,8 @@ namespace MarcSample
             //this.marcControl1.Content = new string((char)31, 1) + "1";
             // this.marcControl1.Content = "ش12345678901234567890123";
             // this.marcControl1.Content = "012345678901234567890123";
-            // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB شلاؤيث ฟิแกำดเ 中文 english\u001e100  \u001fatest333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333";
-            this.marcControl1.Content = "01234567890123456789";
+            this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB شلاؤيث ฟิแกำดเ 中文 english\u001e100  \u001fatest3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333￮﨩\u001d\u001e\u001f33333333";
+            // this.marcControl1.Content = "01234567890123456789";
             this.marcControl1.PadWhileEditing = false;
             // this.marcControl1.PaddingChar = '*';
 
@@ -229,7 +229,7 @@ namespace MarcSample
 
         void LoadMarc()
         {
-            //return;
+            return;
             try
             {
                 var path = GetMarcFileName();
@@ -247,7 +247,7 @@ namespace MarcSample
 
         void SaveMarc()
         {
-            //return;
+            return;
             var path = GetMarcFileName();
             File.WriteAllText(path, this.marcControl1.Content);
         }
@@ -337,5 +337,38 @@ namespace MarcSample
         }
 
         #endregion
+
+
+        // 测试随机发生的字符串
+        private void MenuItem_test_randomChars_Click(object sender, EventArgs e)
+        {
+            char startChar = (char)0x20;
+            int count = 1000;
+
+            for (int i = 0; i < 10; i++)
+            {
+                var text = BuildTestContent(startChar, count);
+                this.marcControl1.Content = text.ToString();
+                startChar += (char)count;
+                if (startChar > 0x9FA5)
+                    startChar = (char)0x20;
+
+                Thread.Sleep(500);
+            }
+        }
+
+        static string BuildTestContent(char startChar, int count)
+        {
+            var text = new StringBuilder();
+            for (int i = 0; i < count; i++)
+            {
+                var ch = (char)((int)startChar + i);
+                text.Append(ch);
+                if ((i % 1000) == 0)
+                    text.Append((char)30);
+            }
+
+            return text.ToString();
+        }
     }
 }

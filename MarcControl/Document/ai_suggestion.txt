@@ -1,0 +1,49 @@
+深呼吸一下，然后分步回答。
+
+结论（优先级建议）
+- 首选：U+FFFD REPLACEMENT CHARACTER（字符：�）——标准、跨平台、语义明确，操作系统/工具链通常也用它表示“无法解码/缺失字形”。  
+- 备选：U+25A1 WHITE SQUARE / U+25A0 BLACK SQUARE（□/■）或字体“tofu”空心方框 —— 在视觉上更醒目，便于快速定位。  
+- 空白类（仅针对空格不可显示）：U+2423 OPEN BOX（␣）或 U+00B7 MIDDLE DOT（·）。（但空格可视化建议与正文“渲染层替换”分开处理）
+
+理由（要点）
+- 语义：U+FFFD 是 Unicode 定义用于替换不可表示字符的标准码位，用户、开发者和调试工具都能理解。  
+- 可见性：白方块/实心方块比 U+FFFD 更醒目，但可能破坏阅读体验。  
+- 不破坏数据：请在“渲染/绘制”层替代显示，而不要把替代字符写回文本（避免改变复制、搜索、语义）。
+
+实作建议（与当前代码库匹配）
+1. 在遇到 ScriptShape/ShapeAndPlace 检测到缺失字形时，不要直接把替换字符插入文本；改为在绘制阶段绘制替代符号（U+FFFD 或方框）。这与项目中多处注释（“显示为替代字符” / 抛异常处）语义一致且更安全。  
+2. 绘制细节：用与正文相同字号的字体，但用可配置颜色（如浅红或灰框），并在鼠标悬停时显示 tooltip（U+XXXX / 字形信息）。  
+3. 可配置化：提供用户选项（替代符号：U+FFFD / □ / · / 不显示；颜色；仅缺失字形显示 vs 所有不可见字符显示）。  
+4. 优先尝试字体回退：在 ShapeAndPlace 中先用字体组逐个尝试；若全部失败，再采取“绘制替代符”策略。
+
+示例：在 `TextControl\Line.cs` 中添加一个小工具函数（只负责返回推荐替代字符串），并在 ShapeAndPlace 无法找到字形时用它在绘制层显示（不改文本）：
+
+```csharp
+csharp TextControl\Line.cs
+// 在 Line 类中添加（靠近类开头的辅助常量/方法）
+static class Replacement
+{
+    // 推荐：U+FFFD REPLACEMENT CHARACTER
+    public const string Default = "\uFFFD";
+
+    // 备用：方块或中点
+    public const string WhiteBox = "\u25A1"; // □
+    public const string MiddleDot = "\u00B7"; // ·
+}
+```
+
+说明如何使用（实现步骤，不直接改写文本）：
+- 在 `ShapeAndPlace` 检测到所有候选字体都产生空字形（当前代码通过 glfs==0 或 partial_fonts 判断）且最终要“抛异常”的分支，不再抛出；而是记录该 range 需要“绘制替代符”标记（比如 `range.DisplayText = Replacement.Default; range.Font = fallbackFont;` 或在绘制时检测 `range.HasMissingGlyphs`）。  
+- 在 `Line.Paint` / `Range.Paint` 绘制文字前，若标记了“缺失字形”，使用 GDI 绘制 `Replacement.Default`（或用户配置的符号），并且可用不同颜色或边框强调。  
+- 同时为调试和可访问性，在 `Range.ColorCache` 或 tooltip 回调中提供缺失信息（U+XXXX, 代码点），便于用户识别问题来源。
+
+额外建议（用户体验）
+- 默认把替代符颜色设为半透明或浅灰，避免破坏阅读。  
+- 提供“显示不可见/替换字符”开关（默认关或默认只显示在不可显示字形处）。  
+- 在状态行或悬浮提示中显示缺失字形的 Unicode 码点和候选字体信息，方便修正字体配置。
+
+需要我做什么？
+- 如果你愿意，我可以给出一个完整的补丁片段（在 `ShapeAndPlace` 的抛异常处改为标记并在 `Paint` 中绘制替代符），并遵循项目风格把可配置项放到 `IContext`/`FontContext` 中。要我生成补丁吗？
+
+~~~
+

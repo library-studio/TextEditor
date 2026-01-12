@@ -120,6 +120,7 @@
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Document\ai_suggestion.txt" />
     <Content Include="Document\Design.txt" />
     <Content Include="Document\Keys.txt" />
     <None Include="Document\blank_char.md" />

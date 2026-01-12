@@ -252,7 +252,7 @@ namespace LibraryStudio.Forms
                 Font used_font = range.Font;
                 var cache = new SafeSCRIPT_CACHE();
                 var a = range.a;
-                Line.ShapeAndPlace(
+                var ret = Line.ShapeAndPlace(
                     func_getfont,
                     context,
                     hdc,
@@ -266,6 +266,11 @@ namespace LibraryStudio.Forms
                     out SCRIPT_VISATTR[] sva,
                     out ushort[] log,
                     ref used_font);
+                if (ret == 1)
+                {
+                    throw new ArgumentException($"内容 '{range.DisplayText}' 中出现了缺乏字形的字符");
+                }
+
                 if (range.Font == null)
                     range.Font = used_font; // 记录实际使用的字体
 
