@@ -35,9 +35,8 @@ namespace LibraryStudio.Forms
                 return false;
             }
 
-            if (HasSelection())
+            if (DeleteSelectionText())
             {
-                SoftlyRemoveSelectionText();
                 return true;
             }
 
@@ -101,16 +100,19 @@ namespace LibraryStudio.Forms
             // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
             _record.MoveByOffs(info.Offs + 1, -1, out info);
 
-            //SetCaretOffs(info.Offs);
-            MoveCaret(info);
+            //MoveCaret(info);
+            SetCaret(info);
+
             _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
 
+            /*
             // 2026/1/11
             ChangeSelection(() =>
             {
                 this._selectOffs1 = info.Offs;
                 this._selectOffs2 = info.Offs;
             });
+            */
             return true;
 #if OLD
             // TODO: 改写函数，单独执行 back space 功能
@@ -219,9 +221,8 @@ namespace LibraryStudio.Forms
             if (this._readonly)
                 return false;
 
-            if (HasSelection())
+            if (DeleteSelectionText())
             {
-                SoftlyRemoveSelectionText();
                 return true;
             }
 
@@ -315,7 +316,6 @@ namespace LibraryStudio.Forms
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                //SetCaretOffs(input_info.Caret);
                 MoveCaret(HitByCaretOffs(input_info.Caret));
             }
 
@@ -369,6 +369,18 @@ namespace LibraryStudio.Forms
 #endif
         }
 
+        bool DeleteSelectionText()
+        {
+            if (HasSelection() == false)
+                return false;
+            var block_start = Math.Min(this._selectOffs1, this._selectOffs2);
+            SoftlyRemoveSelectionText();    // 注意这个函数会改变传入的 info 参数
+
+            // 有时候在保护区域 SoftlyRemoveSelectionText() 之后还残留了块定义，需要先消除，避免影响后面的击键处理
+            SetCaret(HitByCaretOffs(block_start));
+            return true;
+        }
+
         // 处理输入字符
         public virtual bool ProcessInputChar(char ch, HitInfo info)
         {
@@ -382,8 +394,10 @@ namespace LibraryStudio.Forms
             // 检测键盘输入速度
             var delay = _keySpeedDetector.Detect();
 
-            if (HasSelection())
-                SoftlyRemoveSelectionText();
+            if (DeleteSelectionText())
+            {
+                info = _caretInfo; // 更新 info 参数
+            }
 
             var action = "input";
             if (ch == '\r')
@@ -576,9 +590,10 @@ namespace LibraryStudio.Forms
                     }
 
                     // 修改后，插入符定位到头标区下一字段的开头
-                    //SetCaretOffs(24);
-                    MoveCaret(HitByCaretOffs(24 + 1, -1));
+                    // MoveCaret(HitByCaretOffs(24 + 1, -1));
+                    SetCaret(HitByCaretOffs(24 + 1, -1));
 
+                    /*
                     // 2026/1/11
                     // 把 selection start end 设置为 _caretInfo.CaretOffs
                     ChangeSelection(() =>
@@ -586,6 +601,7 @@ namespace LibraryStudio.Forms
                         this._selectOffs1 = _caretInfo.Offs;
                         this._selectOffs2 = _caretInfo.Offs;
                     });
+                    */
                 }
                 else if (info.ChildIndex == 0 && info.TextIndex < 24)
                 {
@@ -617,9 +633,10 @@ namespace LibraryStudio.Forms
                     // 修改后，插入符定位到头标区下一字段的开头
                     // TODO: 使用 MoveGlobalOffsAndBlock(left.Length - old_left.Length + 1);
 
-                    //SetCaretOffs(24);
+                    //MoveCaret(HitByCaretOffs(24 + 1, -1));
                     MoveCaret(HitByCaretOffs(24 + 1, -1));
 
+                    /*
                     // 2026/1/11
                     // 把 selection start end 设置为 _caretInfo.CaretOffs
                     ChangeSelection(() =>
@@ -627,6 +644,7 @@ namespace LibraryStudio.Forms
                         this._selectOffs1 = _caretInfo.Offs;
                         this._selectOffs2 = _caretInfo.Offs;
                     });
+                    */
                 }
                 else
                 {
@@ -702,8 +720,12 @@ namespace LibraryStudio.Forms
             // 插入符 offs 需要特殊调整
             if (input_info.Caret != -1)
             {
-                //SetCaretOffs(input_info.Caret);
-                MoveCaret(HitByCaretOffs(input_info.Caret));
+                // MoveCaret(HitByCaretOffs(input_info.Caret));
+                SetCaret(HitByCaretOffs(input_info.Caret));
+            }
+            else
+            {
+                SetCaret(HitByCaretOffs(this._caret_offs));
             }
 
             // 向前移动一次 Caret

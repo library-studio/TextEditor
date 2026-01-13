@@ -28,6 +28,7 @@ namespace MarcSample
                     return $"头标区";
                 return $"获得 '{field.FieldName}' 的值";
             };
+
             this.marcControl1.CaretMoved += (s, e) =>
             {
                 toolStripStatusLabel_caretOffs.Text = $"Caret:{this.marcControl1.CaretOffset}";
@@ -229,7 +230,7 @@ namespace MarcSample
 
         void LoadMarc()
         {
-            return;
+            //return;
             try
             {
                 var path = GetMarcFileName();
@@ -247,7 +248,7 @@ namespace MarcSample
 
         void SaveMarc()
         {
-            return;
+            //return;
             var path = GetMarcFileName();
             File.WriteAllText(path, this.marcControl1.Content);
         }

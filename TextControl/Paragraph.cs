@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 
 using Vanara.PInvoke;
+using static System.Net.Mime.MediaTypeNames;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 using static Vanara.PInvoke.Gdi32;
@@ -516,6 +517,7 @@ out int new_width);
             }
         }
 
+        // 包含 Chunk 文本，避免再到 SCRIPT_ITEM 中去取 .iCharPos
         class ScriptItem
         {
             public SCRIPT_ITEM Item { get; set; }
@@ -609,7 +611,8 @@ out int new_width);
                         str = segment.Substring(start_index, length);
                     }
 
-                    result_items.Add(new ScriptItem {
+                    result_items.Add(new ScriptItem
+                    {
                         Item = item,
                         Chunk = str,
                         Tag = seg.Tag
@@ -815,7 +818,15 @@ out int new_width);
                 throw new ArgumentException("Script properties not initialized.");
 
             max_pixel_width = line_width;
-            List<Line> lines = new List<Line>();
+            var lines = new List<Line>();
+
+            var replaced_chunks = new List<string>(); // 发生替换后的 chunk 内容
+            for (int i = 0; i < items.Count; i++)
+            {
+                replaced_chunks.Add(null/*items[i].Chunk*/);
+            }
+            Debug.Assert(items.Count == replaced_chunks.Count);
+
             Line line = new Line(parent);
             long start_pixel = 0;
 
@@ -824,14 +835,20 @@ out int new_width);
                 var data = items[i];
                 var item = data.Item;
 
-                // 析出本 item 的文字
-                string str = data.Chunk;
-                var tag = data.Tag;
-
                 {
+                    // 析出本 item 的文字
+                    string text = data.Chunk;
+                    string replaced = replaced_chunks[i];
+                    if (replaced == null)
+                    {
+                        replaced = context?.ConvertText?.Invoke(data.Chunk) ?? data.Chunk;
+                    }
+
+                    var tag = data.Tag;
+
                     Font used_font = null;
-                    string text = str;
-                    var replaced = context?.ConvertText?.Invoke(text) ?? text;
+                    //string text = str;
+                    //var replaced = context?.ConvertText?.Invoke(text) ?? text;
                     for (; ; )
                     {
                         // 寻找可以 break 的位置
@@ -857,7 +874,16 @@ out int new_width);
                             replaced = Line.ReplaceMissingGlyphs(
             dc,
             used_font,
-            replaced);
+            replaced,
+            out int replace_count);
+                            if (replace_count == 0)
+                            {
+                                replaced = Line.ReplaceMissingGlyphs(
+dc,
+null,
+replaced,
+out replace_count);
+                            }
                             // TODO: 重新 Itemize，修改 pItems
                             var new_items = Itemize(
 context,
@@ -866,9 +892,29 @@ replaced,
 parent,
 false,
 tag);
-                            // TODO: 要把 new_item.Chunk 重新设置回原始内容
-                            items.RemoveAt(i);
-                            items.InsertRange(i, new_items);
+
+                            {
+                                replaced_chunks.RemoveAt(i);
+                                replaced_chunks.InsertRange(i, new_items.Select(o => o.Chunk));
+                            }
+
+                            {
+                                items.RemoveAt(i);
+                                // 要把 new_item.Chunk 重新设置回原始内容
+                                // 按照 new_item 中的片段位置，从 text 中取一一对应的位置，覆盖到原 Chunk 中
+                                int offs = 0;
+                                int j = 0;
+                                foreach (var s in new_items.Select(o => o.Chunk))
+                                {
+                                    new_items[j].Chunk = text.Substring(offs, s.Length);
+                                    offs += s.Length;
+                                    j++;
+                                }
+                                items.InsertRange(i, new_items);
+                            }
+
+                            Debug.Assert(items.Count == replaced_chunks.Count);
+
                             i--;
                             break;
                         }
@@ -931,7 +977,7 @@ tag);
                             */
                         }
 
-                        // t 是原始内容，r 是替换后的内容
+                        // t 是原始文字内容，r 是替换后的文字内容
                         RangeWrapper NewRange(string t,
                             string r,
                             int w)
@@ -1321,83 +1367,85 @@ tag);
             abcC = 0;
 
             used_font = null;
-            var cache = new SafeSCRIPT_CACHE();
-            var a = item.a;
-            var ret = Line.ShapeAndPlace(
-                func_getfont,
-                context,
-                dc,
-                ref a,
-                cache,
-                str,
-                out ushort[] glfs,
-                out int[] piAdvance,
-                out _, // GOFFSET[] pGoffset,
-                out ABC pABC,
-                out _,  //SCRIPT_VISATTR[] sva,   // 中间有关于 ZeroWidth 的信息
-                out ushort[] log,
-                ref used_font);
-            if (ret == 1)
+            //using (var cache = new SafeSCRIPT_CACHE())
             {
-                return -1;
-            }
-
-            //    item.a = a;
-            left_width = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
-            if (is_left_most && pABC.abcA < 0)
-                left_width += -pABC.abcA;
-            abcC = pABC.abcC; // 记录 abcC
-
-            if (left_width <= pixel_width)
-            {
-                return str.Length; // 整个字符串都可以放下
-            }
-
-            // var sa = new SCRIPT_ANALYSIS();
-            SCRIPT_LOGATTR[] array = new SCRIPT_LOGATTR[str.Length];
-            ScriptBreak(str, str.Length, a, array);
-
-            // piAdvance 数量可能比 str 内的字符要多？
-
-            // Debug.Assert(array.Length == piAdvance.Length);
-
-            int start = 0;
-            start += pABC.abcA;
-            int delta = 0;
-            if (pABC.abcC < 0)
-                delta = -pABC.abcC;
-            // i 是 Glyphs 下标
-            for (int i = 0; i < piAdvance.Length; i++)
-            {
-                int tail = start + piAdvance[i];
-
-                if (i >= (is_left_most ? 1 : 0)   // 避免 i == 0 时返回。确保至少有一个字符被切割
-                    && tail + delta >= pixel_width)
+                var a = item.a;
+                var ret = Line.ShapeAndPlace(
+                    func_getfont,
+                    context,
+                    dc,
+                    ref a,
+                    //cache,
+                    str,
+                    out ushort[] glfs,
+                    out int[] piAdvance,
+                    out _, // GOFFSET[] pGoffset,
+                    out ABC pABC,
+                    out _,  //SCRIPT_VISATTR[] sva,   // 中间有关于 ZeroWidth 的信息
+                    out ushort[] log,
+                    ref used_font);
+                if (ret == 1)
                 {
-                    // chars 下标
-                    var char_index = GetCharIndex(i);
-                    var attr = array[char_index];
-                    if (attr.fSoftBreak || attr.fWhiteSpace || attr.fCharStop)
+                    return -1;
+                }
+
+                //    item.a = a;
+                left_width = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+                if (is_left_most && pABC.abcA < 0)
+                    left_width += -pABC.abcA;
+                abcC = pABC.abcC; // 记录 abcC
+
+                if (left_width <= pixel_width)
+                {
+                    return str.Length; // 整个字符串都可以放下
+                }
+
+                // var sa = new SCRIPT_ANALYSIS();
+                SCRIPT_LOGATTR[] array = new SCRIPT_LOGATTR[str.Length];
+                ScriptBreak(str, str.Length, a, array);
+
+                // piAdvance 数量可能比 str 内的字符要多？
+
+                // Debug.Assert(array.Length == piAdvance.Length);
+
+                int start = 0;
+                start += pABC.abcA;
+                int delta = 0;
+                if (pABC.abcC < 0)
+                    delta = -pABC.abcC;
+                // i 是 Glyphs 下标
+                for (int i = 0; i < piAdvance.Length; i++)
+                {
+                    int tail = start + piAdvance[i];
+
+                    if (i >= (is_left_most ? 1 : 0)   // 避免 i == 0 时返回。确保至少有一个字符被切割
+                        && tail + delta >= pixel_width)
                     {
-                        left_width = start;
-                        return char_index;
+                        // chars 下标
+                        var char_index = GetCharIndex(i);
+                        var attr = array[char_index];
+                        if (attr.fSoftBreak || attr.fWhiteSpace || attr.fCharStop)
+                        {
+                            left_width = start;
+                            return char_index;
+                        }
                     }
+                    start += piAdvance[i];
                 }
-                start += piAdvance[i];
-            }
 
-            return str.Length;
+                return str.Length;
 
-            int GetCharIndex(int glyphIndex)
-            {
-                int i = 0;
-                foreach (var v in log)
+                int GetCharIndex(int glyphIndex)
                 {
-                    if (v >= glyphIndex)
-                        return i;
-                    i++;
+                    int i = 0;
+                    foreach (var v in log)
+                    {
+                        if (v >= glyphIndex)
+                            return i;
+                        i++;
+                    }
+                    throw new ArgumentException($"glyphIndex {glyphIndex} 在 log 数组中没有找到");
                 }
-                throw new ArgumentException($"glyphIndex {glyphIndex} 在 log 数组中没有找到");
             }
         }
 

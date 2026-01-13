@@ -47,3 +47,50 @@ static class Replacement
 
 ~~~
 
+错误（简述）
+托管调试助手报出 `FatalExecutionEngineError`，在 `ShapeAndPlace` 中执行 `sva = new SCRIPT_VISATTR[max];` 时触发——这通常意味着 CLR 堆已被本地（非托管）代码破坏，而不是简单的托管空引用或普通异常。
+
+为什么会发生（<200 字）
+在同一函数刚刚对 `glfs` 和 `log` 进行了本机交互相关的分配并随即调用 `ScriptShape`。`FatalExecutionEngineError` 几乎总是由非托管/互操作引发的内存损坏导致。最可能的根本原因是传入 Uniscribe 的缓冲区或句柄参数与 Uniscribe 实际写入期望不匹配，从而在本机层写越界并破坏 CLR 堆。证据与可疑点：
+
+- 本函数使用 `max = (int)Math.Round(str.Length * 1.5m + 16)`，随后分配 `glfs = new ushort[max]`，但把 `log = new ushort[str.Length]`。若 Uniscribe 写入 `pwLogClust`（log）时按 glyph 数或按 `cMaxGlyphs` 索引，会越界（glyph 数可能 > 字符数），导致堆损坏——而分配 `sva` 时才被检测出来并崩溃。
+- `SafeSCRIPT_CACHE` 的创建/使用不当也可能导致本机写入非法内存（如果未正确初始化/传递），但从调用序列看首要嫌疑是数组长度/边界不匹配。
+- 其它风险：在 DC 上选择/释放 HFONT 的时机错误（在未先撤换出 DC 的情况下 DeleteObject），或对 P/Invoke 签名/marshal 不匹配，都会导致类似崩溃。
+
+具体且可立即验证的修复（优先级高）
+1) 把 `log` 的长度从 `str.Length` 改为 `max`，以保证 `ScriptShape` 在任何情况下不会写入超出边界的 `pwLogClust`（最小改法，最有可能立即消除越界写入）：
+```csharp
+// 原
+// log = new ushort[str.Length];
+// sva = new SCRIPT_VISATTR[max];
+// 改为
+log = new ushort[max];
+sva = new SCRIPT_VISATTR[max];
+```
+
+2) 对 `ScriptShape` 返回的 `c` 做严格检查，再传递给 `ScriptPlace`：
+```csharp
+var result = ScriptShape(..., glfs, log, sva, out var c);
+// 检查 c 的范围
+if (c < 0 || c > max)
+    throw new InvalidOperationException($"ScriptShape 返回不合理的 glyph 数: {c} (max={max})");
+Array.Resize(ref glfs, c);
+Array.Resize(ref sva, c);
+```
+
+3) 避免不安全的 SafeSCRIPT_CACHE 用法：尽量使用 Vanara/官方包装提供的创建函数或传入 `IntPtr.Zero`（并根据文档处理），不要直接 new 一个未初始化的底层句柄类型。
+
+4) 确保 HFONT 在 DC 中被替换回去后再 DeleteObject；用 `DeleteObject` 而不是自定义 DeleteFont（确认 Vanara API 的正确释放函数），并确保 SelectObject/Dispose 顺序正确（当前代码看起来用 using 包裹 SelectObject，但还是要确认最终 Delete 在 Select 恢复之后执行）。
+
+改进建议（可选）
+- 在调用任何 Uniscribe API 前，把所有传入数组按 `cMaxGlyphs` 一致分配并记录其容量；把所有 P/Invoke 返回码做更完整的防御性处理。
+- 添加本机交互的单元测试（带极端长/复杂脚本字符串）以重现并验证边界。
+- 若使用 Vanara，请优先用其提供的 SafeXXX 工厂/方法，避免手工 new SafeHandle。
+
+Related Work Items
+- 无（在远程仓库中未找到相关 issue/工作项）。
+
+结论（一句话）
+最可能的根本原因是 Uniscribe 在本机层写入了超出 `log` 缓冲区的内容（glyph vs char 长度不一致），导致堆损坏并在随后分配 `sva` 时触发 `FatalExecutionEngineError`。优先修复：把 `log` 的长度改为 `max`，并在 `ScriptShape` 返回后对 `c` 做边界检查。
+
+**要我把 log 长度改为 max 吗？**

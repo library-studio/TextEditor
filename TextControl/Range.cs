@@ -246,18 +246,18 @@ namespace LibraryStudio.Forms
     SafeHDC hdc,
     int pixel_width)
         {
+            //using (var cache = new SafeSCRIPT_CACHE())
             {
                 var range = this;
 
                 Font used_font = range.Font;
-                var cache = new SafeSCRIPT_CACHE();
                 var a = range.a;
                 var ret = Line.ShapeAndPlace(
                     func_getfont,
                     context,
                     hdc,
                     ref a,
-                    cache,
+                    //cache,
                     range.DisplayText,
                     out ushort[] glfs,
                     out int[] piAdvance,

@@ -135,11 +135,12 @@ namespace LibraryStudio.Forms
             bool ensure_caret_visible = true,
             bool conditional_trigger = false)
         {
+            var old_offs = _caretInfo?.Offs ?? 0;
+            var old_field_index = _caretInfo.ChildIndex;
+
             this._caret_offs = result.Offs; // 2026/1/4
             Debug.Assert(result.Offs == this._caret_offs, "caretInfo.Offs 和 _caret_offs 未能同步");
 
-            var old_offs = _caretInfo?.Offs ?? 0;
-            var old_field_index = _caretInfo.ChildIndex;
             /*
             if (result.LineHeight == 0)
                 return;
@@ -170,12 +171,23 @@ namespace LibraryStudio.Forms
 
             SetCompositionWindowPos();
 
+            // 插入符移动以后，重置子字段选择的 toggle 状态
+            if (old_offs != this._caret_offs)
+                _selectCurrentFull = true;
+
             if (conditional_trigger && old_offs == (_caretInfo?.Offs ?? 0))
             {
 
             }
             else
-                this.CaretMoved?.Invoke(this, EventArgs.Empty);
+            {
+                OnCaretMoved(EventArgs.Empty);
+            }
+        }
+
+        public virtual void OnCaretMoved(EventArgs e)
+        {
+            CaretMoved?.Invoke(this, e);
         }
 
         private int _caret_offs = 0; // Caret 全局偏移量。

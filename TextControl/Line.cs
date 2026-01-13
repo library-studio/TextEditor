@@ -8,6 +8,7 @@ using Vanara.PInvoke;
 using static System.Windows.Forms.LinkLabel;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
+using static Vanara.PInvoke.Kernel32;
 using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.Usp10;
 
@@ -832,6 +833,9 @@ namespace LibraryStudio.Forms
             {
                 var segment = seg.Text;
                 var segment_text = segment.Length == 0 ? " " : segment;
+
+#if REMOVED
+
                 int cMaxItems = segment_text.Length + 1;
                 var pItems = new SCRIPT_ITEM[cMaxItems + 1];
 
@@ -880,25 +884,26 @@ namespace LibraryStudio.Forms
                 if (width > max_pixel_width)
                     max_pixel_width = width;
                 */
-                AppendRanges(dc,
+#endif
+                var pItems = Itemize(segment_text, context.ConvertText);
+                var ranges = GetRanges(dc,
     context,
     pItems,
     segment,
     pixel_width,
-    seg.Tag);
-
-            }
-
-            {
-                LayoutLine(this);
-                max_pixel_width = RefreshLine(
                     (p, o) =>
                     {
                         return context?.GetFont?.Invoke(this, this.Tag);
                     },
-                    context,
+                    seg.Tag);
+                this.Ranges.AddRange(ranges);
+            }
+
+            {
+                LayoutLine(this);
+                max_pixel_width = this.PlaceXY(
                     dc,
-                    this,
+                    context,
                     pixel_width);
             }
 
@@ -918,30 +923,47 @@ namespace LibraryStudio.Forms
             result.MaxPixel = max_pixel_width;
             // InitialDefault();
             return result;
+        }
 
-            string convertText(string t)
+        static SCRIPT_ITEM[] Itemize(string segment, ConvertTextFunc convertText)
+        {
+            if (segment.Length == 0)
             {
-                return context?.ConvertText?.Invoke(t) ?? t;
+                throw new ArgumentException("segment 参数值不允许为空字符串");
             }
 
-#if REMOVED
-            void InitialDefault()
+            var segment_text = segment.Length == 0 ? " " : segment;
+            int cMaxItems = segment_text.Length + 1;
+            int array_length = cMaxItems + 1;
+        REDO:
+            var pItems = new SCRIPT_ITEM[array_length];
+
+            /*
+             * 
+
+返回值
+如果成功，则返回 0。 如果函数不成功，则返回非零 HRESULT 值。
+
+如果 pwcInChars 设置为 NULL、 cInChars 为 0、 pItems 设置为 NULL 或 cMaxItems< 2，则该函数将返回E_INVALIDARG。
+
+如果 cMaxItems 的值不足，函数将返回E_OUTOFMEMORY。 与所有错误情况一样，不会完全处理任何项，并且输出数组中没有任何部分包含定义的值。 如果函数返回E_OUTOFMEMORY，则应用程序可以使用更大的 pItems 缓冲区再次调用它。
+            * */
+            var result0 = ScriptItemize(convertText?.Invoke(segment_text) ?? segment_text,
+                segment_text.Length,
+                cMaxItems,
+                Paragraph.sc,
+                Paragraph.ss,
+                pItems,
+                out int pcItems);
+            if (result0 == HRESULT.E_OUTOFMEMORY)
             {
-                if (this.Ranges.Count == 0)
-                {
-                    // 用于探测字体高度宽度的默认 Range
-                    var range = new Range();
-                    range.ReplaceText(context,
-                        dc,
-                        0,
-                        -1,
-                        " ",
-                        1000);
-                    _defaultLineHeight = range.GetPixelHeight();
-                    _returnWidth = range.GetPixelWidth();
-                }
+                array_length += segment_text.Length + 1;
+                goto REDO;
             }
-#endif
+            result0.ThrowIfFailed();
+
+            Array.Resize(ref pItems, pcItems);
+            return pItems;
         }
 
         public int Initialize(
@@ -987,6 +1009,9 @@ IContext context)
             foreach (var seg in contents)
             {
                 var segment = seg.Text;
+
+#if REMOVED
+
                 int cMaxItems = segment.Length + 1;
                 var pItems = new SCRIPT_ITEM[cMaxItems + 1];
 
@@ -1035,33 +1060,30 @@ IContext context)
                 if (width > max_pixel_width)
                     max_pixel_width = width;
                 */
-                AppendRanges(dc,
+#endif
+                var pItems = Itemize(segment, context.ConvertText);
+                var ranges = GetRanges(dc,
                     context,
                     pItems,
                     segment,
                     pixel_width,
-                    seg.Tag);
-            }
-
-            {
-                LayoutLine(this);
-                max_pixel_width = RefreshLine(
                     (p, o) =>
                     {
                         return context?.GetFont?.Invoke(this, this.Tag);
                     },
-                    context,
+                    seg.Tag);
+                this.Ranges.AddRange(ranges);
+            }
+
+            {
+                LayoutLine(this);
+                max_pixel_width = this.PlaceXY(
                     dc,
-                    this,
+                    context,
                     pixel_width);
             }
 
             return max_pixel_width;
-
-            string convertText(string t)
-            {
-                return context?.ConvertText?.Invoke(t) ?? t;
-            }
         }
 
         public void Clear()
@@ -1073,6 +1095,7 @@ IContext context)
             ColorCache?.Clear();
         }
 
+#if REMOVED
         // 即将废止。用 AppendRanges() 代替
         int BuildRanges(SafeHDC dc,
             IContext context,
@@ -1126,48 +1149,171 @@ IContext context)
                 this,
                 pixel_width);
         }
+#endif
 
-        internal void AppendRanges(SafeHDC dc,
+        internal static List<RangeWrapper> GetRanges(SafeHDC dc,
             IContext context,
             SCRIPT_ITEM[] pItems,
             string content,
             int pixel_width,
+            GetFontFunc func_getfont,
             object tag)
         {
             if (Paragraph.sp == null)
-                throw new ArgumentException("Script properties not initialized.");
-
-            // long start_pixel = 0;
-            int start_index = 0;
-            for (int i = 0; i < pItems.Length; i++)
             {
-                var item = pItems[i];
+                throw new ArgumentException("Script properties not initialized.");
+            }
 
+            var items = pItems.ToList<SCRIPT_ITEM>();
+
+            var origin_texts = new List<string>();
+            var replaced_texts = new List<string>();
+            int start_index = 0;
+            for (int i = 0; i < items.Count; i++)
+            {
                 // 析出本 item 的文字
                 string str = "";
-                if (i >= pItems.Length - 1)
+                if (i >= items.Count - 1)
                     str = content.Substring(start_index);
                 else
                 {
-                    int length = pItems[i + 1].iCharPos - item.iCharPos;
+                    int length = items[i + 1].iCharPos - items[i].iCharPos;
                     str = content.Substring(start_index, length);
+                }
+                origin_texts.Add(str);
+                start_index += str.Length;
+
+                replaced_texts.Add(null);
+            }
+            Debug.Assert(origin_texts.Count == items.Count);
+            Debug.Assert(replaced_texts.Count == items.Count);
+
+            var results = new List<RangeWrapper>();
+            for (int i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+
+                // 析出本 item 的文字
+                string str = origin_texts[i];
+                /*
+                if (i >= items.Count - 1)
+                    str = content.Substring(start_index);
+                else
+                {
+                    int length = items[i + 1].iCharPos - item.iCharPos;
+                    str = content.Substring(start_index, length);
+                }
+                */
+
+                var replaced = replaced_texts[i];
+                if (replaced == null)
+                {
+                    replaced = context?.ConvertText?.Invoke(str) ?? str;
                 }
 
                 var new_range = new RangeWrapper
                 {
                     Text = str,
-                    DisplayText = context?.ConvertText?.Invoke(str) ?? str,
+                    DisplayText = replaced,
                     Item = item,
                     a = item.a,
                     Tag = tag,
                 };
-                //new_range.ConvertText = this.ConvertText;
-                this.Ranges.Add(new_range);
-                start_index += str.Length;
+
+
+                //using (var cache = new SafeSCRIPT_CACHE())
+                {
+                    Font used_font = null;
+                    var a = new_range.a;
+                    var ret = ShapeAndPlace(
+                        func_getfont,
+                        context,
+                        dc,
+                        ref a,
+                        //cache,
+                        new_range.DisplayText,
+                        out ushort[] glfs,
+                        out int[] piAdvance,
+                        out GOFFSET[] pGoffset,
+                        out ABC pABC,
+                        out SCRIPT_VISATTR[] sva,
+                        out ushort[] log,
+                        ref used_font);
+                    if (ret == 1)
+                    {
+                        replaced = Line.ReplaceMissingGlyphs(
+dc,
+used_font,
+new_range.DisplayText,
+out int replace_count);
+                        if (replace_count == 0)
+                        {
+                            if (replace_count == 0)
+                            {
+                                replaced = Line.ReplaceMissingGlyphs(
+dc,
+null,
+new_range.DisplayText,
+out replace_count);
+                            }
+                        }
+                        var temp_items = Itemize(replaced, context.ConvertText);
+
+                        items.RemoveAt(i);
+                        items.InsertRange(i, temp_items);
+
+                        origin_texts.RemoveAt(i);
+                        replaced_texts.RemoveAt(i);
+                        int j = 0;
+                        int offs = 0;
+                        foreach (var temp_item in temp_items)
+                        {
+                            int length;
+                            if (i >= temp_items.Length - 1)
+                            {
+                                length = replaced.Length - offs;
+                            }
+                            else
+                            {
+                                length = temp_items[i + 1].iCharPos - temp_item.iCharPos;
+                            }
+
+                            origin_texts.Add(str.Substring(offs, length));
+                            replaced_texts.Add(replaced.Substring(offs, length));
+                            j++;
+                            offs += length;
+                        }
+
+                        Debug.Assert(origin_texts.Count == items.Count);
+                        Debug.Assert(replaced_texts.Count == items.Count);
+
+                        i--;
+                        continue;
+                        // throw new NotImplementedException();
+                    }
+
+                    if (new_range.Font == null)
+                        new_range.Font = used_font; // 记录实际使用的字体
+
+                    new_range.Font = used_font;
+                    new_range.sva = sva; // sva 在 SplitLines() 中尚未计算，是在这里首次计算的。TODO: 将来可以改为在 SplieLines() 结束前计算
+                    new_range.advances = piAdvance; // 记录 advances
+                    new_range.glfs = glfs;
+                    new_range.logClust = log;
+                    new_range.pABC = pABC;
+
+                    // new_range.Left = x_offset;
+
+                    new_range.PixelWidth = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+
+                    new_range.pGoffset = pGoffset; // 记录 pGoffset
+                    new_range.a = a;
+                }
+
+                results.Add(new_range);
             }
 
-            //LayoutLine(this);
-            //return RefreshLine(dc, this, pixel_width);
+            return results;
         }
 
 #if REF
@@ -1202,10 +1348,16 @@ IContext context)
         public static string ReplaceMissingGlyphs(
             SafeHDC dc,
             Font font,
-            string text)
+            string text,
+            out int replace_count)
         {
+            replace_count = 0;
             if (font == null)
+            {
+                replace_count = text.Length;
                 return new string('�', text.Length);
+            }
+
             var font_handle = font.ToHfont();
             try
             {
@@ -1231,9 +1383,14 @@ IContext context)
                         }
 
                         if (glyphAvailable)
+                        {
                             result.Append(char.ConvertFromUtf32(cp));
+                        }
                         else
+                        {
+                            replace_count++;
                             result.Append('�'); // 替代字符
+                        }
 
                     }
                     return result.ToString();
@@ -1254,7 +1411,7 @@ IContext context)
             IContext context,
             SafeHDC dc,
             ref SCRIPT_ANALYSIS sa,
-            SafeSCRIPT_CACHE cache,
+            // SafeSCRIPT_CACHE cache,
             string str,
             out ushort[] glfs,
             out int[] piAdvance,
@@ -1266,128 +1423,141 @@ IContext context)
         {
             var max = (int)Math.Round(str.Length * 1.5m + 16);  // 1.5m
             int redo_count = 0;
-        REDO:
-            glfs = new ushort[max];
-            log = new ushort[str.Length];
-            sva = new SCRIPT_VISATTR[max];
 
-            IEnumerable<Font> fonts = null;
-
-            if (used_font != null)
             {
-                fonts = new List<Font>() { used_font };
-            }
-            else
-            {
-                fonts = func_getfont?.Invoke(null, null);
-                /*
-                fonts.AddRange(_fonts);
-                if (_default_font != null)
-                    fonts.Insert(0, _default_font);
-                */
-            }
+                IEnumerable<Font> fonts = null;
 
-            var partial_fonts = new List<Tuple<Font, int>>();
 
-            foreach (var font in fonts)
-            {
-                // Основний курс української мови 中的 ї 是乌克兰语中特有的字符，基里尔文字中没有这个字符
-                // 如果宋体遇到 e.Script = 8 的，因为宋体里面包含了俄文字符但不包含
-                // 乌克兰文字符，所以这里要让给 MS Sans Serif 字体来渲染
-                // TODO: 假设机器上没有 MS Sans Serif 这样的包含乌克兰文的字体怎么办呢？
-                if (FontContext.CheckSupporting(font, sa.eScript) == false)
-                    continue;
-
-                // IntPtr font_handle = context.GetFontHandle(font);
-                var font_handle = font.ToHfont();
-                try
+                if (used_font != null)
                 {
-                    // var handle = Gdi32.SelectObject(dc, font.ToHfont());
-                    using (var dc_context = dc.SelectObject(font_handle))
+                    fonts = new List<Font>() { used_font };
+                }
+                else
+                {
+                    fonts = func_getfont?.Invoke(null, null);
+                    /*
+                    fonts.AddRange(_fonts);
+                    if (_default_font != null)
+                        fonts.Insert(0, _default_font);
+                    */
+                }
+
+                var partial_fonts = new List<Tuple<Font, int>>();
+
+                foreach (var font in fonts)
+                {
+                    // Основний курс української мови 中的 ї 是乌克兰语中特有的字符，基里尔文字中没有这个字符
+                    // 如果宋体遇到 e.Script = 8 的，因为宋体里面包含了俄文字符但不包含
+                    // 乌克兰文字符，所以这里要让给 MS Sans Serif 字体来渲染
+                    // TODO: 假设机器上没有 MS Sans Serif 这样的包含乌克兰文的字体怎么办呢？
+                    if (FontContext.CheckSupporting(font, sa.eScript) == false)
+                        continue;
+
+                    IntPtr font_handle = context.GetFontHandle(font);
+                    // var font_handle = font.ToHfont();
+                    try
                     {
-                        cache = new SafeSCRIPT_CACHE();
-                        uint USP_E_SCRIPT_NOT_IN_FONT = 0x80040200;
-                        var result = ScriptShape(dc,
-                            cache,
-                            str,
-                            str.Length,
-                            max,
-                            ref sa, // 指向运行的 SCRIPT_ANALYSIS 结构的指针，其中包含之前对 ScriptItemize 的调用的结果。
-                            glfs,
-                            log,
-                            sva,
-                            out var c);
-                        if (result == USP_E_SCRIPT_NOT_IN_FONT)
-                            continue;
+                    REDO:
+                        log = new ushort[str.Length];   // str.Length
+                        glfs = new ushort[max];
+                        sva = new SCRIPT_VISATTR[max];
 
-                        if (result == HRESULT.E_OUTOFMEMORY)
+                        // var handle = Gdi32.SelectObject(dc, font.ToHfont());
+                        // using (var cache = new SafeSCRIPT_CACHE())
+                        var cache = new SafeSCRIPT_CACHE();
+                        using (var dc_context = dc.SelectObject(font_handle))
                         {
-                            if (redo_count < 10)
+                            uint USP_E_SCRIPT_NOT_IN_FONT = 0x80040200;
+                            var result = ScriptShape(dc,
+                                cache,
+                                str,
+                                str.Length,
+                                max,
+                                ref sa, // 指向运行的 SCRIPT_ANALYSIS 结构的指针，其中包含之前对 ScriptItemize 的调用的结果。
+                                glfs,
+                                log,
+                                sva,
+                                out var c);
+                            if (result == USP_E_SCRIPT_NOT_IN_FONT)
+                                continue;
+
+                            if (result == HRESULT.E_OUTOFMEMORY)
                             {
-                                max += str.Length;
-                                redo_count++;
-                                goto REDO;
+                                if (redo_count < 10)
+                                {
+                                    max += str.Length;
+                                    redo_count++;
+                                    goto REDO;
+                                }
                             }
-                        }
-                        result.ThrowIfFailed();
+                            result.ThrowIfFailed();
 
-                        Array.Resize(ref glfs, c);
+                            Array.Resize(ref glfs, c);
 
-                        // 检查是否有空的字形
-                        // TODO: 记下最少空字形的一轮，以便最后采纳
-                        var null_count = glfs.Where(g => g == 0).Count();
-                        if (null_count > 0)
-                        {
-                            if (null_count < str.Length)
+                            // 检查是否有空的字形
+                            // TODO: 记下最少空字形的一轮，以便最后采纳
+                            var null_count = glfs.Where(g => g == 0).Count();
+                            if (null_count > 0)
                             {
-                                partial_fonts.Add(new Tuple<Font, int>(font, null_count));
+                                if (null_count < str.Length)
+                                {
+                                    partial_fonts.Add(new Tuple<Font, int>(font, null_count));
+                                }
+                                continue;
                             }
-                            continue;
+
+                            if (used_font == null)
+                                used_font = font; // 记录实际使用的字体
+
+                            Array.Resize(ref sva, c);
+
+                            Array.Resize(ref log, str.Length);
+
+
+                            piAdvance = new int[c];
+                            pGoffset = new GOFFSET[c];
+                            result = ScriptPlace(dc,
+                                cache,
+                                glfs,
+                                c,
+                                sva,
+                                ref sa,
+                                piAdvance,
+                                pGoffset,
+                                out pABC);
+                            result.ThrowIfFailed();
+
+                            return 0;
                         }
-
-                        if (used_font == null)
-                            used_font = font; // 记录实际使用的字体
-
-                        Array.Resize(ref sva, c);
-
-                        piAdvance = new int[c];
-                        pGoffset = new GOFFSET[c];
-                        result = ScriptPlace(dc,
-                            cache,
-                            glfs,
-                            c,
-                            sva,
-                            ref sa,
-                            piAdvance,
-                            pGoffset,
-                            out pABC);
-                        result.ThrowIfFailed();
-
-                        return 0;
+                    }
+                    finally
+                    {
+                        // Gdi32.DeleteFont(font_handle);
                     }
                 }
-                finally
+
+                if (partial_fonts.Count > 0)
                 {
-                    Gdi32.DeleteFont(font_handle);
+                    partial_fonts.Sort((a, b) => a.Item2 - b.Item2);    // 排序，数量少的在前
+                    var temp_font = partial_fonts[0].Item1;
+                    if (used_font == null)
+                        used_font = temp_font; // 记录实际使用的字体
                 }
-            }
+                else
+                {
+                    used_font = null;
+                }
 
-            if (partial_fonts.Count > 0)
-            {
-                partial_fonts.Sort((a, b) => a.Item2 - b.Item2);    // 排序，数量少的在前
-                var temp_font = partial_fonts[0].Item1;
-                if (used_font == null)
-                    used_font = temp_font; // 记录实际使用的字体
-            }
-            else
-            {
-                used_font = null;
-            }
+                piAdvance = null;
+                pABC = new ABC();
+                pGoffset = null;
 
-            piAdvance = null;
-            pABC = new ABC();
-            pGoffset = null;
-            return 1;
+                log = null;
+                glfs = null;
+                sva = null;
+                return 1;
+
+            }
             // 显示为替代字符
 
             /*
@@ -1427,7 +1597,128 @@ IContext context)
             line.piLogicalToVisual = piLogicalToVisual;
         }
 
+        public int PlaceXY(
+    SafeHDC hdc,
+    IContext context,
+    int pixel_width)
+        {
+            int x_offset = 0;
+            foreach (var index in this.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = this.Ranges[index];
 
+                range.Left = x_offset;
+
+                bool isLeftMost = (index == 0);
+                bool isRightMost = (index == this.Ranges.Count - 1);
+
+                // Font used_font = range.Font;
+                var pABC = range.pABC;
+                if (isLeftMost && pABC.abcA < 0)
+                {
+                    range.PixelWidth += -pABC.abcA;
+                    range.Left += -pABC.abcA;
+                }
+                if (isRightMost && pABC.abcC < 0)
+                {
+                    range.PixelWidth += -pABC.abcC;
+                }
+
+                x_offset += range.PixelWidth; // 更新 line 的左边界位置。注意这个左边界位置不能靠遍历 Range 元素累加来获得，因为逻辑顺序和显示顺序不一定是一致的
+            }
+
+            if (this.TextAlign != TextAlign.None)
+            {
+                x_offset += this.AlignmentText(pixel_width, x_offset);
+            }
+
+            this.ProcessBaseline(null);
+            return x_offset; // 返回行的 Pixel 宽度
+        }
+
+
+        // 重做一次 ShapeAndPlace()，刷新某些成员。并调整每个 Range 的 abc
+        // return:
+        //      返回行的 Pixel 宽度
+        public static int RefreshLine(
+            GetFontFunc func_getfont,
+            IContext context,
+            SafeHDC hdc,
+            Line line,
+            int pixel_width)
+        {
+            int x_offset = 0;
+            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = line.Ranges[index];
+
+                bool isLeftMost = (index == 0);
+                bool isRightMost = (index == line.Ranges.Count - 1);
+
+                Font used_font = range.Font;
+                //using (var cache = new SafeSCRIPT_CACHE())
+                {
+                    var a = range.a;
+                    var ret = ShapeAndPlace(
+                        func_getfont,
+                        context,
+                        hdc,
+                        ref a,
+                        //cache,
+                        range.DisplayText,
+                        out ushort[] glfs,
+                        out int[] piAdvance,
+                        out GOFFSET[] pGoffset,
+                        out ABC pABC,
+                        out SCRIPT_VISATTR[] sva,
+                        out ushort[] log,
+                        ref used_font);
+                    if (ret == 1)
+                    {
+                        // TODO: 这里会返回 1 么?
+                        throw new NotImplementedException();
+                    }
+
+                    if (range.Font == null)
+                        range.Font = used_font; // 记录实际使用的字体
+
+                    range.Font = used_font;
+                    range.sva = sva; // sva 在 SplitLines() 中尚未计算，是在这里首次计算的。TODO: 将来可以改为在 SplieLines() 结束前计算
+                    range.advances = piAdvance; // 记录 advances
+                    range.glfs = glfs;
+                    range.logClust = log;
+                    range.pABC = pABC;
+
+                    range.Left = x_offset;
+
+                    range.PixelWidth = (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+                    if (isLeftMost && pABC.abcA < 0)
+                    {
+                        range.PixelWidth += -pABC.abcA;
+                        range.Left += -pABC.abcA;
+                    }
+                    if (isRightMost && pABC.abcC < 0)
+                    {
+                        range.PixelWidth += -pABC.abcC;
+                    }
+
+                    range.pGoffset = pGoffset; // 记录 pGoffset
+                    range.a = a;
+
+                    x_offset += range.PixelWidth; // 更新 line 的左边界位置。注意这个左边界位置不能靠遍历 Range 元素累加来获得，因为逻辑顺序和显示顺序不一定是一致的
+                }
+            }
+
+            if (line.TextAlign != TextAlign.None)
+            {
+                x_offset += line.AlignmentText(pixel_width, x_offset);
+            }
+
+            line.ProcessBaseline(null);
+            return x_offset; // 返回行的 Pixel 宽度
+        }
+
+#if OLD
         // 重做一次 ShapeAndPlace()，刷新某些成员。并调整每个 Range 的 abc
         // return:
         //      返回行的 Pixel 宽度
@@ -1465,6 +1756,16 @@ IContext context)
                     ref used_font);
                 if (ret == 1)
                 {
+                    var pItems = Itemize(range.DisplayText, context.ConvertText);
+                    var ranges = GetRanges(hdc,
+                        context,
+                        pItems,
+                        range.DisplayText,
+                        pixel_width,
+                        range.Tag);
+                    // TODO: line 需要重新 layout
+                    line.Ranges.RemoveAt(index);
+                    this.Ranges.AddRange(ranges);
                     // ScriptItemize()
                     // TODO: 这里会返回 1 么?
                     throw new NotImplementedException();
@@ -1507,6 +1808,7 @@ IContext context)
             line.ProcessBaseline(null);
             return x_offset; // 返回行的 Pixel 宽度
         }
+#endif
 
         // 2025/11/27
         // 调整行内文字对齐效果
@@ -1844,7 +2146,6 @@ range.Text.Length);
                 var block_rect = block_rects[index]; // 获取块背景矩形
                 //var block_bound = block_abc_rects[index];
 
-                var cache = new SafeSCRIPT_CACHE();
                 int iReserved = 0;
 
                 // Range 的主体矩形。斜体情况可能会有部分笔画伸出这个矩形之外
@@ -1869,6 +2170,9 @@ range.Text.Length);
                     //var font_handle = used_font.ToHfont();
                     try
                     {
+                        // using (var cache = new SafeSCRIPT_CACHE())
+                        var cache = new SafeSCRIPT_CACHE();
+
                         using (var dc_context = hdc.SelectObject(font_handle))
                         {
 
@@ -2047,7 +2351,6 @@ clipRect);
                 Font used_font = range.Font;
                 IntPtr font_handle = context.GetFontHandle(range.Font);
 
-                var cache = new SafeSCRIPT_CACHE();
                 int iReserved = 0;
 
                 /*
@@ -2069,48 +2372,48 @@ clipRect);
                 //var font_handle = used_font.ToHfont();
                 try
                 {
+                    // using (var cache = new SafeSCRIPT_CACHE())
+                    var cache = new SafeSCRIPT_CACHE();
                     using (var dc_context = hdc.SelectObject(font_handle))
                     {
-                        {
-                            /*
-                            //testing
-                            DrawSolidRectangle(hdc,
+                        /*
+                        //testing
+                        DrawSolidRectangle(hdc,
 block_rect,
 Color.Green,
 clipRect);
-                            */
+                        */
 
-                            // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
-                            var highlight_text_color = range.ColorCache
-                                .GetForeColor(
-                                context?.GetForeColor,
-                                range,
-                                true);
-                            var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
-                            var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
-                            try
-                            {
-                                var ret = ScriptTextOut(hdc,
-                cache,
-                x + range.Left,
-                y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
-                (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
-                Intersect(block_rect, clipRect),   // [In, Optional] PRECT lprc,
-                range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
-                range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
-                iReserved,  //  [Optional] int iReserved,
-                range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
-                range.glfs.Length,    // int cGlyphs,
-                range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
-                null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
-                range.pGoffset[0]); // in GOFFSET pGoffset); 
-                                ret.ThrowIfFailed();
-                            }
-                            finally
-                            {
-                                Gdi32.SetBkMode(hdc, old_mode);
-                                Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
-                            }
+                        // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                        var highlight_text_color = range.ColorCache
+                            .GetForeColor(
+                            context?.GetForeColor,
+                            range,
+                            true);
+                        var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+                        var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+                        try
+                        {
+                            var ret = ScriptTextOut(hdc,
+            cache,
+            x + range.Left,
+            y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
+            (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
+            Intersect(block_rect, clipRect),   // [In, Optional] PRECT lprc,
+            range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
+            range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
+            iReserved,  //  [Optional] int iReserved,
+            range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
+            range.glfs.Length,    // int cGlyphs,
+            range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
+            null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
+            range.pGoffset[0]); // in GOFFSET pGoffset); 
+                            ret.ThrowIfFailed();
+                        }
+                        finally
+                        {
+                            Gdi32.SetBkMode(hdc, old_mode);
+                            Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
                         }
                     }
                 }

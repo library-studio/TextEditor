@@ -212,7 +212,7 @@ namespace LibraryStudio.Forms
         SCRIPT_CONTROL sc;
         SCRIPT_STATE ss;
 
-        SafeSCRIPT_CACHE _cache = null;
+        //SafeSCRIPT_CACHE _cache = null;
 
         // int _line_height = 20;
 
@@ -232,7 +232,7 @@ namespace LibraryStudio.Forms
                 out ss);
             result.ThrowIfFailed();
 
-            _cache = new SafeSCRIPT_CACHE();
+            //_cache = new SafeSCRIPT_CACHE();
 
         }
 

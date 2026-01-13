@@ -28,7 +28,7 @@ namespace LibraryStudio.Forms
 
         // public new event EventHandler TextChanged;
 
-        History _history = new History(10*1024);
+        History _history = new History(10 * 1024);
 
         public string DumpHistory()
         {
@@ -1535,7 +1535,7 @@ out long left_width);
                         if (HasSelection() && _shiftPressed == false)
                         {
                             int offs;
-                            if (e.KeyCode == Keys.Left)
+                            if (e.KeyCode == Keys.Home)
                                 offs = Math.Min(_selectOffs1, _selectOffs2);  // 到块的头部
                             else
                                 offs = Math.Max(_selectOffs1, _selectOffs2);
@@ -1544,7 +1544,7 @@ out long left_width);
                             _selectOffs2 = offs;
                             //SetCaretOffs(offs);
 
-                            ret = _record.MoveByOffs(_caret_offs + (e.KeyCode == Keys.Home ? 1 : -1),
+                            ret = _record.MoveByOffs(offs + (e.KeyCode == Keys.Home ? 1 : -1),
                                 e.KeyCode == Keys.Home ? -1 : 1,
                                 out info);
                         }
@@ -1558,6 +1558,52 @@ out long left_width);
                             }
                             else
                             {
+                                var field_index = _caretInfo.ChildIndex;
+                                int start = -1;
+                                if (e.KeyCode == Keys.Home)
+                                {
+                                    if (this._record.GetFieldOffsRange(field_index, out int field_start, out int field_end) == true)
+                                    {
+                                        start = field_start;
+                                        bool is_control_field = this._record.GetField(field_index)?.IsControlField ?? false;
+                                        // 如果已经在字段名第一字符
+                                        if (_caret_offs == field_start && field_index != 0)
+                                        {
+                                            if (is_control_field)
+                                                start = Math.Min(field_end, field_start + 3);
+                                            else
+                                                start = Math.Min(field_end, field_start + 5);
+                                        }
+                                        else if (
+                                            (_caret_offs <= field_start + 3 && is_control_field)
+                                            || (_caret_offs <= field_start + 5 && is_control_field == false)
+                                            )
+                                        {
+                                            // 如果在字段名或指示符区域内，则要到字段第一字符
+                                            start = field_start;
+                                        }
+                                        else
+                                        {
+                                            start = -1;
+                                        }
+                                    }
+
+                                }
+
+                                if (start != -1)
+                                {
+                                    ret = _record.MoveByOffs(start, 0, out info);
+                                }
+                                else
+                                {
+                                    int x0 = this.HorizontalScroll.Value;
+                                    info = _record.HitTest(
+                                        e.KeyCode == Keys.Home ?
+                                        x0 + _fieldProperty.ContentX
+                                        : this.ClientSize.Width,
+                                        _caretInfo.Y);
+                                }
+#if REMOVED
                                 var field_index = _caretInfo.ChildIndex;
                                 if (this._record.GetFieldOffsRange(field_index, out int field_start, out int field_end) == true)
                                 {
@@ -1579,6 +1625,7 @@ out long left_width);
                                 {
                                     ret = -1;
                                 }
+#endif
                             }
                         }
 

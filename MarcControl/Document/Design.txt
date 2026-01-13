@@ -609,3 +609,6 @@ context.ClearFontCache() 可以适当延长时间再清除。
 
 ~~~
 自动发生各种字符进行测试，观察字体不能支持显示的情况。
+
+~~~
+using (var cache = new SafeSCRIPT_CACHE()) 用法速度慢

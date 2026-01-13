@@ -2399,8 +2399,8 @@ out int max_pixel_width)
                 // 实际上在下一个字段的第一字符进行替换或插入
                 if (end == caret_offs_in_field)
                 {
-                    if (_fields.Count == 1
-                        || _fields[1].TextLength <= 1)
+                    //if (_fields.Count == 1
+                    //    || _fields[1].TextLength <= 1)
                     {
                         index = 1;  // 调整到头标区后第一个字段，重做
                         var temp = info.Clone();
