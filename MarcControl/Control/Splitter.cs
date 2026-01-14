@@ -29,6 +29,11 @@ namespace LibraryStudio.Forms
                 if (value < 0)
                     value = 0;
 
+                if (value < Metrics.DefaultSplitterPixelWidth)
+                {
+                    value = Metrics.DefaultSplitterPixelWidth;
+                }
+
                 if (_fieldProperty.CaptionPixelWidth != value)
                 {
                     _fieldProperty.CaptionPixelWidth = value;

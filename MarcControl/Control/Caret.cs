@@ -231,7 +231,7 @@ namespace LibraryStudio.Forms
             var start_offs = _caret_offs; // 记录开始偏移量
 
             HitInfo info = null;
-            if (delta >= 0)
+            if (/*delta >= 0*/false)
             {
                 // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                 // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等

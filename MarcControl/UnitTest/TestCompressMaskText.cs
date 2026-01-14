@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -119,11 +119,11 @@ ABC1234#",
         [InlineData("26",
             @"ABCDEtest#
 ABCDE1234",
-            "|||||")]
+            "")]
         [InlineData("27",
             @"BCDEtest#
 ABCDE1234",
-            "|||||||||")]
+            "||||")]
         // 保护 BCDE
         [InlineData("28",
             @"BCDEtest#
@@ -133,7 +133,7 @@ ABCDE1234#",
         [InlineData("29",
             @"test#
 ABCDE1234",
-            "|||||")]
+            "")]
         // 三个完整字段
         [InlineData("30",
             @"ABCDEtest#
@@ -146,6 +146,22 @@ ABCDEtest#
 ABCDE1234#
 ABC5678#",
             "||||||||||||||||||||||||")]
+        [InlineData("40",
+            @"#ABCDE1234",
+            "")]
+        [InlineData("41",
+            @"#BCDE1234",
+            "||||")]
+        [InlineData("42",
+            @"#BCDE#ABC1234",
+            "||||")]
+        [InlineData("43",
+            @"#BCDE#ABCDE1234",
+            "||||")]
+        [InlineData("44",
+            @"#BCDE#ABCDEF1234",
+            "|||||")]   // BCDE 因为不连续被保留；F 因为超出 5 被保留
+
         public void compressMaskText(
             string index,
             string text,

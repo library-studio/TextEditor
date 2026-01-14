@@ -1169,7 +1169,7 @@ out long left_width);
                 return v;
             }
 
-            if (this.Focused || new_caret_offs != -1)
+            if (/*this.Focused ||*/ new_caret_offs != -1)
             {
                 if (new_caret_offs != -1)
                     MoveCaret(HitByCaretOffs(new_caret_offs + 1, -1), false);

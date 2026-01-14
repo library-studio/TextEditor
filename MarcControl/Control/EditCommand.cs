@@ -48,6 +48,7 @@ namespace LibraryStudio.Forms
             return false;
         }
 
+        // TODO: 改为可以删除泰文的任意一个 char
         public virtual bool ProcessBackspaceChar(HitInfo info_param,
             DeleteKeyStyle style,
             bool delay)
@@ -60,7 +61,9 @@ namespace LibraryStudio.Forms
             // 移动插入符
             var ret = _record.MoveByOffs(info_param.Offs, -1, out HitInfo info);
             if (ret != 0)
+            {
                 return false;
+            }
 
             //SetGlobalOffs(info.Offs);
             //MoveCaret(HitByGlobalOffs(info.Offs));
@@ -68,34 +71,42 @@ namespace LibraryStudio.Forms
             var input_info = this._record.GetDeleteInfo(info,
                 style,
                 PadWhileEditing ? PaddingChar : (char)0);
-            if (input_info.Start == input_info.End
-                && input_info.Text == "")
+
+            // 特殊文字，可能多个字符粘连，中间不允许插入符停留
+            // TODO: 在保护区域删除时要自动填充
+            if (old_offs - info.Offs > 1)
             {
-                /*
-                // 如果发现删除被阻止，并且原因是到了上一个字段尾部，需要回到起点 offs
-                if (info.Offs != save_info.Offs)
-                {
-                    SetGlobalOffs(save_info.Offs);
-                    MoveCaret(save_info);
-                }
-                */
-                return false;
+                ReplaceText(info.Offs,
+    old_offs,
+    "",
+    delay_update: delay,
+    auto_adjust_caret_and_selection: false);
             }
             else
             {
-                ReplaceText(input_info.Start,
-                    input_info.End,
-                    input_info.Text,
-                    delay_update: delay,
-                    auto_adjust_caret_and_selection: false);
+                if (input_info.Start == input_info.End
+                    && input_info.Text == "")
+                {
+                    return false;
+                }
+                else
+                {
+                    ReplaceText(input_info.Start,
+                        input_info.End,
+                        input_info.Text,
+                        delay_update: delay,
+                        auto_adjust_caret_and_selection: false);
+                }
+                // 插入符 offs 需要特殊调整
+                if (input_info.Caret != -1)
+                {
+                    //SetGlobalOffs(input_info.Caret);
+                    //MoveCaret(HitByGlobalOffs(input_info.Caret));
+                    info.Offs = input_info.Caret;
+                }
+
             }
-            // 插入符 offs 需要特殊调整
-            if (input_info.Caret != -1)
-            {
-                //SetGlobalOffs(input_info.Caret);
-                //MoveCaret(HitByGlobalOffs(input_info.Caret));
-                info.Offs = input_info.Caret;
-            }
+
 
             // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
             _record.MoveByOffs(info.Offs + 1, -1, out info);
@@ -114,57 +125,6 @@ namespace LibraryStudio.Forms
             });
             */
             return true;
-#if OLD
-            // TODO: 改写函数，单独执行 back space 功能
-            // 函数难点在于，向左移动“一步”，在泰文等特殊语言中，可能不只是一个 char
-            // TODO: 注意连续的、不可分割的一个整体的多个字符情况
-            var replace = this._record.GetReplaceMode(info_param,
-                "backspace",
-                PaddingChar,
-                out string fill_content);
-            if (string.IsNullOrEmpty(fill_content) == false)
-            {
-                ReplaceText(_global_offs,
-                    _global_offs,
-                    fill_content,
-                    delay_update: delay,
-                    false);
-            }
-
-            // 记忆起点 offs
-            var old_offs = _global_offs;
-            // 移动插入符
-            var ret = _record.MoveByOffs(_global_offs, -1, out HitInfo info);
-            if (ret != 0)
-                return false;
-
-            SetGlobalOffs(info.Offs);
-
-            // 删除一个或者多个字符
-            if (replace)
-            {
-                ReplaceText(_global_offs,
-                    old_offs,
-                    new string(PaddingChar, old_offs - _global_offs),
-                    delay_update: delay,
-                    false);
-            }
-            else
-            {
-                ReplaceText(_global_offs,
-                    old_offs,
-                    "",
-                    delay_update: delay,
-                    false);
-            }
-
-            // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
-            _record.MoveByOffs(_global_offs + 1, -1, out info);
-
-            MoveCaret(info);
-            _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
-            return true;
-#endif
         }
 
         #region 编辑行为风格
@@ -291,11 +251,38 @@ namespace LibraryStudio.Forms
         }
 
         // 删除当前位置一个字符
+        // 对于泰文来说，要能一次删除连续的有关联的两个字符
         public virtual bool ProcessDeleteChar(HitInfo info,
             DeleteKeyStyle style,
             bool delay)
         {
             Debug.Assert(this._caret_offs == info.Offs);
+
+            int char_count = 1;
+            {
+                var save_info = info.Clone();
+                // 记忆起点 offs
+                var old_offs = info.Offs;
+                // 移动插入符
+                var ret = _record.MoveByOffs(info.Offs, 1, out HitInfo temp_info);
+                if (ret != 0)
+                {
+                    return false;
+                }
+                char_count = temp_info.Offs - old_offs;
+            }
+
+            // 删除多于一个 char
+            if (char_count > 1)
+            {
+                ReplaceText(info.Offs,
+    info.Offs + char_count,
+    "",
+    delay_update: delay,
+    auto_adjust_caret_and_selection: false);
+                SetCaret(HitByCaretOffs(info.Offs));
+                return true;
+            }
 
             var input_info = this._record.GetDeleteInfo(info,
                 style,
@@ -841,7 +828,26 @@ namespace LibraryStudio.Forms
         // 折行。即，默认的输入回车的效果
         public bool BreakText()
         {
-            return ProcessInputChar('\r', _caretInfo);
+            // 获得当前字段的字段名和指示符
+            int index = this.CaretFieldIndex;
+            if (index >= this.MarcRecord.FieldCount)
+                return false;
+            if (index == 0)
+                return ProcessInputChar('\r', _caretInfo);
+
+            var field = this.GetDomRecord().GetField(index);
+            var prefix = field.Name + field.Indicator;
+            /*
+            var infos = this.MarcRecord.LocateFields(this.CaretOffset, this.CaretOffset);
+            if (infos.Length == 0)
+                return false;
+            var info = infos[0];
+            */
+            this.ReplaceText(this.CaretOffset,
+                this.CaretOffset,
+                new string(Metrics.FieldEndCharDefault, 1) + prefix,
+                false);
+            return true;
         }
 
         // 将插入符移动到下一个字段的内容第一字符位置
@@ -1149,7 +1155,7 @@ namespace LibraryStudio.Forms
             //Debug.Assert(old_text.Length == old_mask_text.Length);
 
             // 压缩。相当于先删除一次
-            var compressed = MarcRecord.CompressMaskText(old_mask_text);
+            var compressed = MarcRecord.CompressMaskText(old_mask_text, PaddingChar);
 
             string result = "";
             // compress 被 text 内容置换，最后长度不少于 compressed 原有长度

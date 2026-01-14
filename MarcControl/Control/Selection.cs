@@ -86,7 +86,7 @@ namespace LibraryStudio.Forms
         }
 
 
-        // 删除块中的文字。硬性删除的版本，可能会导致固定长内容的字符数变化
+        // 删除块中的文字。硬性删除的版本，删除后可能会导致原固定长内容的字符数变化
         public bool RawRemoveBolckText()
         {
             if (_selectOffs1 == _selectOffs2)

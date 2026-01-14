@@ -330,6 +330,7 @@ namespace LibraryStudio.Forms
         // 把字符串中的 mask char 有条件保留替换，删除其余字符。
         // 遇到字段结束符的时候，要把之前的完整的 5 字符(或者 3 字符)的 mask 也丢弃
         // mask char 规则: 0x01~0x03 表示字段名位置, 0x04~0x05 表示指示符位置, 0x06 表示头标区位置(最多 24 个字符都是这个值)
+        // parameters:
         public static string CompressMaskText(string text,
             char padding_char = ' ')
         {
@@ -363,29 +364,60 @@ namespace LibraryStudio.Forms
 
                 prev_char = ch;
             }
+
+            // 2026/1/14
+            TryForwardRemoveMask(result);
+
             return Clean(result.ToString());
 
-            /*
-            // 尝试移除末尾连续的一段普通字符
-            void TryRemoveTailNormal(StringBuilder b)
+            // 尝试从头到尾遍历，移除邻接字段结束符的连续的一段 mask 字符
+            // 如果 start_value 不为 0，则表示从该值开始检查连续性。如果为 0，表示每当中间遇到字段结束符时才开始计算增量
+            void TryForwardRemoveMask(StringBuilder b, char start_value = (char)0)
             {
                 if (b.Length == 0)
-                    return;
-                int s = 0;
-                int e = b.Length - 1;
-                // 倒着检查
-                for (int i = e; i >= s; i--)
                 {
-                    char ch = b[i];
-                    if (ch <= 0x06 || ch == Metrics.FieldEndCharDefault)
+                    return;
+                }
+
+                char value = start_value;
+                bool in_range = value == (char)1;
+                int index = 0;
+                // 正着检查，看 value 是否连续
+                while (index < result.Length)
+                {
+                    if (b[index] == Metrics.FieldEndCharDefault)
                     {
-                        b.Remove(i + 1, b.Length - (i + 1));
-                        return; // 出现 mask char
+                        value = (char)1;
+                        in_range = true;
+                        index++;
+                        continue;
+                    }
+                    if (b[index] != value)
+                    {
+                        value = (char)0; // 出现不连续的
+                        in_range = false;
+                        index++;
+                        continue;
+                    }
+
+
+                    if (in_range)
+                    {
+                        b.Remove(index, 1);
+
+                        value++;
+                        if (value > 5)
+                        {
+                            value = (char)0;
+                            in_range = false;
+                        }
+                    }
+                    else
+                    {
+                        index++;
                     }
                 }
-                b.Clear();
             }
-            */
 
             // 尝试移除末尾连续的一段 mask 字符
             void TryRemoveTailMask(StringBuilder b, int len)
@@ -445,8 +477,22 @@ namespace LibraryStudio.Forms
             char Last(StringBuilder b)
             {
                 if (b.Length == 0)
+                {
                     return (char)0;
+                }
+
                 return b[b.Length - 1];
+            }
+
+            // 获得 StringBuilder 的第一个字符
+            char First(StringBuilder b)
+            {
+                if (b.Length == 0)
+                {
+                    return (char)0;
+                }
+
+                return b[0];
             }
         }
 
@@ -508,6 +554,30 @@ namespace LibraryStudio.Forms
             {
                 return offs0 >= start0 && offs0 < end0;
             }
+        }
+#endif
+
+#if REMOVED
+        // parameters:
+        //      next_char_is_field_end  [out] end 位置之后的一个字符，如果存在这个字符，并且这个字符是字段结束符，则本参数返回 true
+        public string MergeTextMask(int start,
+            int end,
+            out bool reach_field_end)
+        {
+            reach_field_end = false;
+            var text1 = MergeTextMask(start, end);
+
+            if (end != int.MaxValue)
+            {
+                int end1 = end + 1;
+                var next_char = MergeTextMask(start + text1.Length, start + text1.Length + 1);
+                if (next_char.Length == 1
+                    && next_char[0] == Metrics.FieldEndCharDefault)
+                {
+                    reach_field_end = true;
+                }
+            }
+            return text1;
         }
 #endif
 
@@ -1491,7 +1561,8 @@ namespace LibraryStudio.Forms
                         }
                     }
                     // 在头标区范围内，变长，拉上后面的一个字段
-                    if (end + delta < 24 && delta > 0)
+                    // TODO: 这里的边界情况要单元测试一下
+                    if (end + delta <= 24 && delta > 0)
                     {
                         right.Append(field.MergeFullText());
                         results.Add(field);
@@ -3077,7 +3148,7 @@ out int count)
         {
             if (_fields == null)
                 return;
-            foreach(var field in _fields)
+            foreach (var field in _fields)
             {
                 field?.Dispose();
             }
@@ -3088,7 +3159,7 @@ out int count)
         // 避免 field 没有 Dispose() 就删除
         static void RemoveFields(List<MarcField> fields, int start, int count)
         {
-            for(int i=start; i<start+count; i++)
+            for (int i = start; i < start + count; i++)
             {
                 fields[i]?.Dispose();
             }
