@@ -629,3 +629,162 @@ using (var cache = new SafeSCRIPT_CACHE()) 用法速度慢
 
 ~~~
 Tab 键从当前子字段跳到下一个子字段。Shift+Tab 键从当前子字段跳到上一个子字段。
+
+
+~~~
+原有的 MarcRecord.MoveByOffs() 代码:
+
+        // 根据 Caret Offs 进行移动
+        // 注: 偏移位置中有一些位置是具有多个可用位置的情况。比如 Paragraph 中
+        // 下一行的开头等同于上一行的末尾，为了获得其中期望的一个可用位置，可善用
+        // direction 参数值，direction
+        // 小于 0 表示这是从后向前移动，如果遇到后方可用的位置优先使用后方的；direction
+        // 大于 0 表表示这是从前向后的移动，如果遇到靠前的可用位置优先使用靠前的。
+        // 而如果 direction 为零，则无法表达取舍倾向性。比如 offs:1 direction:0。如果确有倾向性要求，
+        // 以倾向靠后的可用位置为例，上例可以改为以 offs:2 direction:-1 调用。
+        // parameters:
+        //      offs    插入符在当前对象中的偏移
+        //      direction   -1 向左 0 原地 1 向右
+        // return:
+        //      -1  越过左边
+        //      0   成功
+        //      1   越过右边
+        public int MoveByOffs(int offs_param,
+            int direction,
+            out HitInfo info)
+        {
+            info = new HitInfo();
+
+            var infos = new List<HitInfo>();
+
+            int offs = 0;
+            MarcField field = null;
+            int start_y = 0;
+            for (int i = 0; i < _fields.Count; i++)
+            {
+                // info.RangeIndex = 0;
+                field = _fields[i] as MarcField;
+                // TODO: 改为使用 .FullTextLength
+                var line_text_length = field.PureTextLength;
+                var return_length = i == 0 ? 0 : 1;
+                var text_length = line_text_length + return_length;
+                if (offs_param + direction >= offs && offs_param + direction < offs + text_length)
+                {
+                    var ret = field.MoveByOffs(offs_param - offs,
+                        direction,
+                        out HitInfo hit_info);
+                    if (ret == 0)
+                    {
+                        Debug.Assert(ret == 0);
+
+                        var temp_info = new HitInfo
+                        {
+                            X = hit_info.X,
+                            Y = hit_info.Y + start_y,
+                            Area = hit_info.Area,
+                            ChildIndex = i,
+                            TextIndex = hit_info.Offs,
+                            Offs = offs + hit_info.Offs,
+                            LineHeight = hit_info.LineHeight,
+                            InnerHitInfo = hit_info,
+                        };
+
+                        if (direction >= 0)
+                        {
+                            info = temp_info;
+                            return 0;
+                        }
+                        // 暂时不返回，继续匹配后面可能匹配的位置
+                        infos.Add(temp_info);
+                    }
+                }
+                else
+                {
+                    // 如果早先发生过匹配，则表明此时发生不匹配以后，再往后不可能发生匹配了，
+                    // 于是及时返回，避免多余的后继匹配操作
+                    if (infos.Count > 0)
+                    {
+                        info = infos[infos.Count - 1];
+                        return 0;
+                    }
+                }
+
+                offs += text_length;
+                start_y += field.GetPixelHeight();
+            }
+
+            if (offs == offs_param + direction)
+            {
+                if (_fields.Count > 0)
+                {
+                    // 最后一个字段的结束符右侧
+                    var last_field = _fields.Last();
+                    // 找最后一个字段的第一个字符的 caret 位置
+                    var ret = last_field.MoveByOffs(0,
+        0,
+        out HitInfo hit_info);
+                    if (ret == 0)
+                    {
+                        // 头标区得到的 x 在 content 区，要调整到 name 区
+                        if (this._fields.Count == 1)
+                            hit_info.X = _fieldProperty.NameX;
+
+                        var temp_info = new HitInfo
+                        {
+                            X = hit_info.X,
+                            Y = hit_info.Y + start_y,
+                            Area = hit_info.Area,
+                            ChildIndex = _fields.Count,
+                            TextIndex = hit_info.Offs,
+                            Offs = offs + hit_info.Offs,
+                            LineHeight = hit_info.LineHeight,
+                            InnerHitInfo = hit_info,
+                        };
+                        info = temp_info;
+                        return 0;
+                    }
+                }
+                else
+                {
+                    // 连头标区都没有
+                    info = new HitInfo
+                    {
+                        X = _fieldProperty.NameX,
+                        Y = 0 + start_y,
+                        Area = Area.BottomBlank,
+                        ChildIndex = _fields.Count,
+                        TextIndex = 0,
+                        Offs = offs,
+                        LineHeight = FontContext.DefaultFontHeight,
+                        InnerHitInfo = null,
+                    };
+                    return 0;
+                }
+            }
+
+            if (infos.Count > 0)
+            {
+                info = infos[infos.Count - 1];
+                return 0;
+            }
+
+            // 没有任何 MarcField 的情况
+            if (_fields.Count == 0
+                && offs + direction == 0)
+            {
+                info.X = 0;
+                info.Y = 0;
+                info.ChildIndex = 0;
+                info.Offs = offs + direction;
+                info.TextIndex = 0;
+                info.Area = Area.Text;
+                info.LineHeight = 0;    //  Line.GetLineHeight();
+                return 0;
+            }
+
+            // TODO: 定位到尽量靠后的一个 marcfield 末尾
+            info.Area = Area.BottomBlank;
+            return 1;
+        }
+
+

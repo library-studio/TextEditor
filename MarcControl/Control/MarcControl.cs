@@ -1273,9 +1273,7 @@ out long left_width);
         #endregion
 
 
-        //bool _shiftPressed = false; // Shift 键是否按下
-        //bool _controlPressed = false;
-        bool _shiftPressed
+        bool shiftPressed
         {
             get
             {
@@ -1283,7 +1281,7 @@ out long left_width);
             }
         }
 
-        bool _controlPressed
+        bool controlPressed
         {
             get
             {
@@ -1302,7 +1300,7 @@ out long left_width);
                 case Keys.Left:
                 case Keys.Right:
                     {
-                        if (_controlPressed)
+                        if (controlPressed)
                         {
                             // 如果是向左，并且 caret 正好在块头部，需要先向左移动一个字符
                             if (
@@ -1343,7 +1341,7 @@ out long left_width);
 
                             HitInfo info = null;
                             int ret = 0;
-                            if (HasSelection() && _shiftPressed == false)
+                            if (HasSelection() && shiftPressed == false)
                             {
                                 int offs;
                                 if (e.KeyCode == Keys.Left)
@@ -1362,7 +1360,7 @@ out long left_width);
                             else
                             {
                                 // 向右移动，且在头标区内，需要特殊处理
-                                if (_shiftPressed == false && e.KeyCode == Keys.Right
+                                if (shiftPressed == false && e.KeyCode == Keys.Right
                                     && _caretInfo.ChildIndex == 0)
                                 {
                                     // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
@@ -1383,7 +1381,7 @@ out long left_width);
                             //SetCaretOffs(info.Offs);
                             MoveCaret(info);
 
-                            if (_shiftPressed)
+                            if (shiftPressed)
                                 _selectOffs2 = _caret_offs;
                             else
                             {
@@ -1399,7 +1397,7 @@ out long left_width);
                     break;
                 case Keys.Up:
                     // 整块选择字段
-                    if (_controlPressed)
+                    if (controlPressed)
                     {
                         if (InSelectingField() == false)
                         {
@@ -1439,7 +1437,7 @@ out long left_width);
 
                             ChangeSelection(() =>
                             {
-                                if (_shiftPressed)
+                                if (shiftPressed)
                                     _selectOffs2 = _caret_offs;
                                 else
                                 {
@@ -1464,7 +1462,7 @@ out long left_width);
                     break;
                 case Keys.Down:
                     // 整块选择字段
-                    if (_controlPressed)
+                    if (controlPressed)
                     {
                         if (InSelectingField() == false)
                         {
@@ -1502,7 +1500,7 @@ out long left_width);
 
                             ChangeSelection(() =>
                             {
-                                if (_shiftPressed)
+                                if (shiftPressed)
                                     _selectOffs2 = _caret_offs;
                                 else
                                 {
@@ -1532,7 +1530,7 @@ out long left_width);
 
                         HitInfo info = null;
                         int ret = 0;
-                        if (HasSelection() && _shiftPressed == false)
+                        if (HasSelection() && shiftPressed == false)
                         {
                             int offs;
                             if (e.KeyCode == Keys.Home)
@@ -1550,7 +1548,7 @@ out long left_width);
                         }
                         else
                         {
-                            if (_controlPressed)
+                            if (controlPressed)
                             {
                                 ret = _record.MoveByOffs(e.KeyCode == Keys.Home ? 0 : this._record.TextLength,
     0,
@@ -1635,7 +1633,7 @@ out long left_width);
                         //SetCaretOffs(info.Offs);
                         MoveCaret(info);
 
-                        if (_shiftPressed)
+                        if (shiftPressed)
                             _selectOffs2 = _caret_offs;
                         else
                         {
@@ -1680,7 +1678,7 @@ out long left_width);
 
                             ChangeSelection(() =>
                             {
-                                if (_shiftPressed)
+                                if (shiftPressed)
                                     _selectOffs2 = _caret_offs;
                                 else
                                 {
@@ -1705,92 +1703,29 @@ out long left_width);
 
                     }
                     break;
-                case Keys.ShiftKey:
-                    //_shiftPressed = true;
-                    break;
-                case Keys.ControlKey:
-                    //_controlPressed = true;
-                    break;
                 case Keys.Delete:
                     if (ProcessDeleteKey(_caretInfo, _deleteKeyStyle) == true)
+                    {
                         e.Handled = true;
+                    }
+
                     break;
                 case Keys.Back:
-#if REMOVED
-                    if (this._readonly)
-                        return;
-                    if (HasBlock())
-                        SoftlyRemoveBolckText();
-                    else
-                    {
-                        var delay = _keySpeedDetector.Detect();
-                        if (_global_offs > 0)
-                        {
-                            // TODO: 改写函数，单独执行 back space 功能
-                            // 函数难点在于，向左移动“一步”，在泰文等特殊语言中，可能不只是一个 char
-                            // TODO: 注意连续的、不可分割的一个整体的多个字符情况
-                            var replace = this._record.GetReplaceMode(_caretInfo,
-                                "backspace",
-                                PaddingChar,
-                                out string fill_content);
-                            if (string.IsNullOrEmpty(fill_content) == false)
-                                ReplaceText(_global_offs,
-                                    _global_offs,
-                                    fill_content,
-                                    delay_update: delay,
-                                    false);
-
-                            // 记忆起点 offs
-                            var old_offs = _global_offs;
-                            // 移动插入符
-                            var ret = _record.MoveByOffs(_global_offs, -1, out HitInfo info);
-                            if (ret != 0)
-                                break;
-
-                            SetGlobalOffs(info.Offs);
-
-                            // 删除一个或者多个字符
-                            if (replace)
-                                ReplaceText(_global_offs,
-                                    old_offs,
-                                    new string(PaddingChar, old_offs - _global_offs),
-                                    delay_update: delay,
-                                    false);
-                            else
-                                ReplaceText(_global_offs,
-                                    old_offs,
-                                    "",
-                                    delay_update: delay,
-                                    false);
-
-                            //this.Invalidate();
-
-                            // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
-                            _record.MoveByOffs(_global_offs + 1, -1, out info);
-
-                            MoveCaret(info);
-
-                            _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
-
-#if REMOVED
-                            // 删除前一个字符
-                            _content = _content.Remove(_global_offs - 1, 1);
-                            // 迫使重新计算行高，重新布局 Layout
-                            Relayout(false); // 不改变 _global_offs 的值
-
-                            DeltaGlobalOffs(-1);
-                            this.Invalidate();
-#endif
-                        }
-                    }
-                    e.Handled = true;
-                    return;
-#endif
                     if (ProcessBackspaceKey(_caretInfo) == true)
                     {
                         e.Handled = true;
                     }
 
+                    break;
+
+                case Keys.Tab:
+                    {
+                        var offs = GetNextSubfieldOffs(shiftPressed, out int delta);
+                        if (offs != -1)
+                        {
+                            SetCaret(HitByCaretOffs(offs - delta, delta));
+                        }
+                    }
                     break;
             }
             base.OnKeyDown(e);
@@ -1801,11 +1736,9 @@ out long left_width);
             switch (e.KeyCode)
             {
                 case Keys.ShiftKey:
-                    //_shiftPressed = false;
                     EndFieldSelect();
                     break;
                 case Keys.ControlKey:
-                    //_controlPressed = false;
                     EndFieldSelect();
                     break;
             }

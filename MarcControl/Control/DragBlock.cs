@@ -78,7 +78,7 @@ namespace LibraryStudio.Forms
             var text = _record.MergeText(start, start + length);
 
             bool copy = true;
-            if (_controlPressed == false)
+            if (controlPressed == false)
             {
                 // 先剪切，再粘贴
                 SoftlyRemoveSelectionText();

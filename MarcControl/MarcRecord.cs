@@ -657,7 +657,7 @@ namespace LibraryStudio.Forms
                 var line_text_length = field.PureTextLength;
                 var return_length = i == 0 ? 0 : 1;
                 var text_length = line_text_length + return_length;
-                if (offs_param + direction >= offs && offs_param + direction < offs + text_length)
+                if (offs_param + direction >= offs && offs_param + direction <= offs + text_length) // 2026/1/15 从 < 改为 <=
                 {
                     var ret = field.MoveByOffs(offs_param - offs,
                         direction,

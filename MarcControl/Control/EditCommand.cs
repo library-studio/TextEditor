@@ -991,6 +991,130 @@ namespace LibraryStudio.Forms
             return true;
         }
 
+        // 根据当前插入符位置，获得下一个子字段的起始位置
+        public int GetNextSubfieldOffs(bool prev,
+            out int delta)
+        {
+            delta = 0;
+            var index = this.CaretFieldIndex;
+            /*
+            var field_info = this._record.LocateFields(_caret_offs, _caret_offs).FirstOrDefault();
+            if (field_info == null)
+                return -1;
+            */
+            if (index >= this._record.FieldCount)
+            {
+                if (prev)
+                {
+                    return Math.Max(0, this._record.TextLength - 1);
+                }
+
+                return -1;
+            }
+            var field = this._record.GetField(index);
+            if (this._record.GetFieldOffsRange(index,
+    out int start,
+    out int end) == false)
+            {
+                return -1;
+            }
+
+            var subfield_info = field.GetSubfieldBoundsEx(_caret_offs - start, true);
+
+            int offs_start = start + subfield_info.StartOffs;
+            int offs_end = start + subfield_info.EndOffs;
+
+            if (prev)
+            {
+                if (_caret_offs > offs_end)
+                {
+                    return offs_end;
+                }
+                else if (_caret_offs > offs_start)
+                {
+                    delta = -1; // 靠后
+                    return offs_start;
+                }
+                else
+                {
+                    if (_caret_offs <= start)
+                    {
+                        // 寻找上一个字段
+                        index--;
+                        if (index < 0)
+                        {
+                            return -1;
+                        }
+                        field = this._record.GetField(index);
+                        this._record.GetFieldOffsRange(index,
+                            out start,
+                            out end);
+                        subfield_info = field.GetSubfieldBoundsEx(
+                            end - (index == 0 ? 0 : 1),
+                            true);
+                        var content_end = end - (index == 0 ? 0 : 1);
+                        if (index == 0) // 头标区需要微调一下才能定位到 24 字符右侧。否则就会定位到 001 第一字符
+                        {
+                            delta = 1;  // 优先用靠前的位置
+                        }
+                        else
+                            delta = -1; // 靠后
+
+                        return content_end;
+                        /*
+                        if (index == 0) // 头标区需要微调一下才能定位到 24 字符右侧。否则就会定位到 001 第一字符
+                        {
+                            delta = 1;  // 优先用靠前的位置
+                        }
+
+                        return start + subfield_info.EndOffs;
+                        */
+                    }
+
+                    // 寻找上一个子字段
+                    subfield_info = field.GetSubfieldBoundsEx(offs_start - 1 - start, false);
+                    delta = -1; // 靠后
+                    return start + subfield_info.StartOffs;
+                }
+            }
+
+            if (_caret_offs < offs_start)
+            {
+                return _caret_offs;
+            }
+            else if (_caret_offs < offs_end)
+            {
+                return offs_end;
+            }
+            else
+            {
+                var content_end = end - (index == 0 ? 0 : 1);
+                if (_caret_offs == content_end && content_end != end)
+                {
+                    return end;
+                }
+
+                if (_caret_offs >= end) // end 左侧是字段结束符
+                {
+                    // 寻找下一个字段
+                    index++;
+                    if (index >= this._record.FieldCount)
+                    {
+                        return -1;
+                    }
+                    field = this._record.GetField(index);
+                    this._record.GetFieldOffsRange(index,
+                        out start,
+                        out end);
+                    delta = -1; // 靠后
+                    return Math.Min(start, this._record.TextLength);
+                }
+                // 寻找下一个子字段
+                subfield_info = field.GetSubfieldBoundsEx(offs_end + 1 - start, true);
+                return start + subfield_info.EndOffs;
+            }
+        }
+
         private bool _selectCurrentFull = true;
         // 选择当前插入符所在子字段为文字块
         // 除了子字段，字段名，指示符，或者子字段左侧的无主文字，都可以被选择
@@ -1129,7 +1253,9 @@ namespace LibraryStudio.Forms
                 start + length,
                 text,
                 delay_update: false);
-            this.Select(start, start + text.Length, start + 1, -1);
+            // this.Select(start, start + text.Length, start + 1, -1);
+            int end = start + text.Length;
+            this.Select(end, end, end + 1, -1);
             return true;
         }
 
@@ -1172,7 +1298,9 @@ namespace LibraryStudio.Forms
                 start + old_mask_text.Length,
                 result,
                 delay_update: false);
-            this.Select(start, start + result.Length, start + 1, -1);
+            // this.Select(start, start + result.Length, start + 1, -1);
+            int end = start + result.Length;
+            this.Select(end, end, end + 1, -1);
             return true;
         }
 

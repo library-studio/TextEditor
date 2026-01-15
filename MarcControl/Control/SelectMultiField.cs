@@ -27,7 +27,7 @@ namespace LibraryStudio.Forms
         void BeginFieldSelect(int index)
         {
             // 如果是按住 Ctrl 键进入本函数，则要汇总当前已有的 offs range 对应的 field index start end range，以便开始在此基础上修改选择
-            if (_shiftPressed || _controlPressed)
+            if (shiftPressed || controlPressed)
             {
                 // Ctrl 键被按下的时候，观察 _select_field_start 是否有以前
                 // 残留的值，如果有则说明刚点选过(完整)字段，可以直接利用
@@ -88,7 +88,7 @@ namespace LibraryStudio.Forms
 
         void EndFieldSelect()
         {
-            if (_shiftPressed || _controlPressed)
+            if (shiftPressed || controlPressed)
             {
                 // 中途不改变 _selecting_field
             }
