@@ -543,6 +543,7 @@ namespace LibraryStudio.Forms
             bool clear_history = false)
         {
             string replaced_text = this._record.MergeText();
+            value = CleanContent(value);
             Relayout(value, true);
             if (set_changed)
                 SetChanged();
@@ -577,6 +578,16 @@ namespace LibraryStudio.Forms
                     });
                 }
             }
+        }
+
+        static string CleanContent(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return "";
+            var index = text.IndexOf(Metrics.RecordEndCharDefault);
+            if (index != -1)
+                return text.Substring(0, index);
+            return text;
         }
 
 

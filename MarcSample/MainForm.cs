@@ -186,7 +186,7 @@ namespace MarcSample
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            StopClipboardStressTest();
+            Stop();
             SaveMarc();
             SaveState();
         }
@@ -261,18 +261,18 @@ namespace MarcSample
 
         private void MenuItem_stopStressTest_Click(object sender, EventArgs e)
         {
-            StopClipboardStressTest();
+            Stop();
         }
 
         #region Clipboard Stress Testing
 
-        CancellationTokenSource _cancelStress = null;
+        CancellationTokenSource _cancel = null;
 
         void StartClipboardStressTest()
         {
-            StopClipboardStressTest();
-            _cancelStress = new CancellationTokenSource();
-            var token = _cancelStress.Token;
+            Stop();
+            _cancel = new CancellationTokenSource();
+            var token = _cancel.Token;
             var task = Task.Factory.StartNew((o) =>
             {
                 try
@@ -307,13 +307,13 @@ namespace MarcSample
             TaskScheduler.Default);
         }
 
-        void StopClipboardStressTest()
+        void Stop()
         {
-            if (_cancelStress != null)
+            if (_cancel != null)
             {
-                _cancelStress.Cancel();
-                _cancelStress.Dispose();
-                _cancelStress = null;
+                _cancel.Cancel();
+                _cancel.Dispose();
+                _cancel = null;
             }
         }
 
@@ -370,6 +370,72 @@ namespace MarcSample
             }
 
             return text.ToString();
+        }
+
+        private async void MenuItem_test_loadFromCompactFile_Click(object sender, EventArgs e)
+        {
+            Stop();
+            _cancel = new CancellationTokenSource();
+            var token = _cancel.Token;
+
+            using (OpenFileDialog dlg = new OpenFileDialog())
+            {
+                dlg.Title = $"Open compact file";
+                dlg.Filter = "*.compact|*.compact|All files (*.*)|*.*";
+                dlg.RestoreDirectory = true;
+
+                if (dlg.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+
+                await Task.Factory.StartNew((t) =>
+                    {
+                        foreach (var content in CompactReader(dlg.FileName, Encoding.UTF8))
+                        {
+                            if (token.IsCancellationRequested)
+                                break;
+                            this.Invoke(new Action(() => {
+                                this.marcControl1.Content = content;
+                                this.marcControl1.Update();
+                            }));
+                            Thread.Sleep(500);
+                        }
+                    },
+                    null,
+                    token,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
+            }
+        }
+
+        static IEnumerable<string> CompactReader(string filename,
+            Encoding encoding)
+        {
+            using (var stream = File.OpenRead(filename))
+            using (var s = new BufferedStream(stream))
+            {
+                List<byte> buffer = new List<byte>();
+                while (true)
+                {
+                    var ret = s.ReadByte();
+                    if (ret == -1)
+                    {
+                        if (buffer.Count > 0)
+                        {
+                            yield return encoding.GetString(buffer.ToArray());
+                        }
+
+                        yield break;
+                    }
+                    buffer.Add((byte)ret);
+                    if (ret == 29)
+                    {
+                        yield return Encoding.UTF8.GetString(buffer.ToArray());
+                        buffer.Clear();
+                    }
+                }
+            }
         }
     }
 }

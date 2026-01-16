@@ -618,10 +618,11 @@ using (var cache = new SafeSCRIPT_CACHE()) 用法速度慢
 用海量 MARC 机内格式数据不断装入 MarcControl，观察对其中不具备字形的 char 的替代显示情况，观察内存和 GDI 句柄使用情况，验证没有内存泄漏和句柄泄漏。
 
 ~~~
+(已经实现)
 安全删除块的时候，如果出现了一个块定义，头部是一个字段结束符，尾部是一个字段的最后一个字符，那么可以认为可以全部删除，
 不用保留任何字符。
 也可以理解为头部字符不删除，从第二个字符开始一直删除到最后一个字符外加多删除一个字段结束符。不过这种删除方法，进入编辑历史
-的信息发生了一点不同，当 Undo 的时候操作者会感到诧异。另外这样删除以后插入符的位置也会靠后一个字符。
+的信息发生了一点不同，当 Undo 的时候操作者会感到诧异。另外这样删除以后插入符的位置也会靠后一个字符。(未采纳)
 
 
 ~~~
@@ -787,4 +788,97 @@ Tab 键从当前子字段跳到下一个子字段。Shift+Tab 键从当前子字
             return 1;
         }
 
+        ~~~~
+                void PaintHilightText(
+            IContext context,
+            SafeHDC hdc,
+            int x,
+            int y,
+            Line line,
+            int line_height,
+            int[] indices,
+            Rectangle block_rect,
+            Rectangle clipRect)
+        {
+            foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+            {
+                var range = line.Ranges[index];
 
+                Font used_font = range.Font;
+                IntPtr font_handle = context.GetFontHandle(range.Font);
+
+                int iReserved = 0;
+
+                /*
+                // Range 的主体矩形。斜体情况可能会有部分笔画伸出这个矩形之外
+                Rectangle item_rect = new Rectangle(
+                    x + range.Left,
+                    y,
+                    range.PixelWidth,   // (int)(pABC.abcA + pABC.abcB + pABC.abcC);
+                    line_height);
+
+                // Range 的外围包围矩形。可能比 item_rect 宽度更大(比如斜体情况)
+                // 用于判断 Clip 交叉
+                var item_bounds = AdjustRect(item_rect,
+                    range,
+                    true,
+                    true);
+                */
+
+                //var font_handle = used_font.ToHfont();
+                try
+                {
+                    // using (var cache = new SafeSCRIPT_CACHE())
+                    var cache = new SafeSCRIPT_CACHE();
+                    using (var dc_context = hdc.SelectObject(font_handle))
+                    {
+                        /*
+                        //testing
+                        DrawSolidRectangle(hdc,
+block_rect,
+Color.Green,
+clipRect);
+                        */
+
+                        // var highlight_text_color = context?.GetForeColor?.Invoke(range, true) ?? SystemColors.HighlightText;
+                        var highlight_text_color = range.ColorCache
+                            .GetForeColor(
+                            context?.GetForeColor,
+                            range,
+                            true);
+                        var old_color = Gdi32.SetTextColor(hdc, new COLORREF(highlight_text_color));
+                        var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
+                        try
+                        {
+                            var ret = ScriptTextOut(hdc,
+            cache,
+            x + range.Left,
+            y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
+            (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
+            Intersect(block_rect, clipRect),   // [In, Optional] PRECT lprc,
+            range.a,  // line.Item.a, // in SCRIPT_ANALYSIS psa,
+            range.DisplayText,  // range.Text,  //  [Optional, MarshalAs(UnmanagedType.LPWStr)] string ? pwcReserved,
+            iReserved,  //  [Optional] int iReserved,
+            range.glfs,   // [In, MarshalAs(UnmanagedType.LPArray)] ushort[] pwGlyphs, 
+            range.glfs.Length,    // int cGlyphs,
+            range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
+            null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
+            range.pGoffset[0]); // in GOFFSET pGoffset); 
+                            ret.ThrowIfFailed();
+                        }
+                        finally
+                        {
+                            Gdi32.SetBkMode(hdc, old_mode);
+                            Gdi32.SetTextColor(hdc, old_color); // 恢复文本颜色
+                        }
+                    }
+                }
+                finally
+                {
+                    // Gdi32.DeleteFont(font_handle);
+                }
+            }
+        }
+
+~~~
+MarcSample 中状态行显示批处理进度。

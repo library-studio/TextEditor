@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-
 using static Vanara.PInvoke.Gdi32;
+using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
 {
@@ -160,10 +160,10 @@ namespace LibraryStudio.Forms
 
         // 修改涉及到的更新区域(第二阶段全部更新)
         public Rectangle UpdateRect { get; set; } = System.Drawing.Rectangle.Empty;
-        
+
         // 卷滚区域
         public Rectangle ScrollRect { get; set; } = System.Drawing.Rectangle.Empty;
-        
+
         // 卷滚距离
         public int ScrolledDistance { get; set; }
 
@@ -205,9 +205,24 @@ namespace LibraryStudio.Forms
         // 获得可用字体集合
         GetFontFunc GetFont { get; set; }
 
-        IntPtr GetFontHandle(Font font);
+        IFontCacheItem GetFontCache(Font font);
 
         void ClearFontCache();
+    }
+
+    public interface IFontCacheItem : IDisposable
+    {
+        Font Font { get; }
+        IntPtr Handle { get; }
+        SafeSCRIPT_CACHE Cache { get; }
+        IFontMetrics FontMetrics { get; }
+    }
+
+    public interface IFontMetrics
+    {
+        float Ascent { get; }
+        float Descent { get; }
+        float Spacing { get; }
     }
 
     // 用于预先切割文字为更小段落的函数

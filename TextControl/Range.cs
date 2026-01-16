@@ -592,13 +592,20 @@ namespace LibraryStudio.Forms
 
 
         // 设置好本 Range 的文字基线
-        public void ProcessBaseline(Font default_font)
+        public void ProcessBaseline(IContext context,
+            Font default_font)
         {
             var range = this;
             var font = range.Font;
             if (font == null)
                 font = default_font;
 
+            var metrics = context.GetFontCache(font).FontMetrics;
+            this.Ascent = metrics.Ascent;
+            this.Spacing = metrics.Spacing;
+            this.Descent = metrics.Descent;
+
+#if REMOVED
             var fontFamily = font.FontFamily;
             var height = font.GetHeight();
 
@@ -618,6 +625,7 @@ namespace LibraryStudio.Forms
             this.Ascent = up_height;
             this.Spacing = spacing_height;
             this.Descent = below_height;
+#endif
         }
 
         public virtual void ClearCache()

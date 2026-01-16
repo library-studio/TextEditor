@@ -2,10 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Vanara.PInvoke;
+
+using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
 {
@@ -37,30 +36,31 @@ namespace LibraryStudio.Forms
 
         Hashtable _font_cache = new Hashtable();
 
-        public IntPtr GetFontHandle(Font font)
+        public IFontCacheItem GetFontCache(Font font)
         {
             if (_font_cache == null)
             {
                 _font_cache = new Hashtable();
             }
 
-            var handle = IntPtr.Zero;
+            FontCacheItem item = null;
             if (_font_cache.Contains(font))
             {
-                handle = (IntPtr)_font_cache[font];
+                item = (FontCacheItem)_font_cache[font];
             }
             else
             {
-                handle = font.ToHfont();
+                item = new FontCacheItem(font);
+
                 if (_font_cache.Count > 1000)
                 {
-                    _font_cache.Clear();
+                    ClearFontCache();
                 }
 
-                _font_cache[font] = handle;
+                _font_cache[font] = item;
             }
 
-            return handle;
+            return item;
         }
 
         public void ClearFontCache()
@@ -72,11 +72,8 @@ namespace LibraryStudio.Forms
 
             foreach (var key in _font_cache.Keys)
             {
-                var handle = (IntPtr)_font_cache[key];
-                if (handle != IntPtr.Zero)
-                {
-                    Gdi32.DeleteObject(handle);
-                }
+                var item = (FontCacheItem)_font_cache[key];
+                item?.Dispose();
             }
             _font_cache.Clear();
         }
@@ -86,4 +83,85 @@ namespace LibraryStudio.Forms
             ClearFontCache();
         }
     }
+
+
+    public class FontCacheItem : IFontCacheItem
+    {
+        Font _font;
+        IntPtr _handle;
+        SafeSCRIPT_CACHE _cache;
+        FontMetrics _fontMetrics;
+
+        public FontCacheItem(Font font)
+        {
+            _font = font;
+            _handle = font.ToHfont();
+            _cache = new SafeSCRIPT_CACHE();
+        }
+
+        public Font Font { get => _font; }
+        public IntPtr Handle { get => _handle; }
+        public SafeSCRIPT_CACHE Cache { get => _cache; }
+
+        public IFontMetrics FontMetrics
+        {
+            get
+            {
+                if (_fontMetrics == null)
+                {
+                    _fontMetrics = new FontMetrics(_font);
+                }
+
+                return _fontMetrics;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (this._handle != IntPtr.Zero)
+            {
+                Gdi32.DeleteObject(this._handle);
+            }
+            this._cache?.Dispose();
+        }
+    }
+
+    public class FontMetrics : IFontMetrics
+    {
+        public float _ascent;
+        public float _descent;
+        public float _spacing;
+
+        public FontMetrics(Font font)
+        {
+            var fontFamily = font.FontFamily;
+            var height = font.GetHeight();
+
+            var ascent = fontFamily.GetCellAscent(font.Style);
+            var descent = fontFamily.GetCellDescent(font.Style);
+            var line_spacing = fontFamily.GetLineSpacing(font.Style);
+
+            var em_height = line_spacing;
+            var spacing = em_height - (ascent + descent);
+
+            var up_height = height * ascent / em_height;
+            var spacing_height = height * spacing / em_height;
+            var below_height = height * descent / em_height;
+
+            // Debug.WriteLine($"{fontFamily.Name} height={height} em_height={em_height} spacing={spacing} ascent={ascent} descent={descent} up_height={up_height} blow_height={below_height} spacing_height={spacing_height}");
+
+            this._ascent = up_height;
+            this._spacing = spacing_height;
+            this._descent = below_height;
+        }
+
+        public float Ascent => _ascent;
+
+        public float Descent => _descent;
+
+        public float Spacing => _spacing;
+    }
+
+
+
 }

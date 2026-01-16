@@ -5,11 +5,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using Vanara.PInvoke;
-using static System.Windows.Forms.LinkLabel;
 using static Vanara.PInvoke.Gdi32;
-using static Vanara.PInvoke.Imm32;
-using static Vanara.PInvoke.Kernel32;
-using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.Usp10;
 
 namespace LibraryStudio.Forms
@@ -1453,8 +1449,10 @@ out replace_count);
                     if (FontContext.CheckSupporting(font, sa.eScript) == false)
                         continue;
 
-                    IntPtr font_handle = context.GetFontHandle(font);
+                    var cache_item = context.GetFontCache(font);
+                    IntPtr font_handle = cache_item.Handle;
                     // var font_handle = font.ToHfont();
+                    GdiObjectContext dc_context = null;
                     try
                     {
                     REDO:
@@ -1463,13 +1461,12 @@ out replace_count);
                         sva = new SCRIPT_VISATTR[max];
 
                         // var handle = Gdi32.SelectObject(dc, font.ToHfont());
-                        // using (var cache = new SafeSCRIPT_CACHE())
-                        var cache = new SafeSCRIPT_CACHE();
-                        using (var dc_context = dc.SelectObject(font_handle))
                         {
                             uint USP_E_SCRIPT_NOT_IN_FONT = 0x80040200;
-                            var result = ScriptShape(dc,
-                                cache,
+                            SafeHDC current = SafeHDC.Null;
+                        REDO_SHAPE:
+                            var result = ScriptShape(current,
+                                cache_item.Cache,
                                 str,
                                 str.Length,
                                 max,
@@ -1478,8 +1475,17 @@ out replace_count);
                                 log,
                                 sva,
                                 out var c);
+                            if (result == HRESULT.E_PENDING && current == SafeHDC.Null)
+                            {
+                                current = dc;
+                                dc_context = dc.SelectObject(font_handle);
+                                goto REDO_SHAPE;
+                            }
+
                             if (result == USP_E_SCRIPT_NOT_IN_FONT)
+                            {
                                 continue;
+                            }
 
                             if (result == HRESULT.E_OUTOFMEMORY)
                             {
@@ -1516,8 +1522,9 @@ out replace_count);
 
                             piAdvance = new int[c];
                             pGoffset = new GOFFSET[c];
-                            result = ScriptPlace(dc,
-                                cache,
+                        REDO_PLACE:
+                            result = ScriptPlace(current,
+                                cache_item.Cache,
                                 glfs,
                                 c,
                                 sva,
@@ -1525,6 +1532,12 @@ out replace_count);
                                 piAdvance,
                                 pGoffset,
                                 out pABC);
+                            if (result == HRESULT.E_PENDING && current == SafeHDC.Null)
+                            {
+                                current = dc;
+                                dc_context = dc.SelectObject(font_handle);
+                                goto REDO_PLACE;
+                            }
                             result.ThrowIfFailed();
 
                             return 0;
@@ -1533,6 +1546,7 @@ out replace_count);
                     finally
                     {
                         // Gdi32.DeleteFont(font_handle);
+                        // dc_context?.Dispose();
                     }
                 }
 
@@ -1632,7 +1646,7 @@ out replace_count);
                 x_offset += this.AlignmentText(pixel_width, x_offset);
             }
 
-            this.ProcessBaseline(null);
+            this.ProcessBaseline(context, null);
             return x_offset; // 返回行的 Pixel 宽度
         }
 
@@ -1714,7 +1728,7 @@ out replace_count);
                 x_offset += line.AlignmentText(pixel_width, x_offset);
             }
 
-            line.ProcessBaseline(null);
+            line.ProcessBaseline(context, null);
             return x_offset; // 返回行的 Pixel 宽度
         }
 
@@ -1939,24 +1953,27 @@ range.Text.Length);
             PRECT[] block_bounds = new PRECT[line.Ranges.Count];
             */
             // 每个 range 的矩形
-            //Rectangle[] range_abc_rects = new Rectangle[line.Ranges.Count];
+            Rectangle[] range_abc_rects = new Rectangle[line.Ranges.Count];
 
-            // 块矩形。null 表示不在块内
+            // 块矩形。考虑了 x y 的。null 表示不在块内
             Rectangle[] block_rects = new Rectangle[line.Ranges.Count];
             // abc 调整后的块矩形。null 表示不在块内
             // Rectangle[] block_abc_rects = new Rectangle[line.Ranges.Count];
 
             // 块是否包含全部文字的标志
-            bool[] full_flags = new bool[line.Ranges.Count];
+            bool[] range_selectall_flags = new bool[line.Ranges.Count];
 
-            // 是否存在至少一个 block
+            // Line 中是否存在至少一个文字块
             bool has_block = false;
+            // 是否所有的 Range 都在文字块中
+            bool all_in_block = false;
 
             // 先绘制行和块背景
             // 以逻辑顺序遍历 Ranges。注意显示位置 x 可能是跳动的
             // 每个 Range 的块背景色不能在分散到每个 Range 的处理中绘制，因为那样可能会擦掉 Range 伸出去的笔画(例如 Italic 风格的 'f')。
             if (block_start != block_end)
             {
+                all_in_block = true;
                 int i = 0;
                 int tail_range_index = 0;
                 if (line.Ranges.Count > 0 && line.piLogicalToVisual.Length > line.Ranges.Count - 1)
@@ -1965,11 +1982,10 @@ range.Text.Length);
                 {
                     var is_tail_in_line = i == tail_range_index;
 
-                    /*
                     {
                         var range_rect = new Rectangle(
-                        range.Left,
-                        range.Y,
+                        x + range.Left,
+                        y + range.Y,
                         range.GetPixelWidth(),
                         line_height);
                         range_abc_rects[i] = AdjustRect(range_rect,
@@ -1977,7 +1993,6 @@ range.Text.Length);
                             true,
                             true);
                     }
-                    */
 
                     // 绘制选中范围的背景色
                     if (block_start <= range.DisplayText.Length && block_end > 0)
@@ -1999,7 +2014,9 @@ range.Text.Length);
                         if (tail_in_block)
                         {
                             if (i == this.piLogicalToVisual[i])
+                            {
                                 block_rect.Width += FontContext.DefaultReturnWidth;
+                            }
                             else
                             {
                                 PaintReturnSelectedBack(
@@ -2012,7 +2029,10 @@ range.Text.Length);
                         }
 
                         if (block_rect.Width == 0)
+                        {
                             goto SKIP;
+                        }
+
                         Debug.Assert(block_rect.Width > 0);
 
 
@@ -2063,7 +2083,7 @@ range.Text.Length);
                         }
 #endif
 
-                        full_flags[i] = (block_start <= 0 && block_end >= range.DisplayText.Length); // 标记本 Range 是否全选
+                        range_selectall_flags[i] = (block_start <= 0 && block_end >= range.DisplayText.Length); // 标记本 Range 是否全选
 
                         /*
                         // 设置邻接标志
@@ -2075,9 +2095,13 @@ range.Text.Length);
                             neighbor_rects[i + 1] = block_rect;
                         */
                     }
+                    else
+                    {
+                        // 出现了不在 Line 中的 Range
+                        all_in_block = false;
+                    }
 
                 SKIP:
-
                     block_start -= range.DisplayText.Length;
                     block_end -= range.DisplayText.Length;
 
@@ -2132,15 +2156,16 @@ range.Text.Length);
                 if (string.IsNullOrEmpty(range.DisplayText))
                     continue;
 
-                var full_block = full_flags[index]; // 获取是否全选标志
+                var range_selectall = range_selectall_flags[index]; // 获取是否全选标志
 
                 Font used_font = range.Font;
-                IntPtr font_handle = context.GetFontHandle(range.Font);
+                var cache_item = context.GetFontCache(range.Font);
+                IntPtr font_handle = cache_item.Handle;
 
                 // 如果是全部属于块，这样的第一次显示正常文字可以省略
                 // (如果是斜体，虽然全部属于块，这里也不能省略)
                 var italic = (used_font.Style & FontStyle.Italic) != 0;
-                if (full_block && italic == false)
+                if (range_selectall && italic == false)
                     continue;
 
                 var block_rect = block_rects[index]; // 获取块背景矩形
@@ -2170,9 +2195,6 @@ range.Text.Length);
                     //var font_handle = used_font.ToHfont();
                     try
                     {
-                        // using (var cache = new SafeSCRIPT_CACHE())
-                        var cache = new SafeSCRIPT_CACHE();
-
                         using (var dc_context = hdc.SelectObject(font_handle))
                         {
 
@@ -2188,8 +2210,9 @@ range.Text.Length);
 
                             try
                             {
+                            REDO_SHAPE:
                                 var result = ScriptTextOut(hdc,
-                                            cache,
+                                            cache_item.Cache,
                                             x + range.Left,
                                             y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
                                             (int)Gdi32.ETO.ETO_CLIPPED, // fuOptions,
@@ -2202,6 +2225,13 @@ range.Text.Length);
                                             range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
                                             null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
                                             range.pGoffset[0]); // in GOFFSET pGoffset); 
+                                /*
+                                if (result == HRESULT.E_PENDING)
+                                {
+                                    hdc.SelectObject(font_handle);
+                                    goto REDO_SHAPE;
+                                }
+                                */
                                 result.ThrowIfFailed();
                             }
                             finally
@@ -2280,9 +2310,29 @@ clipRect);
 
             if (has_block)
             {
+                // 计算出要进行绘制的 Range 列表
+                List<int> paint_indices = new List<int>();
+                foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+                {
+                    var range = line.Ranges[index];
+
+                    var block_rect = block_rects[index]; // 获取块背景矩形
+                    if (block_rect == System.Drawing.Rectangle.Empty)
+                    {
+                        continue;
+                    }
+
+                    var enlarge_rect = range_abc_rects[index];
+                    if (enlarge_rect.IntersectsWith(clipRect))
+                    {
+                        paint_indices.Add(index);
+                    }
+                }
+
+
                 // 绘制块内文本
                 // 对于每一个 block_rect，都要考虑它左右两侧侵入的 Range，这些 Range 都需要绘制一次块内文本。实际上绘制的内容可能就进入 clipRect 一点点
-                foreach (var index in line.piVisualToLogical)   // piVisualToLogical
+                foreach (var index in paint_indices/*line.piVisualToLogical*/)
                 {
                     var range = line.Ranges[index];
 
@@ -2290,11 +2340,16 @@ clipRect);
                     if (block_rect == System.Drawing.Rectangle.Empty)
                         continue;
 
+#if REMOVED
                     // 寻找视觉上左右两侧的 Range，检查是否和 block_rect 交叉，如果交叉则拉在一起连续绘制一次
                     int[] GetPaintIndex(int i)
                     {
-                        return new int[] { i };
-#if REMOVED
+                        // 如果每个 Range 都处在文字块中，那么循环绘制时就没有必要拉上左右的 Range 了
+                        if (all_in_block)
+                        {
+                            return new int[] { i };
+                        }
+
                         var results = new List<int>();
                         if (i > 0)
                         {
@@ -2310,13 +2365,13 @@ clipRect);
                                 results.Add(i + 1);
                         }
                         return results.ToArray();
-#endif
                     }
+#endif
 
                     if (block_rect.IntersectsWith(clipRect))
                     {
-                        var indices = GetPaintIndex(index);
-                        Debug.Assert(indices.Length == 1);
+                        // var indices = GetPaintIndex(index);
+
                         PaintHilightText(
             context,
             hdc,
@@ -2324,7 +2379,7 @@ clipRect);
             y,
             line,
             line_height,
-            indices,
+            new int[] { index },
             block_rect,
             clipRect);
                     }
@@ -2349,7 +2404,8 @@ clipRect);
                 var range = line.Ranges[index];
 
                 Font used_font = range.Font;
-                IntPtr font_handle = context.GetFontHandle(range.Font);
+                var cache_item = context.GetFontCache(range.Font);
+                IntPtr font_handle = cache_item.Handle;
 
                 int iReserved = 0;
 
@@ -2372,8 +2428,6 @@ clipRect);
                 //var font_handle = used_font.ToHfont();
                 try
                 {
-                    // using (var cache = new SafeSCRIPT_CACHE())
-                    var cache = new SafeSCRIPT_CACHE();
                     using (var dc_context = hdc.SelectObject(font_handle))
                     {
                         /*
@@ -2394,8 +2448,9 @@ clipRect);
                         var old_mode = Gdi32.SetBkMode(hdc, Gdi32.BackgroundMode.TRANSPARENT); // 设置背景模式为透明
                         try
                         {
-                            var ret = ScriptTextOut(hdc,
-            cache,
+                        REDO_SHAPE:
+                            var result = ScriptTextOut(hdc,
+            cache_item.Cache,
             x + range.Left,
             y + range.Y,    // y + _line_height - (int)GetAscentPixel(used_font),
             (int)Gdi32.ETO.ETO_CLIPPED, // | (int)Gdi32.ETO.ETO_OPAQUE,
@@ -2407,8 +2462,15 @@ clipRect);
             range.glfs.Length,    // int cGlyphs,
             range.advances,  // [In, MarshalAs(UnmanagedType.LPArray)] int[] piAdvance,
             null,   // [In, Optional, MarshalAs(UnmanagedType.LPArray)] int[] ? piJustify,
-            range.pGoffset[0]); // in GOFFSET pGoffset); 
-                            ret.ThrowIfFailed();
+            range.pGoffset[0]); // in GOFFSET pGoffset);
+                            /*
+                            if (result == HRESULT.E_PENDING)
+                            {
+                                hdc.SelectObject(font_handle);
+                                goto REDO_SHAPE;
+                            }
+                            */
+                            result.ThrowIfFailed();
                         }
                         finally
                         {
@@ -2812,11 +2874,11 @@ clipRect);
             }
         }
 #endif
-        void ProcessBaseline(Font default_font)
+        void ProcessBaseline(IContext context, Font default_font)
         {
             foreach (var range in this.Ranges)
             {
-                range.ProcessBaseline(default_font);
+                range.ProcessBaseline(context, default_font);
             }
 
             if (this.Ranges.Count == 0)
