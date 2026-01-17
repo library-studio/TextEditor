@@ -391,15 +391,21 @@ namespace MarcSample
 
                 await Task.Factory.StartNew((t) =>
                     {
+                        int i = 0;
                         foreach (var content in CompactReader(dlg.FileName, Encoding.UTF8))
                         {
                             if (token.IsCancellationRequested)
+                            {
                                 break;
-                            this.Invoke(new Action(() => {
+                            }
+
+                            this.Invoke(new Action(() =>
+                            {
                                 this.marcControl1.Content = content;
                                 this.marcControl1.Update();
                             }));
-                            Thread.Sleep(500);
+                            SetMessage((++i).ToString());
+                            // Thread.Sleep(500);
                         }
                     },
                     null,
@@ -436,6 +442,14 @@ namespace MarcSample
                     }
                 }
             }
+        }
+
+        void SetMessage(string text)
+        {
+            this.Invoke(new Action(() =>
+            {
+                toolStripStatusLabel_message.Text = text;
+            }));
         }
     }
 }

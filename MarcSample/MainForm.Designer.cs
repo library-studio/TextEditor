@@ -42,13 +42,14 @@ namespace MarcSample
             this.MenuItem_startStressTest = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_stopStressTest = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuItem_test_randomChars = new System.Windows.Forms.ToolStripMenuItem();
+            this.MenuItem_test_loadFromCompactFile = new System.Windows.Forms.ToolStripMenuItem();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.toolStripStatusLabel_caretFieldRegion = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel_selectionRange = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStripStatusLabel_caretOffs = new System.Windows.Forms.ToolStripStatusLabel();
             this.toolStrip1 = new System.Windows.Forms.ToolStrip();
             this.marcControl1 = new LibraryStudio.Forms.MarcControl();
-            this.MenuItem_test_loadFromCompactFile = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripStatusLabel_message = new System.Windows.Forms.ToolStripStatusLabel();
             this.menuStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
@@ -64,7 +65,7 @@ namespace MarcSample
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
             this.menuStrip1.Padding = new System.Windows.Forms.Padding(6, 1, 0, 1);
-            this.menuStrip1.Size = new System.Drawing.Size(1091, 50);
+            this.menuStrip1.Size = new System.Drawing.Size(1091, 60);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             // 
@@ -75,7 +76,7 @@ namespace MarcSample
             this.MenuItem_verifyCharCount,
             this.MenuItem_exit});
             this.MenuItem_file.Name = "MenuItem_file";
-            this.MenuItem_file.Size = new System.Drawing.Size(90, 48);
+            this.MenuItem_file.Size = new System.Drawing.Size(90, 58);
             this.MenuItem_file.Text = "&File";
             // 
             // MenuItem_dumpHistory
@@ -106,7 +107,7 @@ namespace MarcSample
             this.MenuItem_readonly,
             this.MenuItem_setFont});
             this.MenuItem_apperance.Name = "MenuItem_apperance";
-            this.MenuItem_apperance.Size = new System.Drawing.Size(195, 48);
+            this.MenuItem_apperance.Size = new System.Drawing.Size(195, 58);
             this.MenuItem_apperance.Text = "&Apperance";
             this.MenuItem_apperance.DropDownOpening += new System.EventHandler(this.MenuItem_apperance_DropDownOpening);
             // 
@@ -146,7 +147,7 @@ namespace MarcSample
             this.MenuItem_test_randomChars,
             this.MenuItem_test_loadFromCompactFile});
             this.MenuItem_test.Name = "MenuItem_test";
-            this.MenuItem_test.Size = new System.Drawing.Size(100, 48);
+            this.MenuItem_test.Size = new System.Drawing.Size(100, 58);
             this.MenuItem_test.Text = "Test";
             // 
             // MenuItem_startStressTest
@@ -170,13 +171,21 @@ namespace MarcSample
             this.MenuItem_test_randomChars.Text = "Test Random Chars";
             this.MenuItem_test_randomChars.Click += new System.EventHandler(this.MenuItem_test_randomChars_Click);
             // 
+            // MenuItem_test_loadFromCompactFile
+            // 
+            this.MenuItem_test_loadFromCompactFile.Name = "MenuItem_test_loadFromCompactFile";
+            this.MenuItem_test_loadFromCompactFile.Size = new System.Drawing.Size(544, 54);
+            this.MenuItem_test_loadFromCompactFile.Text = "Load from compact file ...";
+            this.MenuItem_test_loadFromCompactFile.Click += new System.EventHandler(this.MenuItem_test_loadFromCompactFile_Click);
+            // 
             // statusStrip1
             // 
             this.statusStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripStatusLabel_caretFieldRegion,
             this.toolStripStatusLabel_selectionRange,
-            this.toolStripStatusLabel_caretOffs});
+            this.toolStripStatusLabel_caretOffs,
+            this.toolStripStatusLabel_message});
             this.statusStrip1.Location = new System.Drawing.Point(0, 591);
             this.statusStrip1.Name = "statusStrip1";
             this.statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 11, 0);
@@ -205,10 +214,10 @@ namespace MarcSample
             // toolStrip1
             // 
             this.toolStrip1.ImageScalingSize = new System.Drawing.Size(48, 48);
-            this.toolStrip1.Location = new System.Drawing.Point(0, 50);
+            this.toolStrip1.Location = new System.Drawing.Point(0, 60);
             this.toolStrip1.Name = "toolStrip1";
             this.toolStrip1.Padding = new System.Windows.Forms.Padding(0, 0, 1, 0);
-            this.toolStrip1.Size = new System.Drawing.Size(1091, 25);
+            this.toolStrip1.Size = new System.Drawing.Size(1091, 62);
             this.toolStrip1.TabIndex = 2;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -226,20 +235,19 @@ namespace MarcSample
             this.marcControl1.FixedSizeFont = new System.Drawing.Font("Courier New", 9F, System.Drawing.FontStyle.Bold);
             this.marcControl1.Font = new System.Drawing.Font("宋体", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.marcControl1.HighlightBlankChar = ' ';
-            this.marcControl1.Location = new System.Drawing.Point(0, 75);
+            this.marcControl1.Location = new System.Drawing.Point(0, 122);
             this.marcControl1.Name = "marcControl1";
             this.marcControl1.PaddingChar = ' ';
             this.marcControl1.PadWhileEditing = false;
             this.marcControl1.ReadOnly = false;
-            this.marcControl1.Size = new System.Drawing.Size(1091, 516);
+            this.marcControl1.Size = new System.Drawing.Size(1091, 469);
             this.marcControl1.TabIndex = 3;
             // 
-            // MenuItem_test_loadFromCompactFile
+            // toolStripStatusLabel_message
             // 
-            this.MenuItem_test_loadFromCompactFile.Name = "MenuItem_test_loadFromCompactFile";
-            this.MenuItem_test_loadFromCompactFile.Size = new System.Drawing.Size(544, 54);
-            this.MenuItem_test_loadFromCompactFile.Text = "Load from compact file ...";
-            this.MenuItem_test_loadFromCompactFile.Click += new System.EventHandler(this.MenuItem_test_loadFromCompactFile_Click);
+            this.toolStripStatusLabel_message.Name = "toolStripStatusLabel_message";
+            this.toolStripStatusLabel_message.Size = new System.Drawing.Size(143, 39);
+            this.toolStripStatusLabel_message.Text = "message";
             // 
             // MainForm
             // 
@@ -250,7 +258,7 @@ namespace MarcSample
             this.Controls.Add(this.toolStrip1);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.menuStrip1);
-            this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "MainForm";
             this.Text = "MarcSample";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
@@ -288,6 +296,7 @@ namespace MarcSample
         private System.Windows.Forms.ToolStripMenuItem MenuItem_stopStressTest;
         private System.Windows.Forms.ToolStripMenuItem MenuItem_test_randomChars;
         private System.Windows.Forms.ToolStripMenuItem MenuItem_test_loadFromCompactFile;
+        private System.Windows.Forms.ToolStripStatusLabel toolStripStatusLabel_message;
     }
 }
 
