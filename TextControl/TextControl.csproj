@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Collection.cs" />
     <Compile Include="Context.cs" />
     <Compile Include="EditControl1.cs">
       <SubType>UserControl</SubType>

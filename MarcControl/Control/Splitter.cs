@@ -129,6 +129,7 @@ namespace LibraryStudio.Forms
         // 检测分割条和 Caption 区域
         // 参见 enum FieldRegion 定义
         // return:
+        //      -3  按钮区域
         //      -2  Caption 区域
         //      -1  Splitter 区域
         //      0   其它区域(包括 name indicator 和 content 区域)

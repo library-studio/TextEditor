@@ -10,12 +10,12 @@ namespace LibraryStudio.Forms
     /// 盒子接口。
     /// 所谓盒子，是一种矩形的，可以独立实现编辑效果的显示区域
     /// </summary>
-    public interface IBox
+    public interface IBox : IDisposable
     {
         string Name { get; set; }
 
         // 父节点
-        IBox Parent { get; }
+        IBox Parent { get; set; }
 
         // 清除
         void Clear();
@@ -169,7 +169,13 @@ namespace LibraryStudio.Forms
 
         // 2025/12/4
         // 第一阶段快速更新的区域
-        public Rectangle SmallUpdateRect { get; set; } = System.Drawing.Rectangle.Empty;
+        // public Rectangle SmallUpdateRect { get; set; } = System.Drawing.Rectangle.Empty;
+
+        public void Offset(int x, int y)
+        {
+            UpdateRect = Utility.Offset(UpdateRect, x, y);
+            ScrollRect = Utility.Offset(ScrollRect, x, y);
+        }
     }
 
     /// <summary>

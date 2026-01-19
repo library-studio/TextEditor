@@ -11,6 +11,8 @@ namespace LibraryStudio.Forms
 
         public GetFieldCaptionFunc GetFieldCaption { get; set; }
 
+        public GetStructureFunc GetStructure { get; set; }
+
         // 字段名称注释的像素宽度
         public int CaptionPixelWidth { get; set; } = DefaultSplitterPixelWidth + DefaultCaptionPixelWidth;
 
@@ -47,6 +49,9 @@ namespace LibraryStudio.Forms
         // Name 和 Indicator 和 Content 之间的缝隙厚度
         public int GapThickness { get; set; }
 
+        // 展开/收缩按钮的宽度
+        public int ButtonWidth { get; set; }
+
         // 字段内容区最小宽度。特别是在文档宽度随窗口 Client 区自动变化时
         public int MinFieldContentWidth { get; set; }
 
@@ -80,6 +85,8 @@ namespace LibraryStudio.Forms
             // Name 和 Indicator 之间的缝隙
             GapThickness = Math.Max(2, averageCharWidth / 2);
 
+            ButtonWidth = averageCharWidth;
+
             NamePixelWidth = BorderThickness + BlankUnit
                 + averageCharWidth * 3
                 + BlankUnit + this.BorderThickness
@@ -96,6 +103,7 @@ namespace LibraryStudio.Forms
 
         // 检测分割条和 Caption 区域
         // return:
+        //      -3  Button 区域
         //      -2  Caption 区域
         //      -1  Splitter 区域
         //      0   其它区域(包括 name indicator 和 content 区域)
@@ -109,6 +117,11 @@ namespace LibraryStudio.Forms
             if (x < this.CaptionPixelWidth)
             {
                 return -1;
+            }
+
+            if (x < this.CaptionPixelWidth + this.ButtonWidth)
+            {
+                return -3;
             }
 
             return 0;
@@ -132,7 +145,8 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness + this.BorderThickness + this.BlankUnit; // 两侧都准备了空白
+                // return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness + this.BorderThickness + this.BlankUnit; // 两侧都准备了空白
+                return NameBorderX + this.BorderThickness + this.BlankUnit;
             }
         }
 
@@ -140,7 +154,9 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness; // Name 边框左边还有空白，用于绘制 Solid 区的左边线
+                return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness
+                    + this.ButtonWidth;
+                // Name 边框左边还有空白，用于绘制 Solid 区的左边线
             }
         }
 
@@ -208,4 +224,12 @@ namespace LibraryStudio.Forms
 
     public delegate bool GetReadOnlyFunc(IBox box);
 
+    public delegate IEnumerable<FieldInfo> GetStructureFunc(IBox box);
+
+    public class FieldInfo
+    {
+        public string Name { get; set; }
+        public string Caption { get; set; }
+        public int Length { get; set; }
+    }
 }

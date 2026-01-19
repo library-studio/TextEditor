@@ -5,7 +5,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Vanara.PInvoke;
+using static System.Net.Mime.MediaTypeNames;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
+using static Vanara.PInvoke.Gdi32;
+using static Vanara.PInvoke.User32;
 using static Vanara.PInvoke.User32.RAWINPUT;
 
 namespace LibraryStudio.Forms
@@ -82,6 +86,7 @@ Rectangle rect)
 
 
         bool _isMouseDown = false;
+        bool _isButtonDown = false;
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
@@ -109,6 +114,16 @@ Rectangle rect)
 
                 }
                 */
+
+                // 按下了“展开/收缩”按钮
+                if (result.InnerHitInfo?.ChildIndex == (int)FieldRegion.Button)
+                {
+                    ToggleExpand(result);
+                    base.OnMouseDown(e);
+                    _isButtonDown = true;
+                    return;
+                }
+
                 // 点击 Caption 区域
                 var splitter_test = TestSplitterArea(e.X);
                 if (splitter_test == -2)
@@ -132,6 +147,9 @@ Rectangle rect)
                     base.OnMouseDown(e);
                     return;
                 }
+
+                // 2026/1/19
+                ResetFieldSelect();
 
                 SetCaret(result, reset_selection: true);
 #if REMOVED
@@ -165,6 +183,14 @@ Rectangle rect)
             this._isMouseDown = false;
 
             EndMonitorCaretVisible();
+
+            // 抬起了“展开/收缩”按钮
+            if (this._isButtonDown == true)
+            {
+                base.OnMouseUp(e);
+                this._isButtonDown = false;
+                return;
+            }
 
             if (_splitting)
             {
@@ -249,6 +275,13 @@ Rectangle rect)
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            // 按下了“展开/收缩”按钮之后，在抬起之前的偶然移动
+            if (this._isButtonDown == true)
+            {
+                base.OnMouseMove(e);
+                return;
+            }
+
             if (_isMouseDown && _splitting)
             {
                 MoveSplitting(e.X);
@@ -373,5 +406,59 @@ e.Y + this.VerticalScroll.Value);
             base.OnMouseDoubleClick(e);
         }
 
+        void ToggleExpand(HitInfo info)
+        {
+            ReplaceTextResult ret = null;
+            using (var g = this.CreateGraphics())
+            {
+                var handle = g.GetHdc();
+                using (var dc = new SafeHDC(handle))
+                {
+                    ret = _record.ToggleExpand(
+                        info,
+                        _context,
+                        dc,
+                        GetLimitWidth()
+                        );
+                    _context.ClearFontCache();
+                }
+            }
+
+            var max_pixel_width = ret.MaxPixel;
+            var replaced_text = ret.ReplacedText;
+            var update_rect = ret.UpdateRect;
+            var scroll_rect = ret.ScrollRect;
+            var scroll_distance = ret.ScrolledDistance;
+
+            int x = -this.HorizontalScroll.Value;
+            int y = -this.VerticalScroll.Value;
+
+            if (scroll_distance != 0)
+            {
+                Utility.Offset(ref scroll_rect, x, y);
+                if (scroll_rect.IsEmpty == false)
+                {
+                    User32.ScrollWindowEx(this.Handle,
+                        0,
+                        scroll_distance,
+                        scroll_rect,
+                        null,
+                        HRGN.NULL,
+                        out _,
+                        ScrollWindowFlags.SW_INVALIDATE);
+                    _invalidateCount++;
+                }
+            }
+
+            if (update_rect != System.Drawing.Rectangle.Empty)
+            {
+                update_rect.Offset(x, y);
+                this.Invalidate(update_rect);
+            }
+
+            if (max_pixel_width == 0)
+                max_pixel_width = this._record.GetPixelWidth();
+            this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
+        }
     }
 }

@@ -18,8 +18,7 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        IBox _parent = null;
-        public IBox Parent => _parent;
+        public IBox Parent { get; set; }
 
         public int Height;  // 该 Line 的高度。由下属每个 Range 的高度汇总而来
 
@@ -35,7 +34,7 @@ namespace LibraryStudio.Forms
 
         public Line(IBox parent)
         {
-            _parent = parent;
+            Parent = parent;
             Ranges = new List<RangeWrapper>();
             piVisualToLogical = new int[0];
             piLogicalToVisual = new int[0];
@@ -3048,7 +3047,7 @@ clipRect);
 
         public Line(IBox parent, string text)
         {
-            _parent = parent;
+            Parent = parent;
             Ranges = new List<RangeWrapper>()
             {
                 new RangeWrapper(text)

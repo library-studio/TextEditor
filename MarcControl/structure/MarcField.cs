@@ -3,14 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Runtime.Remoting.Messaging;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using MarcControl.structure;
 using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -23,17 +18,38 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        public IBox Parent => _record;
+        public IBox Parent
+        {
+            get
+            {
+                return _record;
+            }
+            set
+            {
+                _record = value as MarcRecord;
+            }
+        }
 
         internal MarcRecord _record = null;
 
         Line _caption;
         Line _name;
         Line _indicator;
-        Paragraph _content;
+
+        // _content 可能是 Paragraph 或 MarcFieldCollection 或 MarcSubfieldCollection
+        IBox _content;
 
         // 引用字段共同属性
         Metrics _fieldProperty;
+
+        ViewMode _viewMode = ViewMode.Plane;    //  ViewMode.Plane;
+        public ViewMode ViewMode
+        {
+            get
+            {
+                return _viewMode;
+            }
+        }
 
         public bool IsHeader { get; set; }
 
@@ -67,14 +83,34 @@ namespace LibraryStudio.Forms
                 };
         }
 
+        // 注意确保 _name 内容设置好了以后再调用本函数
         void EnsureContent()
         {
-            if (_content == null)
+            if (_viewMode.HasFlag(ViewMode.Plane)
+                || this.IsHeader || this.IsControlField)
             {
-                _content = new Paragraph(this)
+                if (_content == null || !(_content is Paragraph))
                 {
-                    Name = "content",
-                };
+                    _content?.Dispose();
+                    _content = new Paragraph(this)
+                    {
+                        Name = "content",
+                    };
+                }
+                return;
+            }
+            if (_viewMode.HasFlag(ViewMode.Table))
+            {
+                // TODO: Table 模式下，头标区和 ControlField 无法切换到 Table 模式，依然保留 Plane 模式
+                if (_content == null || !(_content is MarcSubfieldCollection))
+                {
+                    _content?.Dispose();
+                    _content = new MarcSubfieldCollection(this, _fieldProperty)
+                    {
+                        Name = "content",
+                    };
+                }
+                return;
             }
         }
 
@@ -290,7 +326,7 @@ namespace LibraryStudio.Forms
             }
 
             // 点击到了 Caption 区域和 Name 区域的缝隙位置
-            else if (x < _fieldProperty.CaptionPixelWidth)
+            else if (x < _fieldProperty.CaptionPixelWidth) // _fieldProperty.NameBorderX - _fieldProperty.ButtonWidth
             {
                 /*
                 return new HitInfo
@@ -306,6 +342,13 @@ namespace LibraryStudio.Forms
                 */
                 caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
             }
+
+            // 点击到了字段名左边的按钮
+            else if (x < _fieldProperty.CaptionPixelWidth + _fieldProperty.ButtonWidth)
+            {
+                caption_area_hitted = (int)FieldRegion.Button;
+            }
+
 
             var start = _fieldProperty.NameBorderX; // 这里包括了左侧边沿空间
             // must 表示“其它 box 为空，必须用当前这个来 hittest”
@@ -1009,8 +1052,8 @@ bool focused = false)
             // 绘制代表焦点的竖线
             if (focused)
             {
-                var line_rect = GetFocusedRect(x, y);
-                if (line_rect.IntersectsWith(clipRect))
+                var focus_rect = GetFocusedRect(x, y);
+                if (focus_rect.IntersectsWith(clipRect))
                 {
                     /*
                     DrawVertLine(hdc,
@@ -1018,7 +1061,7 @@ bool focused = false)
                     Color.Red);
                     */
                     DrawSolidRectangle(hdc,
-                        line_rect,
+                        focus_rect,
                         _fieldProperty.FocusColor);
                 }
             }
@@ -1117,7 +1160,7 @@ _fieldProperty?.BorderColor ?? SystemColors.ControlDark);
         public Rectangle GetFocusedRect(int x, int y)
         {
             // var x0 = x + _fieldProperty.ContentBorderX - _fieldProperty.BorderThickness * 2 - 1;
-            var x0 = x + _fieldProperty.SolidX;
+            var x0 = x + _fieldProperty.SolidX + _fieldProperty.ButtonWidth;
             return new Rectangle(x0, y, _fieldProperty.GapThickness, this.GetPixelHeight());
         }
 
@@ -1715,11 +1758,7 @@ clipRect);
             int start,
             int end,
             string content,
-            int pixel_width/*,
-            out string replaced,
-            out Rectangle update_rect,
-            out Rectangle scroll_rect,
-            out int scroll_distance*/)
+            int pixel_width)
         {
             var update_rect = System.Drawing.Rectangle.Empty;
             /*
@@ -1850,6 +1889,8 @@ clipRect);
             {
                 EnsureContent();
 
+                if (content_value.Last() == Metrics.FieldEndCharDefault)
+                    content_value = content_value.Substring(0, content_value.Length - 1);
                 if (content_value != _content.MergeText())
                 {
                     var ret = _content.ReplaceText(
@@ -2875,11 +2916,40 @@ clipRect);
             _caption?.Dispose();
             _caption = null;
         }
+
+        // return:
+        //      0   未给出本次修改的像素宽度。需要调主另行计算
+        //      其它  本次修改后的像素宽度
+        public ReplaceTextResult ToggleExpand(
+            HitInfo info,
+            IContext context,
+            Gdi32.SafeHDC dc,
+            int pixel_width)
+        {
+            if (info.ChildIndex == (int)FieldRegion.Button)
+            {
+                var text = this.MergeText();
+                this._viewMode = this._viewMode == ViewMode.Plane ? ViewMode.Table : ViewMode.Plane;
+                this.EnsureContent();
+                return ReplaceText(context,
+                    dc,
+                    0,
+                    -1,
+                    text,
+                    pixel_width);
+            }
+            else
+            {
+                // _content.ToggoleExpand(info.InnerHitInfo);
+                return new ReplaceTextResult();
+            }
+        }
     }
 
     public enum FieldRegion
     {
         None = -100,
+        Button = -3,    // -3 表示字段名左侧的展开/收缩按钮
         Caption = -2,
         Splitter = -1,  // -1 表示 caption 和 name 之间的缝隙
         Name = 0,

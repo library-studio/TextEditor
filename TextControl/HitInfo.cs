@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -70,6 +70,7 @@ namespace LibraryStudio.Forms
         LeftBlank = 0x04,
         RightBlank = 0x08,
         Text = 0x10,
+        // Button = 0x20,  // 左侧按钮
     }
 
 }

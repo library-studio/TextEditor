@@ -15,8 +15,7 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        IBox _parent = null;
-        public IBox Parent => _parent;
+        public IBox Parent { get; set; }
 
         public SCRIPT_ITEM Item;
 

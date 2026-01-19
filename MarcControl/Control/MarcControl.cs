@@ -1311,6 +1311,8 @@ out long left_width);
                 case Keys.Left:
                 case Keys.Right:
                     {
+                        ResetFieldSelect();
+
                         if (controlPressed)
                         {
                             // 如果是向左，并且 caret 正好在块头部，需要先向左移动一个字符
@@ -1469,6 +1471,13 @@ out long left_width);
                             InvalidateBlockRegion();
                             */
                         }
+                        else
+                        {
+                            if (shiftPressed == false && HasSelection())
+                            {
+                                Select(_caret_offs, _caret_offs, _caret_offs);
+                            }
+                        }
                     }
                     break;
                 case Keys.Down:
@@ -1482,13 +1491,22 @@ out long left_width);
                         else
                         {
                             // 向下移动一个字段
+                            // 注: 这种方法获得的 end，位于字段结束符右边，本来就是下一个字段的范围了。但头标区比较特殊，没有字段结束符，需要另外判断处理
                             this._record.GetContiguousFieldOffsRange(
                                 _caretInfo.ChildIndex,
                                 1,
                                 out _,
                                 out int end);
                             //SetCaretOffs(end);
-                            MoveCaret(HitByCaretOffs(end, 0));
+                            if (end == 24)
+                            {
+                                MoveCaret(HitByCaretOffs(end + 1, -1));
+                            }
+                            else
+                            {
+                                MoveCaret(HitByCaretOffs(end, 0));
+                            }
+
                             AdjustFieldSelect(_caretInfo.ChildIndex);
                         }
 
@@ -1531,6 +1549,13 @@ out long left_width);
                             // this.Invalidate();
                             InvalidateBlockRegion();
                             */
+                        }
+                        else
+                        {
+                            if (shiftPressed == false && HasSelection())
+                            {
+                                Select(_caret_offs, _caret_offs, _caret_offs);
+                            }
                         }
                     }
                     break;

@@ -6,9 +6,6 @@ using System.Linq;
 using System.Text;
 
 using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TextBox;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Usp10;
 
@@ -22,8 +19,7 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        IBox _parent = null;
-        public IBox Parent => _parent;
+        public IBox Parent { get; set; }
 
         List<Line> _lines = new List<Line>();
 
@@ -36,7 +32,7 @@ namespace LibraryStudio.Forms
 
         public Paragraph(IBox parent)
         {
-            _parent = parent;
+            Parent = parent;
         }
 
         public void Paint(
@@ -518,7 +514,7 @@ out int new_width);
         }
 
         // 包含 Chunk 文本，避免再到 SCRIPT_ITEM 中去取 .iCharPos
-        class ScriptItem
+        public class ScriptItem
         {
             public SCRIPT_ITEM Item { get; set; }
             public string Chunk { get; set; }
@@ -526,7 +522,7 @@ out int new_width);
             public object Tag { get; set; }
         }
 
-        static List<ScriptItem> Itemize(
+        public static List<ScriptItem> Itemize(
             IContext context,
             SafeHDC dc,
             string content,
@@ -2170,7 +2166,7 @@ tag);
 
         public Paragraph(IBox parent, string text)
         {
-            _parent = parent;
+            Parent = parent;
             _lines = new List<Line>() {
             new Line(this, text)
             };

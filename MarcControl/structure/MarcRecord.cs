@@ -18,7 +18,17 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        public IBox Parent => (IBox)_marcControl;
+        public IBox Parent
+        {
+            get
+            {
+                return (IBox)_marcControl;
+            }
+            set
+            {
+                _marcControl = value as MarcControl;
+            }
+        }
 
         internal MarcControl _marcControl = null;
         public MarcControl GetControl() { return _marcControl; }
@@ -3165,6 +3175,37 @@ out int count)
             }
 
             fields.RemoveRange(start, count);
+        }
+
+        public ReplaceTextResult ToggleExpand(HitInfo info,
+            IContext context,
+            Gdi32.SafeHDC dc,
+            int pixel_width)
+        {
+            if (info.ChildIndex < 0
+                && info.ChildIndex >= this.FieldCount)
+                return new ReplaceTextResult();
+            var field = this.GetField(info.ChildIndex);
+
+            var old_height = field.GetPixelHeight();
+            var blow_height = SumHeight(_fields, info.ChildIndex, _fields.Count - info.ChildIndex);
+
+            var ret = field.ToggleExpand(info.InnerHitInfo,
+                context,
+                dc,
+                pixel_width);
+
+            var new_height = field.GetPixelHeight();
+
+            var y0 = SumHeight(_fields, 0, info.ChildIndex);
+            ret.Offset(0, y0);
+            ret.ScrolledDistance = new_height - old_height;
+            if (new_height - old_height > 0)
+                ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
+            else
+                ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
+
+            return ret;
         }
     }
 }

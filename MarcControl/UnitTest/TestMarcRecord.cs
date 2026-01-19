@@ -233,6 +233,7 @@ namespace LibraryStudio.Forms
             string content,
             string[] correct)
         {
+            Console.WriteLine(index);
             {
                 var results = MarcRecord.SplitLines_v2(content,
                     Metrics.FieldEndCharDefault,
@@ -278,6 +279,8 @@ namespace LibraryStudio.Forms
     string content,
     string[] correct)
         {
+            Console.WriteLine(index);
+
             {
                 var results = MarcRecord.SplitLines_v2(content,
                     Metrics.FieldEndCharDefault,
@@ -320,6 +323,8 @@ namespace LibraryStudio.Forms
         {
             var results = MarcRecord.SplitFields_v2(content, start);
             AssertAreEqual(correct, results.ToArray());
+
+            Console.WriteLine(index);
         }
 
         #endregion
@@ -1321,6 +1326,8 @@ string correct_result)
             string correct_content,
             string return_new_text)
         {
+            Console.WriteLine(index);
+
             MarcRecord.BuildContent(content);
             UiTestHelpers.UseControl((ctl) =>
             {

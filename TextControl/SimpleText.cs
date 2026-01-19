@@ -18,8 +18,7 @@ namespace LibraryStudio.Forms
     {
         public string Name { get; set; }
 
-        IBox _parent = null;
-        public IBox Parent => _parent;
+        public IBox Parent { get; set; }
 
         List<Paragraph> _paragraphs = new List<Paragraph>();
 
@@ -1163,6 +1162,23 @@ namespace LibraryStudio.Forms
                 line.ClearCache();
             }
         }
+
+        public void Dispose()
+        {
+            DisposeParagraphs();
+        }
+
+        void DisposeParagraphs()
+        {
+            if (_paragraphs == null)
+                return;
+            foreach(var p in _paragraphs)
+            {
+                p?.Dispose();
+            }
+            _paragraphs.Clear();
+        }
+
         public int LineCount
         {
             get
