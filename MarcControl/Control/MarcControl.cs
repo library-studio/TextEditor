@@ -608,6 +608,7 @@ namespace LibraryStudio.Forms
         {
             if (_disableUpdate == 0)
             {
+                // _context.ViewModeTree = _record.GetViewModeTree();
                 using (var g = this.CreateGraphics())
                 {
                     Rectangle update_rect = System.Drawing.Rectangle.Empty;
@@ -727,6 +728,7 @@ namespace LibraryStudio.Forms
                 });
             */
             var ret = _record.ReplaceText(
+                _record.GetViewModeTree(),
                 _context,
                 dc,
                 0,
@@ -1077,6 +1079,7 @@ out long left_width);
                 using (var dc = new SafeHDC(handle))
                 {
                     ret = _record.ReplaceText(
+                        _record.GetViewModeTree(),
                         _context,
                         dc,
                         start,

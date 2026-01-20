@@ -882,6 +882,17 @@ namespace LibraryStudio.Forms
             }
         }
 
+        public ReplaceTextResult ReplaceText(
+    IContext context,
+    SafeHDC dc,
+    int start,
+    int end,
+    string text,
+    int pixel_width)
+        {
+            throw new NotImplementedException();
+        }
+
         // 替换一段文字
         // 若 start 和 end 为 0 -1 表示希望全部替换。-1 在这里表达“尽可能大”
         // 而 0 0 表示在偏移 0 插入内容，注意偏移 0 后面的原有内容会保留
@@ -896,16 +907,13 @@ namespace LibraryStudio.Forms
         // return:
         //      进行折行处理以后，所发现的最大行宽像素数。可能比 pixel_width 参数值要大
         public ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
             IContext context,
             SafeHDC dc,
             int start,
             int end,
             string text,
-            int pixel_width/*,
-            out string replaced,
-            out Rectangle update_rect,
-            out Rectangle scroll_rect,
-            out int scroll_distance*/)
+            int pixel_width)
         {
             var update_rect = System.Drawing.Rectangle.Empty;
             /*
@@ -1042,16 +1050,13 @@ namespace LibraryStudio.Forms
                 //      0   未给出本次修改的像素宽度。需要调主另行计算
                 //      其它  本次修改后的像素宽度
                 var ret = field.ReplaceText(
+                    view_mode_tree?.ChildViewModes?.ElementAtOrDefault(first_paragraph_index),
                     context,
                     dc,
     left_text.Length,
     field.PureTextLength - right_text.Length,   // ?? PureTextLength 正确么？
     text,
-    pixel_width/*,
-    out string current_replaced,
-    out Rectangle update_rect,
-    out Rectangle _,
-    out int _*/);
+    pixel_width);
 
                 if (clear_on_empty
     && _fields.Count == 1
@@ -1128,20 +1133,18 @@ namespace LibraryStudio.Forms
                         }
                         new_field.IsHeader = true;
                     }
+
                     // return:
                     //      0   未给出本次修改的像素宽度。需要调主另行计算
                     //      其它  本次修改后的像素宽度
                     var ret = new_field.ReplaceText(
+                        view_mode_tree?.ChildViewModes?.ElementAtOrDefault(first_paragraph_index + new_fields.Count),
                         context,
                         dc,
                         0,
                         -1,
                         line,
-                        pixel_width/*,
-                        out string _,
-                        out Rectangle update_rect1,
-                        out Rectangle scroll_rect1,
-                        out int scroll_distance1*/);
+                        pixel_width);
 
                     var update_rect1 = ret.UpdateRect;
                     // var width = new_field.Initialize(dc, field, pixel_width, splitRange);
@@ -3206,6 +3209,17 @@ out int count)
                 ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
 
             return ret;
+        }
+
+        // 注: “我”自己的 ViewMode 是无所谓的，要靠父对象的 ViewMode 来定义
+        public ViewModeTree GetViewModeTree()
+        {
+            var results = new List<ViewModeTree>();
+            foreach (var child in _fields)
+            {
+                results.Add(child.GetViewModeTree());
+            }
+            return new ViewModeTree { ChildViewModes = results };
         }
     }
 }

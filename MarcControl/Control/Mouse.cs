@@ -459,6 +459,7 @@ e.Y + this.VerticalScroll.Value);
             if (max_pixel_width == 0)
                 max_pixel_width = this._record.GetPixelWidth();
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
+            SetCaret(HitByCaretOffs(_caret_offs), false);
         }
     }
 }

@@ -12,7 +12,7 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 定长输入模板
     /// </summary>
-    public class Template : IBox, IDisposable
+    public class Template : IBox, IDisposable, IViewMode
     {
         List<Line> _lines = new List<Line>();
         Metrics _metrics = null;
@@ -60,6 +60,8 @@ namespace LibraryStudio.Forms
                 return _below;
             }
         }
+
+        public ViewMode ViewMode { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
         public bool CaretMoveDown(
             int x,
@@ -411,8 +413,16 @@ namespace LibraryStudio.Forms
             }
         }
 
+        public ReplaceTextResult ReplaceText(IContext context, Gdi32.SafeHDC dc, int start, int end, string content, int pixel_width)
+        {
+            throw new NotImplementedException();
+        }
+
+
         // context 中需要一种机制用于获取模板的结构定义
-        public ReplaceTextResult ReplaceText(IContext context,
+        public ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
+            IContext context,
             Gdi32.SafeHDC dc,
             int start,
             int end,
@@ -506,6 +516,14 @@ namespace LibraryStudio.Forms
                 _lines = new List<Line>();
             }
         }
+
+        // TODO: 允许在不具备模板分段信息的情况下，把内容当作整个一个 Paragraph 处理。这时就存在 ViewMode 为两种不同值的可能性的
+        public ViewModeTree GetViewModeTree()
+        {
+            // 目前一定是展开状态
+            return new ViewModeTree { ViewMode = ViewMode.Table };
+        }
+
 
 #if REMOVED
         public List<Line> FindLines(

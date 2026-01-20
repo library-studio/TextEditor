@@ -106,13 +106,16 @@
     <Compile Include="Control\EditCommand.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="structure\MarcField.cs" />
-    <Compile Include="structure\MarcRecord.cs" />
+    <Compile Include="Structure\Collection.cs" />
+    <Compile Include="Structure\MarcContext.cs" />
+    <Compile Include="Structure\MarcField.cs" />
+    <Compile Include="Structure\MarcRecord.cs" />
     <Compile Include="Metrics.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="structure\MarcSubfield.cs" />
-    <Compile Include="structure\MarcSubfieldCollection.cs" />
-    <Compile Include="structure\Template.cs" />
+    <Compile Include="Structure\MarcSubfield.cs" />
+    <Compile Include="Structure\MarcSubfieldCollection.cs" />
+    <Compile Include="Structure\Template.cs" />
+    <Compile Include="Structure\ViewModeTree.cs" />
     <Compile Include="UnitTest\MarcControlTests_NUnitStyle.cs" />
     <Compile Include="UnitTest\TestCompressMaskText.cs" />
     <Compile Include="UnitTest\TestDOM.cs" />

@@ -14,7 +14,7 @@ namespace LibraryStudio.Forms
     /// MARC 字段编辑区域
     /// 由一个 Line(字段名)，一个 Line(字段指示符)，一个 Paragraph (字段内容) 构成
     /// </summary>
-    public class MarcField : IBox, IDisposable
+    public class MarcField : IViewBox, IDisposable
     {
         public string Name { get; set; }
 
@@ -48,6 +48,10 @@ namespace LibraryStudio.Forms
             get
             {
                 return _viewMode;
+            }
+            set
+            {
+                _viewMode = value;
             }
         }
 
@@ -1747,12 +1751,24 @@ clipRect);
                 update_rect.Offset(_fieldProperty.CaptionX, 0);
         }
 
+        public ReplaceTextResult ReplaceText(
+    IContext context,
+    SafeHDC dc,
+    int start,
+    int end,
+    string content,
+    int pixel_width)
+        {
+            throw new NotImplementedException();
+        }
+
         // TODO: 如果替换过程中实际上增加了最后一个字段的结束符，那要
         // 考虑给 replaced 最后减少一个结束符，以免 Undo 的时候发生不一致
         // return:
         //      0   未给出本次修改的像素宽度。需要调主另行计算
         //      其它  本次修改后的像素宽度
         public ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
             IContext context,
             SafeHDC dc,
             int start,
@@ -1883,28 +1899,49 @@ clipRect);
                 }
             }
 
+            if (view_mode_tree != null
+                && view_mode_tree.ViewMode != this._viewMode)
+            {
+                this._viewMode = view_mode_tree.ViewMode;
+            }
+
             if (true
                 // string.IsNullOrEmpty(content_value) == false
                 )
             {
+                // 保留一下 _content 内容清空之前，旧内容的宽度
+                int old_width = _content?.GetPixelWidth() ?? 0;
+
                 EnsureContent();
 
-                if (content_value.Last() == Metrics.FieldEndCharDefault)
+                if (content_value.LastOrDefault() == Metrics.FieldEndCharDefault)
                     content_value = content_value.Substring(0, content_value.Length - 1);
                 if (content_value != _content.MergeText())
                 {
-                    var ret = _content.ReplaceText(
+                    ReplaceTextResult ret;
+                    if (_content is IViewBox)
+                    {
+                        ret = (_content as IViewBox).ReplaceText(
+                        this.GetViewModeTree(),
                     context,
                     dc,
     0,
     -1,
     content_value,
     pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fieldProperty.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
-    /*,
-    out replaced,
-    out Rectangle update_rect_content,
-    out scroll_rect,
-    out scroll_distance*/);
+    );
+                    }
+                    else
+                    {
+                        ret = _content.ReplaceText(
+context,
+dc,
+0,
+-1,
+content_value,
+pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fieldProperty.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
+);
+                    }
 
                     // 由于块背景实际上可能包含了字符面积以外的高度更大的面积，
                     // 所以 update_rect 上边沿要依然为 0，但高度要加大 y0 那么多。相当于下移以后再调整 Y 为 0
@@ -1920,6 +1957,9 @@ clipRect);
                     {
                         // 如果 updateRect 不包含第一行，则水平和垂直方向都要 Offset
                     }
+
+                    if (rect.Width < old_width)
+                        rect.Width = old_width;
 
                     var update_rect_content = Utility.Offset(
                         rect,
@@ -2931,7 +2971,9 @@ clipRect);
                 var text = this.MergeText();
                 this._viewMode = this._viewMode == ViewMode.Plane ? ViewMode.Table : ViewMode.Plane;
                 this.EnsureContent();
-                return ReplaceText(context,
+                return ReplaceText(
+                    null,
+                    context,
                     dc,
                     0,
                     -1,
@@ -2943,6 +2985,20 @@ clipRect);
                 // _content.ToggoleExpand(info.InnerHitInfo);
                 return new ReplaceTextResult();
             }
+        }
+
+        public ViewModeTree GetViewModeTree()
+        {
+            if (_content is IViewMode)
+            {
+                // 只要当前对象不是展开的状态，则没有必要再递归获得下级的状态
+                if (this._viewMode == ViewMode.Plane)
+                    return null;
+                var result = (_content as IViewMode).GetViewModeTree();
+                result.ViewMode = this._viewMode;
+                return result;
+            }
+            return new ViewModeTree { ViewMode = this._viewMode };
         }
     }
 

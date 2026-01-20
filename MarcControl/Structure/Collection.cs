@@ -9,12 +9,11 @@ using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
 {
-#if REMOVED
     /// <summary>
     /// 容纳若干 IBox 对象的容器
     /// </summary>
-    public class Collection<T> : IBox, IDisposable
-        where T : IBox, IDisposable, new()
+    public class Collection<T> : IViewBox, IDisposable
+        where T : IViewBox, IDisposable, new()
     {
         List<T> _lines = new List<T>();
 
@@ -22,12 +21,14 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                foreach(var child in _lines)
+                foreach (var child in _lines)
                 {
                     yield return child;
                 }
             }
         }
+
+        public ViewMode ViewMode { get; set; }
 
         public string Name { get; set; }
 
@@ -636,6 +637,18 @@ namespace LibraryStudio.Forms
         }
 
         public virtual ReplaceTextResult ReplaceText(
+    IContext context,
+    SafeHDC dc,
+    int start,
+    int end,
+    string text,
+    int pixel_width)
+        {
+            throw new NotImplementedException();
+        }
+
+        public virtual ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
             IContext context,
             SafeHDC dc,
             int start,
@@ -644,12 +657,6 @@ namespace LibraryStudio.Forms
             int pixel_width)
         {
             var result = new ReplaceTextResult();
-            /*
-            update_rect = System.Drawing.Rectangle.Empty;
-            scroll_rect = System.Drawing.Rectangle.Empty;
-            scroll_distance = 0;
-            replaced = "";
-            */
 
             // 先分别定位到 start 所在的 Line，和 end 所在的 Line
             // 观察被替换的范围 start - end，跨越了多少个 Line
@@ -685,7 +692,9 @@ namespace LibraryStudio.Forms
                     var child = CreateChild(context, j);
                     child.Parent = this;
                     // collection 会直接把 context 中的 ViewModeTree 不做修改就传递下去
-                    var ret = child.ReplaceText(context,
+                    var ret = child.ReplaceText(
+                        view_mode_tree?.ChildViewModes?.ElementAtOrDefault(j),
+                        context,
                         dc,
                         0,
                         -1,
@@ -927,7 +936,28 @@ namespace LibraryStudio.Forms
             _below = this._lines[0].Below;  // TODO: 加上除第一行以外的所有行的高度?
         }
 
+        // 注: “我”自己的 ViewMode 是无所谓的，要靠父对象的 ViewMode 来定义
+        public ViewModeTree GetViewModeTree()
+        {
+            var results = new List<ViewModeTree>();
+            foreach (var child in Children)
+            {
+                if (child is IViewMode)
+                {
+                    results.Add((child as IViewMode).GetViewModeTree());
+                }
+                else
+                {
+                    results.Add(new ViewModeTree { ViewMode = child.ViewMode });
+                }
+            }
+            return new ViewModeTree { ChildViewModes = results };
+        }
     }
 
-#endif
+
+    public interface IViewBox : IBox, IViewMode
+    {
+
+    }
 }

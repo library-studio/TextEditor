@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using LibraryStudio.Forms;
+using NUnit.Framework.Interfaces;
 using Vanara.PInvoke;
+using static Vanara.PInvoke.Gdi32;
 
 namespace MarcControl.structure
 {
@@ -30,6 +33,13 @@ namespace MarcControl.structure
 
         public override ReplaceTextResult ReplaceText(IContext context, Gdi32.SafeHDC dc, int start, int end, string text, int pixel_width)
         {
+            throw new NotImplementedException();
+        }
+
+        public ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
+            IContext context, Gdi32.SafeHDC dc, int start, int end, string text, int pixel_width)
+        {
             var ret = base.ReplaceText(context, dc, start, end, text, pixel_width);
             foreach(MarcSubfield child in Children)
             {
@@ -38,6 +48,13 @@ namespace MarcControl.structure
             }
             return ret;
         }
+
+        /*
+        public override MarcSubfield CreateChild(IContext context, int index)
+        {
+            return base.CreateChild(context, index);
+        }
+        */
 
         // 把文字内容按需切割为子结构所需的部分
         public override IEnumerable<string> SplitChildren(string text)
@@ -92,6 +109,7 @@ namespace MarcControl.structure
 
             return lines;
         }
+
 
     }
 }

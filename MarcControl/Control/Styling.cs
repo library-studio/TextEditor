@@ -19,7 +19,7 @@ namespace LibraryStudio.Forms
     public partial class MarcControl
     {
         // IContext 是 IBox 提供的通用机制。通过一个参数传递到各个 API 调用中
-        IContext _context = null;
+        Context _context = null;
 
         // Metrics 是 MarcRecord 和 MarcField 才有的特殊的，针对 MARC 结构的风格参数
         // TODO: 建议将 _fieldProperty 更名为 _marcMetrics
@@ -108,7 +108,7 @@ namespace LibraryStudio.Forms
             this.Invalidate();
         }
 
-        public IContext GetDefaultContext()
+        public Context GetDefaultContext()
         {
             /*
             return new Context {

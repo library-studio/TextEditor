@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 using Vanara.PInvoke;
@@ -10,7 +11,7 @@ namespace LibraryStudio.Forms
     /// 有两种模式: 平面、表格
     /// 表格模式下，如果 _name 内容为空，表示这是一个字段的指示符后面到第一个子字段之间的文本。这部分文本没有子字段名 
     /// </summary>
-    public class MarcSubfield : IBox, IDisposable
+    public class MarcSubfield : IViewBox, IDisposable
     {
         Paragraph _content = null;
 
@@ -36,6 +37,10 @@ namespace LibraryStudio.Forms
             get
             {
                 return _viewMode;
+            }
+            set
+            {
+                _viewMode = value;
             }
         }
 
@@ -362,6 +367,18 @@ virtual_tail_length);
         }
 
         public ReplaceTextResult ReplaceText(IContext context,
+    Gdi32.SafeHDC dc,
+    int start,
+    int end,
+    string content,
+    int pixel_width)
+        {
+            throw new NotFiniteNumberException();
+        }
+
+        public ReplaceTextResult ReplaceText(
+            ViewModeTree view_mode_tree,
+            IContext context,
             Gdi32.SafeHDC dc,
             int start,
             int end,
@@ -504,6 +521,11 @@ virtual_tail_length);
                 this.TextLength,
                 this.MergeText(0, this.TextLength),
                 pixel_width);
+        }
+
+        public ViewModeTree GetViewModeTree()
+        {
+            return null;
         }
     }
 

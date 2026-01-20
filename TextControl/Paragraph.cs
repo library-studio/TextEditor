@@ -1631,7 +1631,7 @@ tag);
                 if (y >= current_y && (y < current_y + line.GetPixelHeight() || isLastLine))
                 {
                     var sub_info = line.HitTest(x,
-    current_y);
+    y - current_y); // 2026/1/20 修改。原来是 current_y
                     return new HitInfo
                     {
                         X = sub_info.X,
