@@ -13,6 +13,8 @@ namespace LibraryStudio.Forms
     /// </summary>
     public class MarcSubfield : IViewBox, IDisposable
     {
+        Line _caption = null;
+
         Paragraph _content = null;
 
         Line _name = null;
@@ -74,25 +76,82 @@ namespace LibraryStudio.Forms
 
         public float Below => _content?.Below ?? 0;
 
+        int GetContentX(int x0 = 0)
+        {
+            return x0 + Metrics?.ButtonWidth ?? 0;
+        }
+
+        int GetContentY(int y0 = 0)
+        {
+            return y0;
+        }
+
+        Rectangle GetButtonRect(int x = 0, int y = 0)
+        {
+            IBox box;
+            if (_viewMode == ViewMode.Plane)
+            {
+                box = _content;
+            }
+            else
+            {
+                box = _name;
+            }
+
+            {
+                var height = box?.GetPixelHeight() ?? 0;
+                if (height == 0)
+                {
+                    height = FontContext.DefaultFontHeight;
+                }
+                return new Rectangle(x,
+        y,
+        Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
+        height);
+            }
+        }
+
+
         public bool CaretMoveDown(int x, int y, out HitInfo info)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
+
             if (_active_mode == 0)
-            return _content.CaretMoveDown(x, y, out info);
-            if (_active_mode == 1)
+            {
+                var ret = _content.CaretMoveDown(x - x0, y - y0, out HitInfo sub_info);
+                info = sub_info.Clone();
+                info.X += x0;
+                info.Y += y0;
+                info.ChildIndex = (int)FieldRegion.Content;
+                // 保持 info.LineHeight
+                info.InnerHitInfo = sub_info;
+                return ret;
+            }
+            else if (_active_mode == 1)
             {
                 int name_height = _name.GetPixelHeight();
                 if (y < name_height)
                 {
-                    return _name.CaretMoveDown(x, y, out info);
+                    var ret = _name.CaretMoveDown(x - x0, y - y0, out HitInfo sub_info);
+                    info = sub_info.Clone();
+                    info.X += x0;
+                    info.Y += y0;
+                    info.ChildIndex = (int)FieldRegion.Content;
+                    // 保持 info.LineHeight
+                    info.InnerHitInfo = sub_info;
+                    return ret;
                 }
                 else
                 {
-                    var ret = _template.CaretMoveDown(x, y - name_height, out info);
-                    if (info != null)
-                    {
-                        info.Y += name_height;
-                        info.Offs += 2;
-                    }
+                    var ret = _template.CaretMoveDown(x - x0, y - y0 - name_height, out HitInfo sub_info);
+                    info = sub_info.Clone();
+                    info.X += x0;
+                    info.Y += y0 + name_height;
+                    info.Offs += 2;
+                    info.ChildIndex = (int)FieldRegion.Content;
+                    // 保持 info.LineHeight
+                    info.InnerHitInfo = sub_info;
                     return ret;
                 }
             }
@@ -103,23 +162,51 @@ namespace LibraryStudio.Forms
 
         public bool CaretMoveUp(int x, int y, out HitInfo info)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
+
             if (_active_mode == 0)
-                return _content.CaretMoveUp(x, y, out info);
+            {
+                var ret = _content.CaretMoveUp(x - x0, y - y0, out HitInfo sub_info);
+                info = sub_info.Clone();
+                info.X += x0;
+                info.Y += y0;
+                info.ChildIndex = (int)FieldRegion.Content;
+                // 保持 info.LineHeight
+                info.InnerHitInfo = sub_info;
+                return ret;
+            }
             if (_active_mode == 1)
             {
                 int name_height = _name.GetPixelHeight();
                 if (y < name_height)
                 {
-                    return _name.CaretMoveUp(x, y, out info);
+                    var ret = _name.CaretMoveUp(x - x0, y - y0, out HitInfo sub_info);
+                    info = sub_info.Clone();
+                    info.X += x0;
+                    info.Y += y0;
+                    info.ChildIndex = (int)FieldRegion.Content;
+                    // 保持 info.LineHeight
+                    info.InnerHitInfo = sub_info;
+                    return ret;
                 }
                 else
                 {
-                    var ret = _template.CaretMoveUp(x, y - name_height, out info);
+                    var ret = _template.CaretMoveUp(x - x0, y - y0 - name_height, out HitInfo sub_info);
+                    /*
                     if (info != null)
                     {
                         info.Y += name_height;
                         info.Offs += 2;
                     }
+                    */
+                    info = sub_info.Clone();
+                    info.X += x0;
+                    info.Y += y0 + name_height;
+                    info.Offs += 2;
+                    info.ChildIndex = (int)FieldRegion.Content;
+                    // 保持 info.LineHeight
+                    info.InnerHitInfo = sub_info;
                     return ret;
                 }
             }
@@ -130,6 +217,8 @@ namespace LibraryStudio.Forms
 
         public void Clear()
         {
+            _caption?.Clear();
+
             _content?.Clear();
 
             _name?.Clear();
@@ -138,6 +227,8 @@ namespace LibraryStudio.Forms
 
         public void ClearCache()
         {
+            _caption?.ClearCache();
+
             _content?.ClearCache();
 
             _name?.ClearCache();
@@ -146,6 +237,8 @@ namespace LibraryStudio.Forms
 
         public void Dispose()
         {
+            _caption?.Dispose();
+
             _content?.Dispose();
 
             _name?.Dispose();
@@ -172,6 +265,8 @@ namespace LibraryStudio.Forms
 
         public int GetPixelWidth()
         {
+            var x0 = GetContentX();
+
             int width1 = 0;
             int width2 = 0;
             if (_viewMode.HasFlag(ViewMode.Plane))
@@ -186,16 +281,23 @@ namespace LibraryStudio.Forms
                 width2 = Math.Max(_name.GetPixelWidth(), _template.GetPixelWidth());
             }
 
-            return Math.Max(width1, width2);
+            return x0 + Math.Max(width1, width2);
         }
 
         public Region GetRegion(int start_offs = 0, int end_offs = int.MaxValue, int virtual_tail_length = 0)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
             if (_active_mode == 0)
             {
                 if (_content == null)
+                {
                     return null;
-                return _content.GetRegion(start_offs, end_offs, virtual_tail_length);
+                }
+
+                var region =  _content.GetRegion(start_offs, end_offs, virtual_tail_length);
+                region?.Offset(x0, y0);
+                return region;
             }
             else if (_active_mode == 1)
             {
@@ -209,23 +311,25 @@ namespace LibraryStudio.Forms
                         region1 = _name.GetRegion(start_offs,
                             Math.Min(end_offs, name_length),
                             virtual_tail_length);
+                        region1?.Offset(x0, y0);
                     }
                     if (end_offs > name_length)
                     {
                         region2 = _template.GetRegion(Math.Max(0, start_offs - name_length),
                             end_offs - name_length,
                             virtual_tail_length);
-                        if (region2 != null)
-                        {
-                            var matrix = new System.Drawing.Drawing2D.Matrix();
-                            matrix.Translate(0, _name.GetPixelHeight());
-                            region2.Transform(matrix);
-                        }
+                        region2?.Offset(x0 + 0, y0 + _name.GetPixelHeight());
                     }
                     if (region1 == null)
+                    {
                         return region2;
+                    }
+
                     if (region2 == null)
+                    {
                         return region1;
+                    }
+
                     region1.Union(region2);
                     region2?.Dispose();
                     return region1;
@@ -237,27 +341,53 @@ namespace LibraryStudio.Forms
 
         public HitInfo HitTest(int x, int y)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
+            if (x < x0)
+                return new HitInfo { ChildIndex = (int)FieldRegion.Button};
             if (_active_mode == 0)
             {
-                return _content?.HitTest(x, y) ?? null;
+                if (_content == null)
+                    return null;
+                var sub_info = _content?.HitTest(x - x0, y - y0) ?? null;
+                var info = sub_info.Clone();
+                info.X += x0;
+                info.Y += y0;
+                info.ChildIndex = (int)FieldRegion.Content;
+                info.InnerHitInfo = sub_info;
+                return info;
             }
             else if (_active_mode == 1)
             {
                 if (_name != null && _template != null)
                 {
                     int name_height = _name.GetPixelHeight();
-                    if (y < name_height)
+                    if (y - y0 < name_height)
                     {
-                        return _name.HitTest(x, y);
+                        var sub_info = _name.HitTest(x - x0, y - y0);
+                        var info = sub_info.Clone();
+                        info.X += x0;
+                        info.Y += y0;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        info.InnerHitInfo = sub_info;
+                        return info;
                     }
                     else
                     {
-                        var info = _template.HitTest(x, y - name_height);
+                        var sub_info = _template.HitTest(x - x0, y - y0 - name_height);
+                        /*
                         if (info != null)
                         {
                             info.Offs += 2;
                             info.Y += name_height;
                         }
+                        */
+                        var info = sub_info.Clone();
+                        info.X += x0;
+                        info.Y += y0 + name_height;
+                        info.Offs += 2;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        info.InnerHitInfo = sub_info;
                         return info;
                     }
                 }
@@ -293,11 +423,22 @@ namespace LibraryStudio.Forms
         //      1   越过右边
         public int MoveByOffs(int offs, int direction, out HitInfo info)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
             // 疑问: 如果两个视图模式都启用了怎么办？插入符只能在其中一个上面
             if (_active_mode == 0)
             {
                 if (_content != null)
-                    return _content.MoveByOffs(offs, direction, out info);
+                {
+                    var ret = _content.MoveByOffs(offs, direction, out HitInfo sub_info);
+                    info = sub_info.Clone();
+                    info.X += x0;
+                    info.Y += y0;
+                    info.ChildIndex = (int)FieldRegion.Content;
+                    // 保持 info.LineHeight
+                    info.InnerHitInfo = sub_info;
+                    return ret;
+                }
             }
             else if (_active_mode == 1)
             {
@@ -306,12 +447,26 @@ namespace LibraryStudio.Forms
                     int name_length = _name.TextLength;
                     if (offs + direction < name_length)
                     {
-                        return _name.MoveByOffs(offs, direction, out info);
+                        var ret = _name.MoveByOffs(offs, direction, out HitInfo sub_info);
+                        info = sub_info.Clone();
+                        info.X += x0;
+                        info.Y += y0;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        // 保持 info.LineHeight
+                        info.InnerHitInfo = sub_info;
+                        return ret;
                     }
                     else
                     {
-                        var ret = _template.MoveByOffs(offs - name_length, direction, out info);
+                        var ret = _template.MoveByOffs(offs - name_length, direction, out HitInfo sub_info);
+                        // info.Offs += name_length;
+                        info = sub_info.Clone();
+                        info.X += x0;
+                        info.Y += y0;
                         info.Offs += name_length;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        // 保持 info.LineHeight
+                        info.InnerHitInfo = sub_info;
                         return ret;
                     }
                 }
@@ -330,14 +485,28 @@ namespace LibraryStudio.Forms
             int blockOffs2,
             int virtual_tail_length)
         {
+            var x0 = GetContentX();
+            var y0 = GetContentY();
+
+            {
+                var rect = GetButtonRect(x, y);
+                if (clipRect.IntersectsWith(rect))
+                {
+                    // FontContext.PaintExpandButton(dc, rect.X, rect.Y, this._viewMode == ViewMode.Table);
+                    FontContext.DrawExpandIcon(dc, rect, 2,
+                        Metrics?.BorderColor ?? Color.White,
+                        this._viewMode == ViewMode.Table);
+                }
+            }
+
             int y_offs = 0;
             if (_viewMode.HasFlag(ViewMode.Plane)
                 && _content != null)
             {
                 _content.Paint(context,
                     dc,
-                    x,
-                    y,
+                    x + x0,
+                    y + y0,
                     clipRect,
                     blockOffs1,
                     blockOffs2,
@@ -349,16 +518,16 @@ namespace LibraryStudio.Forms
             {
                 _name.Paint(context,
 dc,
-x,
-y + y_offs,
+x + x0,
+y + y0 + y_offs,
 clipRect,
 blockOffs1,
 blockOffs2,
 virtual_tail_length);
                 _template.Paint(context,
     dc,
-    x,
-    y + y_offs + _name.GetPixelHeight(),
+    x + x0,
+    y + y0 + y_offs + _name.GetPixelHeight(),
     clipRect,
     blockOffs1 - 2,
     blockOffs2 - 2,
@@ -389,6 +558,10 @@ virtual_tail_length);
             ReplaceTextResult ret2 = null;
             string new_text = "";
             string old_text = "";
+
+            var x0 = GetContentX();
+            var y0 = GetContentY();
+
             if (_viewMode.HasFlag(ViewMode.Plane))
             {
                 EnsureContent();
@@ -417,7 +590,9 @@ virtual_tail_length);
                 }
 
                 if (end == -1)
+                {
                     end = Int32.MaxValue;
+                }
 
                 old_text = this.MergeText();
                 new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
@@ -455,6 +630,8 @@ virtual_tail_length);
                 return new ReplaceTextResult();
             }
 
+            var button_rect = GetButtonRect(0,0);
+
             if (ret1 != null && ret2 != null)
             {
                 // ret1 在上 ret2 在下
@@ -462,6 +639,7 @@ virtual_tail_length);
                 var rect2 = ret2.UpdateRect;
                 rect2.Offset(0, name_height);
                 var update_rect = Utility.Union(ret1.UpdateRect, rect2);
+                update_rect = Utility.Union(update_rect, button_rect);
                 var max_pixel_width = Math.Max(ret1.MaxPixel, ret2.MaxPixel);
                 ret2 = new ReplaceTextResult
                 {
@@ -475,11 +653,21 @@ virtual_tail_length);
             }
             if (ret1 != null)
             {
+                ret1.UpdateRect = Utility.Offset(ret1.UpdateRect, x0, y0);
+                ret1.UpdateRect = Utility.Union(ret1.UpdateRect, button_rect);
+
+                ret1.ScrollRect = Utility.Offset(ret1.ScrollRect, x0, y0);
+                ret1.MaxPixel += x0;
                 return ret1;
             }
 
             if (ret2 != null)
             {
+                ret2.UpdateRect = Utility.Offset(ret2.UpdateRect, x0, y0);
+                ret2.UpdateRect = Utility.Union(ret2.UpdateRect, button_rect);
+
+                ret2.ScrollRect = Utility.Offset(ret2.ScrollRect, x0, y0);
+                ret2.MaxPixel += x0;
                 return ret2;
             }
 
@@ -489,7 +677,9 @@ virtual_tail_length);
         void EnsureContent()
         {
             if (_content == null)
+            {
                 _content = new Paragraph(this);
+            }
         }
 
         void EnsureNameAndTemplate()

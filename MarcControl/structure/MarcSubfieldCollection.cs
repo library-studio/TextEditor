@@ -6,9 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using LibraryStudio.Forms;
-using NUnit.Framework.Interfaces;
+
 using Vanara.PInvoke;
-using static Vanara.PInvoke.Gdi32;
 
 namespace MarcControl.structure
 {
@@ -36,11 +35,13 @@ namespace MarcControl.structure
             throw new NotImplementedException();
         }
 
-        public ReplaceTextResult ReplaceText(
+        public override ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
             IContext context, Gdi32.SafeHDC dc, int start, int end, string text, int pixel_width)
         {
-            var ret = base.ReplaceText(context, dc, start, end, text, pixel_width);
+            var ret = base.ReplaceText(
+                view_mode_tree,
+                context, dc, start, end, text, pixel_width);
             foreach(MarcSubfield child in Children)
             {
                 child.Parent = this;

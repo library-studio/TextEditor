@@ -909,3 +909,11 @@ Template 定长模板的结构设计。有两种可能的方法。
 
 ~~~
 MarcSubfield 左端应该也有 Caption 区域，Splitter 区域，Button 区域。
+
+~~~
+展开、收缩按钮用普通文字显示即可。
+˃˅
+
+
+~~~
+Template 中使用 Line 还是 Paragraph 可以思考一下

@@ -3190,7 +3190,9 @@ out int count)
                 return new ReplaceTextResult();
             var field = this.GetField(info.ChildIndex);
 
+            var y0 = SumHeight(_fields, 0, info.ChildIndex);
             var old_height = field.GetPixelHeight();
+            var old_width = field.GetPixelWidth();
             var blow_height = SumHeight(_fields, info.ChildIndex, _fields.Count - info.ChildIndex);
 
             var ret = field.ToggleExpand(info.InnerHitInfo,
@@ -3200,13 +3202,17 @@ out int count)
 
             var new_height = field.GetPixelHeight();
 
-            var y0 = SumHeight(_fields, 0, info.ChildIndex);
             ret.Offset(0, y0);
+            {
+                var new_width = field.GetPixelWidth();
+                var rect = ret.UpdateRect;
+                rect.Height = new_height;
+                rect.Width = Math.Max(old_width, new_width);
+                ret.UpdateRect = rect;
+            }
+
             ret.ScrolledDistance = new_height - old_height;
-            if (new_height - old_height > 0)
-                ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
-            else
-                ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
+            ret.ScrollRect = new Rectangle(0, y0 + old_height, int.MaxValue, blow_height);
 
             return ret;
         }

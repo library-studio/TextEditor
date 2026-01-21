@@ -681,6 +681,7 @@ namespace LibraryStudio.Forms
             string content = left_text + text + right_text;
 
             var new_lines = new List<T>();
+            // 下级元素的最大宽度
             int max_pixel_width = pixel_width;
             if (string.IsNullOrEmpty(content) == false)
             {

@@ -28,7 +28,8 @@ namespace LibraryStudio.Forms
 
         // 根据 HitInfo 设置插入符的 offs 和更新显示
         void SetCaret(HitInfo result,
-            bool reset_selection = true)
+            bool reset_selection = true,
+            bool ensure_caret_visible = true)
         {
             //SetCaretOffs(result.Offs);
 
@@ -36,7 +37,7 @@ namespace LibraryStudio.Forms
             Debug.Assert(_caret_offs <= _record.TextLength);
 #endif
 
-            MoveCaret(result);
+            MoveCaret(result, ensure_caret_visible);
 
             if (reset_selection)
             {

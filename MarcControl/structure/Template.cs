@@ -12,9 +12,9 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 定长输入模板
     /// </summary>
-    public class Template : IBox, IDisposable, IViewMode
+    public class Template : IViewBox, IDisposable
     {
-        List<Line> _lines = new List<Line>();
+        List<Paragraph> _lines = new List<Paragraph>();
         Metrics _metrics = null;
 
         public Template(IBox parent, Metrics metrics)
@@ -113,7 +113,7 @@ namespace LibraryStudio.Forms
             return true;
         }
 
-        Line HitLine(int x, int y)
+        Paragraph HitLine(int x, int y)
         {
             // 找到 x, y 所在的 line
             var temp = this.HitTest(x, y);
@@ -305,7 +305,7 @@ namespace LibraryStudio.Forms
             var infos = new List<HitInfo>();
 
             int offs = 0;
-            Line line = null;
+            Paragraph line = null;
             int start_y = 0;
             for (int i = 0; i < _lines.Count; i++)
             {
@@ -442,19 +442,27 @@ namespace LibraryStudio.Forms
                 end = temp;
             }
 
-            if (end == -1)
-                end = Int32.MaxValue;
-
             var old_text = this.MergeText();
+
+            this.Clear();
+
+            if (end == -1)
+                end = old_text.Length;
+
             var new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
 
             var new_lines = new List<Line>();
             if (_metrics == null)
                 throw new ArgumentException("无法进行 ReplaceText 操作，因为没有指定 Metrics.GetStructure 函数");
 
-            var field_infos = _metrics.GetStructure(this)?.ToList();
+            var field_infos = _metrics.GetStructure?.Invoke(this)?.ToList();
             if (field_infos == null)
-                throw new ArgumentException("无法进行 ReplaceText 操作，因为没有指定 Metrics.GetStructure 函数调用返回了 null");
+            {
+                // throw new ArgumentException("无法进行 ReplaceText 操作，因为没有指定 Metrics.GetStructure 函数调用返回了 null");
+                field_infos = new List<FieldInfo> {
+                    new FieldInfo{ Length = new_text.Length}
+                };
+            }
 
             // 如果 new_text 长度不足?
             var total_length = field_infos.Sum((info) => info.Length);
@@ -470,13 +478,16 @@ namespace LibraryStudio.Forms
             foreach (var info in field_infos)
             {
                 var line_text = new_text.Substring(offs, info.Length);
-                var line = new Line(this);
+                var line = new Paragraph(this);
                 line.ReplaceText(context,
                     dc,
                     0,
-                    info.Length,
+                    -1,
                     line_text,
                     pixel_width);
+
+                this._lines.Add(line);
+
                 pixel_height += line.GetPixelHeight();
                 max_pixel_width = Math.Max(max_pixel_width, line.GetPixelWidth());
                 i++;
@@ -513,7 +524,7 @@ namespace LibraryStudio.Forms
         {
             if (_lines == null)
             {
-                _lines = new List<Line>();
+                _lines = new List<Paragraph>();
             }
         }
 

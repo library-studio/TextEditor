@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -115,8 +116,9 @@ Rectangle rect)
                 }
                 */
 
+
                 // 按下了“展开/收缩”按钮
-                if (result.InnerHitInfo?.ChildIndex == (int)FieldRegion.Button)
+                if (HitButton(result))
                 {
                     ToggleExpand(result);
                     base.OnMouseDown(e);
@@ -170,6 +172,20 @@ Rectangle rect)
             base.OnMouseDown(e);
         }
 
+        static bool HitButton(HitInfo info)
+        {
+            var current = info;
+            while (current != null)
+            {
+                if (current.ChildIndex == (int)FieldRegion.Button)
+                {
+                    return true;
+                }
+
+                current = current.InnerHitInfo;
+            }
+            return false;
+        }
         protected override void OnMouseUp(MouseEventArgs e)
         {
             // 有可能没有经过 OnMouseDown()，一上来就是 OnMouseUp()，这多半是别的窗口操作残留的消息
@@ -278,6 +294,7 @@ Rectangle rect)
             // 按下了“展开/收缩”按钮之后，在抬起之前的偶然移动
             if (this._isButtonDown == true)
             {
+                Cursor = Cursors.Arrow;
                 base.OnMouseMove(e);
                 return;
             }
@@ -294,11 +311,20 @@ Rectangle rect)
                 BeginMonitorCaretVisible();
             }
 
-            if (_isMouseDown)
-            {
-                var result = _record.HitTest(
+            var result = _record.HitTest(
 e.X + this.HorizontalScroll.Value,
 e.Y + this.VerticalScroll.Value);
+
+            if (HitButton(result))
+            {
+                Cursor = Cursors.Arrow;
+                base.OnMouseMove(e);
+                return;
+            }
+
+            if (_isMouseDown)
+            {
+
 
                 // 鼠标选择字段时拖动进入这里。而如果是按住 Ctrl 或 Shift 点选，则不应进入这里
                 if (InSelectingField())
@@ -424,6 +450,10 @@ e.Y + this.VerticalScroll.Value);
                 }
             }
 
+            if (ret.UpdateRect == System.Drawing.Rectangle.Empty
+                && ret.ScrollRect == System.Drawing.Rectangle.Empty)
+                return;
+
             var max_pixel_width = ret.MaxPixel;
             var replaced_text = ret.ReplacedText;
             var update_rect = ret.UpdateRect;
@@ -452,14 +482,16 @@ e.Y + this.VerticalScroll.Value);
 
             if (update_rect != System.Drawing.Rectangle.Empty)
             {
+                Debug.Assert( update_rect.Width < int.MaxValue, "不允许用极大值来 Invalidate");
                 update_rect.Offset(x, y);
                 this.Invalidate(update_rect);
+                // this.Invalidate();
             }
 
             if (max_pixel_width == 0)
                 max_pixel_width = this._record.GetPixelWidth();
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
-            SetCaret(HitByCaretOffs(_caret_offs), false);
+            SetCaret(HitByCaretOffs(_caret_offs), reset_selection: false, ensure_caret_visible: false);
         }
     }
 }

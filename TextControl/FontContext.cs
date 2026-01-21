@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -116,6 +117,89 @@ namespace LibraryStudio.Forms
                 return size.Width / sample.Length;
             }
         }
+
+        static Font _button_font = new Font("Arial", 10F);
+
+        public static void PaintExpandButton(SafeHDC dc,
+            int x,
+            int y,
+            bool expanded)
+        {
+            string text;   // "˃˅";
+            if (expanded)
+                text = "˅";
+            else
+                text = "˃";
+
+            var handle = _button_font.ToHfont();
+            try
+            {
+                using (var context = dc.SelectObject(handle))
+                {
+                    Gdi32.TextOut(dc, x, y, text, text.Length);
+                }
+            }
+            finally
+            {
+                Gdi32.DeleteObject(handle);
+            }
+        }
+
+        public static void DrawExpandIcon(SafeHDC hdc,
+Rectangle rect,
+// COLORREF back_color,
+int border_thickness,
+COLORREF border_color,
+bool expanded)
+        {
+            // 创建实心画刷
+            //var hBrush = Gdi32.CreateSolidBrush(back_color);
+            //var oldBrush = Gdi32.SelectObject(hdc, hBrush);
+
+            SafeHPEN hPen;
+            if (border_color == Color.Transparent)
+                hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_NULL,
+    0, border_color);
+            else
+                hPen = Gdi32.CreatePen((int)Gdi32.PenStyle.PS_SOLID,
+                    border_thickness, border_color);
+            var hOldPen = Gdi32.SelectObject(hdc, hPen);
+
+            try
+            {
+                POINT[] apt = new POINT[3];
+                int half_h = rect.Height / 2;
+                int half_w = rect.Width / 2;
+                if (expanded)
+                {
+                    // 高度是宽度的一半
+                    var h = half_w;
+                    var bottom = rect.Top + half_h + (h/2);
+                    apt[0] = new POINT(rect.Left, bottom - h);
+                    apt[1] = new POINT(rect.Left + half_w, bottom);
+                    apt[2] = new POINT(rect.Right, bottom - h);
+                }
+                else
+                {
+                    // 高度等于宽度
+                    var delta = (rect.Height - rect.Width)/2;
+                    apt[0] = new POINT(rect.Left + half_w, rect.Top + delta);
+                    apt[1] = new POINT(rect.Right, rect.Top + half_h);
+                    apt[2] = new POINT(rect.Left + half_w, rect.Bottom - delta);
+                }
+                var ret = Gdi32.Polyline(hdc, apt, 3);
+                Debug.Assert(ret == true);
+            }
+            finally
+            {
+                // 恢复原画刷并释放资源
+                //Gdi32.SelectObject(hdc, oldBrush);
+                Gdi32.SelectObject(hdc, hOldPen);
+                //Gdi32.DeleteObject(hBrush);
+                Gdi32.DeleteObject(hPen);
+            }
+        }
+
 
         public void Dispose()
         {
@@ -377,6 +461,6 @@ namespace LibraryStudio.Forms
             }
         }
 
-#endregion
+        #endregion
     }
 }

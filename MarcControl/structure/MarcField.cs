@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Windows.Forms;
 using MarcControl.structure;
 using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
@@ -88,20 +89,24 @@ namespace LibraryStudio.Forms
         }
 
         // 注意确保 _name 内容设置好了以后再调用本函数
-        void EnsureContent()
+        // _content 中存储的对象，可以是 Paragraph Template MarcSubfieldCollection 之一。
+        // 其中，Template 在没有模板定义的情况下，默认当作一个 Paragraph 处理，那么实际上
+        // _content 中存储的对象，可以简化为两种类型: Template 和 MarcSubfieldCollection 之一。
+        bool EnsureContent()
         {
             if (_viewMode.HasFlag(ViewMode.Plane)
-                || this.IsHeader || this.IsControlField)
+                /*|| this.IsHeader || this.IsControlField*/)
             {
-                if (_content == null || !(_content is Paragraph))
+                if (_content == null || !(_content is Template))
                 {
                     _content?.Dispose();
-                    _content = new Paragraph(this)
+                    _content = new Template(this, _fieldProperty)
                     {
                         Name = "content",
                     };
+                    return true;
                 }
-                return;
+                return false;
             }
             if (_viewMode.HasFlag(ViewMode.Table))
             {
@@ -113,9 +118,11 @@ namespace LibraryStudio.Forms
                     {
                         Name = "content",
                     };
+                    return true;
                 }
-                return;
+                return false;
             }
+            return false;
         }
 
         public MarcField(MarcRecord record,
@@ -1494,6 +1501,31 @@ clipRect);
                 _name?.GetPixelHeight() ?? 0);
         }
 
+        Rectangle GetButtonRect(int x = 0, int y = 0)
+        {
+            IBox box;
+            if (this.IsHeader)
+            {
+                box = _content;
+            }
+            else
+            {
+                box = _name;
+            }
+
+            {
+                var height = box?.GetPixelHeight() ?? 0;
+                if (height == 0)
+                {
+                    height = FontContext.DefaultFontHeight;
+                }
+                return new Rectangle(x + _fieldProperty.CaptionPixelWidth,
+        (int)(y + _baseLine - (box?.BaseLine ?? 0)) + 0,
+        _fieldProperty.ButtonWidth,
+        height);
+            }
+        }
+
         int VerticalUnit()
         {
             return _fieldProperty.BlankUnit / 2;
@@ -1635,6 +1667,18 @@ clipRect);
                 }
             }
 
+            // 绘制 Expand Button
+            {
+                rect = GetButtonRect(x0, y);
+                if (clipRect.IntersectsWith(rect))
+                {
+                    // FontContext.PaintExpandButton(dc, rect.X, rect.Y, this._viewMode == ViewMode.Table);
+                    FontContext.DrawExpandIcon(dc, rect, 2,
+                        _fieldProperty?.BorderColor ?? Color.White,
+                        this._viewMode == ViewMode.Table);
+                }
+            }
+
             x = x0 + _fieldProperty.NameX;
             // rect = new Rectangle(x, y, _fieldProperty.NamePixelWidth, Line.GetLineHeight());
             rect = GetNameRect(x0, y);
@@ -1652,6 +1696,7 @@ clipRect);
                 */
                 // TODO: Intersect() 判断的矩形可以是包括边框的更大矩形。这样一些溢出的情况也能得以刷新显示
                 if (clipRect.IntersectsWith(rect))
+                {
                     _name.Paint(
                         context,
                         dc,
@@ -1661,6 +1706,8 @@ clipRect);
                         blockOffs1,
                         blockOffs2,
                         right_most == _name ? virtual_tail_length : 0);
+                }
+
                 var delta = _name.TextLength;
                 blockOffs1 -= delta;
                 blockOffs2 -= delta;
@@ -1777,10 +1824,15 @@ clipRect);
             int pixel_width)
         {
             var update_rect = System.Drawing.Rectangle.Empty;
+
             /*
-            scroll_rect = System.Drawing.Rectangle.Empty;
-            scroll_distance = 0;
+            // 三个区域的更新矩形，要等到 base line 计算好以后，才能合并到一起成为 update_rect
+            var update_rect_name = System.Drawing.Rectangle.Empty;
+            var update_rect_indicator = System.Drawing.Rectangle.Empty;
+            var update_rect_content = System.Drawing.Rectangle.Empty;
+            var update_rect_caption = System.Drawing.Rectangle.Empty;
             */
+
             var result = new ReplaceTextResult();
 
             this.ClearCacheHeight();
@@ -1809,7 +1861,9 @@ clipRect);
                         text = text.Substring(indicator_value.Length);
                     }
                     if (text.Length > 0)
+                    {
                         content_value = text;
+                    }
                 }
             }
             else
@@ -1832,7 +1886,6 @@ clipRect);
                     -1,
                     name_value,
                     _fieldProperty.NameTextWidth);
-
                 var r = GetNameRect();
                 var update_rect_name = Utility.Offset(ret.UpdateRect, r.X, r.Y);
 
@@ -1860,6 +1913,7 @@ clipRect);
                 dc,
                 out Rectangle update_rect_caption); // 返回前 update_rect_caption 已经被平移过了
                 update_rect_caption.Width = Math.Min(update_rect_caption.Width, _fieldProperty.CaptionPixelWidth);
+
                 update_rect = Utility.Union(update_rect, update_rect_caption);
                 max_pixel_width = Math.Max(max_pixel_width,
                     _fieldProperty.NameBorderX);
@@ -1899,10 +1953,12 @@ clipRect);
                 }
             }
 
+            bool view_mode_changed = false;
             if (view_mode_tree != null
                 && view_mode_tree.ViewMode != this._viewMode)
             {
                 this._viewMode = view_mode_tree.ViewMode;
+                view_mode_changed = true;
             }
 
             if (true
@@ -1912,7 +1968,10 @@ clipRect);
                 // 保留一下 _content 内容清空之前，旧内容的宽度
                 int old_width = _content?.GetPixelWidth() ?? 0;
 
-                EnsureContent();
+                if (EnsureContent())
+                {
+                    view_mode_changed = true;
+                }
 
                 if (content_value.LastOrDefault() == Metrics.FieldEndCharDefault)
                     content_value = content_value.Substring(0, content_value.Length - 1);
@@ -1965,22 +2024,13 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                         rect,
                         GetContentX(),
                         y0);
-                    /*
-                    // 注: 右侧加上虚拟回车符号的宽度。避免失效区域不足
-                    if (update_rect_content.IsEmpty == false)
-                        update_rect_content.Width += Line.ReturnWidth();
-                    if (scroll_rect.IsEmpty == false)
-                        scroll_rect.Width += Line.ReturnWidth();
-                    */
 
-                    /*
-                    // 若 Paragraph 中 Line 数变化，就要连左边的矩形一起刷新和滚动
-                    if (scroll_rect.IsEmpty == false)
+                    if (view_mode_changed && update_rect != System.Drawing.Rectangle.Empty)
                     {
-                        update_rect.Width += update_rect.X;
-                        update_rect.X = 0;
+                        // 当视图模式改变后，左侧 name 和 indicator 区的高度也可能发生了变化，要一并刷新
+                        update_rect_content = ExpandUpdateRect(update_rect_content);
                     }
-                    */
+
                     update_rect = Utility.Union(update_rect, update_rect_content);
 
                     max_pixel_width = Math.Max(max_pixel_width,
@@ -1989,14 +2039,23 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                 else
                 {
                     // 搜集清除前的 update_rect
-                    Rectangle update_rect_content = GetRect(_content);
+                    var update_rect_content = GetRect(_content);
                     Utility.Offset(ref update_rect_content,
                         _fieldProperty.ContentX,
                         0);
+
                     update_rect = Utility.Union(update_rect, update_rect_content);
 
+                    if (view_mode_changed)
+                        update_rect = Utility.Union(update_rect, GetButtonRect(0, 0));
+
                     ClearEmpty();
-                    ProcessBaseline();
+                    if (ProcessBaseline() == true)
+                    {
+                        ClearCacheHeight();
+                        update_rect = new Rectangle(0, 0, this.GetPixelWidth(), this.GetPixelHeight());
+                    }
+
                     result.UpdateRect = update_rect;
                     result.MaxPixel = _fieldProperty.ContentX + (_content?.GetPixelWidth() ?? 0);
                     return result;
@@ -2008,11 +2067,35 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                 _content.Clear();
             }
 
+            if (view_mode_changed)
+                update_rect = Utility.Union(update_rect, GetButtonRect(0, 0));
+
+
             ClearEmpty();
-            ProcessBaseline();
+            if (ProcessBaseline() == true)
+            {
+                ClearCacheHeight();
+                update_rect = new Rectangle(0, 0, this.GetPixelWidth(), this.GetPixelHeight());
+            }
+
             result.UpdateRect = update_rect;
             result.MaxPixel = max_pixel_width;
             return result;
+
+            Rectangle ExpandUpdateRect(Rectangle r)
+            {
+                if (r.X > 0)
+                {
+                    r.Width += update_rect.Left;
+                    r.X = 0;
+                }
+                /*
+                var h = this.GetPixelHeight();
+                if (r.Height < h)
+                    r.Height = h;
+                */
+                return r;
+            }
 
             void ClearEmpty()
             {
@@ -2139,8 +2222,10 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
 
 
         // 综合三个区域的基线计算最大基线。还要考虑 Name 和 Indicator 的(上方、下方)竖向空白
-        void ProcessBaseline()
+        bool ProcessBaseline()
         {
+            var old_baseLine = this._baseLine;
+            var old_below = this._below;
             var boxes = GetBoxes();
             if (boxes.Count == 0)
             {
@@ -2148,10 +2233,11 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                 // _baseLine = Line.GetLineHeight();
                 _baseLine = 0;
                 _below = 0;
-                return;
+                return (old_baseLine != this._baseLine || old_below != this._below);
             }
             _baseLine = boxes.Max(x => x.BaseLine) + VerticalUnit() / 2;
             _below = boxes.Max(y => y.Below) + VerticalUnit() / 2;
+            return (old_baseLine != this._baseLine || old_below != this._below);
         }
 
         int FirstLineCaretHeight(IBox box = null)
@@ -2970,7 +3056,7 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
             {
                 var text = this.MergeText();
                 this._viewMode = this._viewMode == ViewMode.Plane ? ViewMode.Table : ViewMode.Plane;
-                this.EnsureContent();
+                // this.EnsureContent();
                 return ReplaceText(
                     null,
                     context,
