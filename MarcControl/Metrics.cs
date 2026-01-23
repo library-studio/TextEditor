@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -224,12 +225,93 @@ namespace LibraryStudio.Forms
 
     public delegate bool GetReadOnlyFunc(IBox box);
 
-    public delegate IEnumerable<FieldInfo> GetStructureFunc(IBox box);
+    // 获得 box 下的结构信息
+    public delegate StructureInfo GetStructureFunc(IBox parent, string name);
 
-    public class FieldInfo
+    public class UnitInfo
     {
         public string Name { get; set; }
         public string Caption { get; set; }
-        public int Length { get; set; }
+
+        public UnitType Type { get; set; } = UnitType.Unkown;
+
+        // 0 表示不确定长度
+        public int Length { get; set; } = 0;
+    }
+
+    public class StructureInfo
+    {
+        public List<UnitInfo> Units { get; set; } = new List<UnitInfo>();
+
+        public static StructureInfo FromChars(int[] length_list)
+        {
+            var result = new StructureInfo();
+            int offs = 0;
+            foreach (var l in length_list)
+            {
+                result.Units.Add(new UnitInfo
+                {
+                    Caption = $"({offs}/{l})",
+                    Length = l,
+                    Type = UnitType.Chars
+                });
+                offs += l;
+            }
+
+            return result;
+        }
+
+        public static StructureInfo FromSubfields()
+        {
+            var result = new StructureInfo();
+            {
+                result.Units.Add(new UnitInfo
+                {
+                    Name = "a",
+                    Length = 0,
+                    Type = UnitType.Subfield
+                });
+            }
+
+            return result;
+        }
+
+        public bool IsType(UnitType type)
+        {
+            if (Units == null || Units.Count == 0)
+            {
+                return false;
+            }
+
+            return Units[0].Type == type;
+        }
+
+        public bool IsUnknown()
+        {
+            return IsType(UnitType.Unkown);
+        }
+
+        public bool IsChars()
+        {
+            return IsType(UnitType.Chars);
+        }
+
+        public bool IsField()
+        {
+            return IsType(UnitType.Field);
+        }
+
+        public bool IsSubfield()
+        {
+            return IsType(UnitType.Subfield);
+        }
+    }
+
+    public enum UnitType
+    {
+        Unkown = 0,
+        Field = 1,
+        Subfield = 2,
+        Chars = 3,
     }
 }

@@ -28,7 +28,22 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public ViewMode ViewMode { get; set; }
+        public StructureInfo StructureInfo { get; set; }
+
+        public Metrics Metrics { get; set; }
+
+        public Collection()
+        {
+
+        }
+
+        public Collection(IBox parent, Metrics metrics)
+        {
+            Parent = parent;
+            Metrics = metrics;
+        }
+
+        public ViewMode ViewMode { get; set; } = ViewMode.Expand;
 
         public string Name { get; set; }
 
@@ -546,8 +561,89 @@ namespace LibraryStudio.Forms
             return 1;
         }
 
+        public virtual void PaintBack(
+    IContext context,
+    SafeHDC hdc,
+    int x,
+    int y,
+    Rectangle clipRect)
+        {
+            // 绘制背景色
+            {
+                /*
+                {
+                    var backColor = context?.GetBackColor?.Invoke(null, false) ?? SystemColors.Window;
+                    var rect = clipRect;
+                    // 注: 如果直接用 clipRect 来绘制背景，右下会漏一条线的面积没有填充到
+                    rect.Width += 1;
+                    rect.Height += 1;
+                    MarcField.DrawSolidRectangle(hdc, rect, backColor);
+                }
+                */
 
-        public void Paint(
+                var height = this.GetPixelHeight() /*- this._blankLineHeigh*/;
+
+                // 绘制提示文字区的底色
+                {
+                    var color = Metrics?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor;
+                    if (color != Color.Transparent)
+                    {
+                        var left_rect = new Rectangle(
+                                x,
+                                y,
+                                Metrics.CaptionPixelWidth,
+                                height);
+                        MarcField.PaintBack(hdc, left_rect, clipRect, color);
+                    }
+                }
+
+                /*
+                // Solid 区
+                {
+                    var color = Metrics?.SolidColor ?? Metrics.DefaultSolidColor;
+                    if (color != Color.Transparent)
+                    {
+                        var left_rect = new Rectangle(
+                            x + Metrics.CaptionPixelWidth,
+                            y,
+                            Metrics.ContentBorderX - Metrics.CaptionPixelWidth,
+                            height);
+                        MarcField.PaintBack(hdc, left_rect, clipRect, color);
+                    }
+                }
+                */
+
+                /*
+                // 垂直线
+                {
+                    var backColor = Metrics.BorderColor;
+                    if (backColor != Color.Transparent)
+                    {
+                        var x0 = x + Metrics.SolidX + Metrics.SolidPixelWidth;
+                        var line_rect = new Rectangle(x0, y, Metrics.BorderThickness, height);
+                        if (line_rect.IntersectsWith(clipRect))
+                        {
+                            MarcField.DrawVertLine(hdc,
+        line_rect,
+        backColor);
+                        }
+                    }
+                }
+                */
+            }
+
+            /*
+            this.PaintSolidArea(hdc,
+                x,
+                y,
+                clipRect,
+                caret_field_index);
+            */
+        }
+
+
+
+        public virtual void Paint(
             IContext context,
             SafeHDC dc,
             int x,
@@ -656,6 +752,11 @@ namespace LibraryStudio.Forms
             string text,
             int pixel_width)
         {
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
             var result = new ReplaceTextResult();
 
             // 先分别定位到 start 所在的 Line，和 end 所在的 Line
@@ -692,6 +793,7 @@ namespace LibraryStudio.Forms
                     // var child = new T();
                     var child = CreateChild(context, j);
                     child.Parent = this;
+                    child.Metrics = this.Metrics;
                     // collection 会直接把 context 中的 ViewModeTree 不做修改就传递下去
                     var ret = child.ReplaceText(
                         view_mode_tree?.ChildViewModes?.ElementAtOrDefault(j),
@@ -949,16 +1051,88 @@ namespace LibraryStudio.Forms
                 }
                 else
                 {
-                    results.Add(new ViewModeTree { ViewMode = child.ViewMode });
+                    results.Add(new ViewModeTree { ViewMode = child.ViewMode == ViewMode.Expand ? child.ViewMode : ViewMode.None });
                 }
             }
-            return new ViewModeTree { ChildViewModes = results };
+            return new ViewModeTree
+            {
+                Name = "!collection",
+                ViewMode = ViewMode.Expand, // 当前容器这一层永远是展开状态
+                ChildViewModes = results
+            };
+        }
+
+        // 利用 info 中的 Children 来展开下级
+        public ReplaceTextResult ToggleExpand(
+    HitInfo info,
+    IContext context,
+    SafeHDC dc,
+    int pixel_width)
+        {
+            // 注: Collection 本身一定是已经展开的状态，这一段代码应该用不上
+            if (info.ChildIndex == (int)FieldRegion.Button)
+            {
+                if (this.ViewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+
+                var text = this.MergeText();
+                this.ViewMode = this.ViewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                return ReplaceText(
+                    null,
+                    context,
+                    dc,
+                    0,
+                    -1,
+                    text,
+                    pixel_width);
+            }
+
+            // 继续展开下级
+            if (info.InnerHitInfo != null
+                && this.ViewMode == ViewMode.Expand
+                && info.ChildIndex >= 0)
+            {
+                var child = this.Children.ElementAtOrDefault(info.ChildIndex);
+                if (child == null)
+                {
+                    return new ReplaceTextResult();
+                }
+
+                var ret = child.ToggleExpand(
+            info.InnerHitInfo,
+            context,
+            dc,
+            pixel_width);
+                ret.Offset(0, SumHeight(info.ChildIndex));
+                return ret;
+            }
+
+            return new ReplaceTextResult();
+
+            int SumHeight(int index)
+            {
+                int y = 0;
+                foreach (var child in this.Children)
+                {
+                    y += child.GetPixelHeight();
+                }
+
+                return y;
+            }
         }
     }
 
 
     public interface IViewBox : IBox, IViewMode
     {
+        Metrics Metrics { get; set; }
 
+        ReplaceTextResult ToggleExpand(
+    HitInfo info,
+    IContext context,
+    SafeHDC dc,
+    int pixel_width);
+
+        // string CaptionText { get; set; }
     }
 }

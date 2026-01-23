@@ -4,8 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.Windows.Forms;
-using MarcControl.structure;
+
 using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
 
@@ -42,8 +41,19 @@ namespace LibraryStudio.Forms
 
         // 引用字段共同属性
         Metrics _fieldProperty;
+        public Metrics Metrics
+        {
+            get
+            {
+                return _fieldProperty;
+            }
+            set
+            {
+                _fieldProperty = value;
+            }
+        }
 
-        ViewMode _viewMode = ViewMode.Plane;    //  ViewMode.Plane;
+        ViewMode _viewMode = ViewMode.None;    //  ViewMode.Plane;
         public ViewMode ViewMode
         {
             get
@@ -88,19 +98,109 @@ namespace LibraryStudio.Forms
                 };
         }
 
+        // 根据 MARC 结构定义，用 Template 或 MarcSubfieldCollection
+        // Char 结构用 Template；Subfield 结构用 MarcSubfieldCollection
+        // 后继还将为 Field 结构(4xx 中嵌套字段情形)用 MarcFieldCollection
+
         // 注意确保 _name 内容设置好了以后再调用本函数
         // _content 中存储的对象，可以是 Paragraph Template MarcSubfieldCollection 之一。
         // 其中，Template 在没有模板定义的情况下，默认当作一个 Paragraph 处理，那么实际上
         // _content 中存储的对象，可以简化为两种类型: Template 和 MarcSubfieldCollection 之一。
-        bool EnsureContent()
+        bool EnsureContent(string name)
         {
-            if (_viewMode.HasFlag(ViewMode.Plane)
-                /*|| this.IsHeader || this.IsControlField*/)
+            bool NewParagraph()
+            {
+                if (_content == null || !(_content is Paragraph))
+                {
+                    _content?.Dispose();
+                    _content = new Paragraph(this/*, _fieldProperty*/)
+                    {
+                        Name = "!content",
+                    };
+                    return true;
+                }
+                return false;
+            }
+
+            bool NewTemplate(StructureInfo info)
             {
                 if (_content == null || !(_content is Template))
                 {
                     _content?.Dispose();
                     _content = new Template(this, _fieldProperty)
+                    {
+                        Name = "!chars",
+                        StructureInfo = info,
+                    };
+                    return true;
+                }
+                return true;
+            }
+
+            bool NewSubfields(StructureInfo info)
+            {
+                if (_content == null || !(_content is MarcSubfieldCollection))
+                {
+                    _content?.Dispose();
+                    _content = new MarcSubfieldCollection(this, _fieldProperty)
+                    {
+                        Name = "!subfields",
+                        StructureInfo = info,
+                    };
+                    return true;
+                }
+                return false;
+            }
+
+            // 应要求，不支持展开。或者暂时为收缩状态
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+            {
+                return NewParagraph();
+            }
+
+            // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
+            // 查询结构定义
+            var struct_info = _fieldProperty.GetStructure?.Invoke(this.Parent, name);
+            // 无法获得结构定义，就用 Paragraph
+            if (struct_info == null
+                || struct_info.Units.Count == 0
+                || struct_info.IsUnknown())
+            {
+                _viewMode = ViewMode.Plane;
+                return NewParagraph();
+            }
+
+            if (_viewMode == ViewMode.Expand)
+            {
+                if (struct_info.IsChars())
+                {
+                    return NewTemplate(struct_info);
+                }
+                else if (struct_info.IsSubfield())
+                {
+                    //SetMode(struct_info);
+                    return NewSubfields(struct_info);
+                }
+                else if (struct_info.IsField())
+                {
+                    //SetMode(struct_info);
+                    throw new NotImplementedException();
+                }
+            }
+
+            if (_viewMode == ViewMode.None)
+                _viewMode = ViewMode.Collapse;
+            return NewParagraph();
+
+#if REMOVED
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse
+                /*|| this.IsHeader || this.IsControlField*/)
+            {
+                // Paragraph
+                if (_content == null || !(_content is Paragraph))
+                {
+                    _content?.Dispose();
+                    _content = new Paragraph(this/*, _fieldProperty*/)
                     {
                         Name = "content",
                     };
@@ -108,9 +208,9 @@ namespace LibraryStudio.Forms
                 }
                 return false;
             }
-            if (_viewMode.HasFlag(ViewMode.Table))
+            if (_viewMode == ViewMode.Expand)
             {
-                // TODO: Table 模式下，头标区和 ControlField 无法切换到 Table 模式，依然保留 Plane 模式
+
                 if (_content == null || !(_content is MarcSubfieldCollection))
                 {
                     _content?.Dispose();
@@ -123,6 +223,7 @@ namespace LibraryStudio.Forms
                 return false;
             }
             return false;
+#endif
         }
 
         public MarcField(MarcRecord record,
@@ -1668,6 +1769,7 @@ clipRect);
             }
 
             // 绘制 Expand Button
+            if (this._viewMode != ViewMode.Plane)
             {
                 rect = GetButtonRect(x0, y);
                 if (clipRect.IntersectsWith(rect))
@@ -1675,7 +1777,7 @@ clipRect);
                     // FontContext.PaintExpandButton(dc, rect.X, rect.Y, this._viewMode == ViewMode.Table);
                     FontContext.DrawExpandIcon(dc, rect, 2,
                         _fieldProperty?.BorderColor ?? Color.White,
-                        this._viewMode == ViewMode.Table);
+                        this._viewMode == ViewMode.Expand);
                 }
             }
 
@@ -1787,12 +1889,7 @@ clipRect);
                 0,
                 -1,
                 caption,
-                int.MaxValue   // _fieldProperty.CaptionPixelWidth,
-                /*,
-                out string replaced,
-                out update_rect,
-                out Rectangle scroll_rect,
-                out int scroll_distance*/);
+                int.MaxValue);
             update_rect = ret.UpdateRect;
             if (update_rect != System.Drawing.Rectangle.Empty)
                 update_rect.Offset(_fieldProperty.CaptionX, 0);
@@ -1823,6 +1920,11 @@ clipRect);
             string content,
             int pixel_width)
         {
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
             var update_rect = System.Drawing.Rectangle.Empty;
 
             /*
@@ -1968,10 +2070,11 @@ clipRect);
                 // 保留一下 _content 内容清空之前，旧内容的宽度
                 int old_width = _content?.GetPixelWidth() ?? 0;
 
-                if (EnsureContent())
+                if (EnsureContent(name_value))
                 {
                     view_mode_changed = true;
                 }
+                Debug.Assert(_viewMode != ViewMode.None);
 
                 if (content_value.LastOrDefault() == Metrics.FieldEndCharDefault)
                     content_value = content_value.Substring(0, content_value.Length - 1);
@@ -1981,7 +2084,8 @@ clipRect);
                     if (_content is IViewBox)
                     {
                         ret = (_content as IViewBox).ReplaceText(
-                        this.GetViewModeTree(),
+                            view_mode_tree,
+                            // this.GetViewModeTree(),
                     context,
                     dc,
     0,
@@ -2063,7 +2167,8 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
             }
             else
             {
-                EnsureContent();
+                EnsureContent(name_value);
+                Debug.Assert(_viewMode != ViewMode.None);
                 _content.Clear();
             }
 
@@ -3052,12 +3157,17 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
             Gdi32.SafeHDC dc,
             int pixel_width)
         {
+            ReplaceTextResult ret1 = null;
+            ReplaceTextResult ret2 = null;
+
             if (info.ChildIndex == (int)FieldRegion.Button)
             {
+                if (this._viewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+
                 var text = this.MergeText();
-                this._viewMode = this._viewMode == ViewMode.Plane ? ViewMode.Table : ViewMode.Plane;
-                // this.EnsureContent();
-                return ReplaceText(
+                this._viewMode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                ret1 = ReplaceText(
                     null,
                     context,
                     dc,
@@ -3066,10 +3176,35 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                     text,
                     pixel_width);
             }
+
+            // 继续展开下级
+            if (info.InnerHitInfo != null
+                && _viewMode == ViewMode.Expand
+                && _content != null && _content is MarcSubfieldCollection)
+            {
+                var collection = _content as MarcSubfieldCollection;
+
+                if (collection.ViewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+                var x0 = GetContentX();
+
+                ret2 = collection.ToggleExpand(
+            info.InnerHitInfo,
+            context,
+            dc,
+            pixel_width - x0);
+                var y0 = GetContentY();
+                ret2.Offset(x0, y0);
+                if (ret1 != null)
+                    ret2.UpdateRect = Utility.Union(ret2.UpdateRect, ret1.UpdateRect);
+                this.ClearCacheHeight();
+                return ret2;
+            }
             else
             {
-                // _content.ToggoleExpand(info.InnerHitInfo);
-                return new ReplaceTextResult();
+                if (ret1 == null)
+                    return new ReplaceTextResult();
+                return ret1;
             }
         }
 
@@ -3078,13 +3213,17 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
             if (_content is IViewMode)
             {
                 // 只要当前对象不是展开的状态，则没有必要再递归获得下级的状态
-                if (this._viewMode == ViewMode.Plane)
+                if (this._viewMode != ViewMode.Expand)
                     return null;
                 var result = (_content as IViewMode).GetViewModeTree();
+                Debug.Assert(result.ViewMode == ViewMode.Expand);
+                Debug.Assert(this._viewMode == ViewMode.Expand);
                 result.ViewMode = this._viewMode;
+                result.Name = "!field";
                 return result;
             }
-            return new ViewModeTree { ViewMode = this._viewMode };
+            return null;
+            // return new ViewModeTree { ViewMode = this._viewMode != ViewMode.Expand ? ViewMode.None : this._viewMode };
         }
     }
 

@@ -40,13 +40,7 @@ namespace LibraryStudio.Forms
             int start,
             int end,
             string content,
-            int pixel_width/*,
-            out string replaced,
-            out Rectangle update_rect,
-            out Rectangle scroll_rect,
-            out int scroll_distance*/);
-
-
+            int pixel_width);
 
 
         // 向下移动插入符一行

@@ -23,9 +23,9 @@ namespace LibraryStudio.Forms
 
         // Metrics 是 MarcRecord 和 MarcField 才有的特殊的，针对 MARC 结构的风格参数
         // TODO: 建议将 _fieldProperty 更名为 _marcMetrics
-        Metrics _fieldProperty = new Metrics();
+        Metrics _marcMetrics = new Metrics();
 
-        public Metrics Metrics { get { return _fieldProperty; } }
+        public Metrics Metrics { get { return _marcMetrics; } }
 
         string _theme_name = null;
         public string ColorThemeName
@@ -38,7 +38,7 @@ namespace LibraryStudio.Forms
             {
                 if (_theme_name != value)
                 {
-                    _fieldProperty.UseColorTheme(value);
+                    _marcMetrics.UseColorTheme(value);
                     if (value == "default"
                         || string.IsNullOrEmpty(value))
                     {
@@ -69,7 +69,7 @@ namespace LibraryStudio.Forms
 
         public ColorTheme GetCustomColorTheme()
         {
-            return (this._fieldProperty as ColorTheme)?.Clone();
+            return (this._marcMetrics as ColorTheme)?.Clone();
         }
 
         public void SetCustomColorTheme(ColorTheme theme)
@@ -78,9 +78,9 @@ namespace LibraryStudio.Forms
             {
                 this._theme_name = "[定制]";
                 // 比较新旧两套 Theme 有无实质性变化
-                if (this._fieldProperty.Clone().ToJson() != theme.ToJson())
+                if (this._marcMetrics.Clone().ToJson() != theme.ToJson())
                 {
-                    this._fieldProperty.ApplyColorTheme(theme);
+                    this._marcMetrics.ApplyColorTheme(theme);
                     OnColorChanged(new EventArgs());
                     OnCustomColorThemeChanged(new EventArgs());
                 }
@@ -88,7 +88,7 @@ namespace LibraryStudio.Forms
             else
             {
                 // 恢复默认主题
-                this._fieldProperty.ApplyColorTheme(ColorTheme.ThemeDefault());
+                this._marcMetrics.ApplyColorTheme(ColorTheme.ThemeDefault());
                 this._theme_name = "默认";
                 OnColorChanged(new EventArgs());
             }
@@ -144,40 +144,40 @@ namespace LibraryStudio.Forms
                 GetForeColor = (o, highlight) =>
                 {
                     if (highlight)
-                        return _fieldProperty?.HightlightForeColor ?? SystemColors.HighlightText;
+                        return _marcMetrics?.HightlightForeColor ?? SystemColors.HighlightText;
                     var range = o as Range;
                     if (range != null
                         && range.Tag is MarcField.Tag tag)
                     {
                         // 子字段名文本为红色
                         if (tag.Delimeter)
-                            return _fieldProperty?.DelimeterForeColor ?? Metrics.DefaultDelimeterForeColor;
+                            return _marcMetrics?.DelimeterForeColor ?? Metrics.DefaultDelimeterForeColor;
                         if (range.Text == " ")
-                            return _fieldProperty?.BlankCharForeColor ?? Metrics.DefaultBlankCharForeColor;
+                            return _marcMetrics?.BlankCharForeColor ?? Metrics.DefaultBlankCharForeColor;
                     }
                     if (this._readonly)
-                        return _fieldProperty?.ReadOnlyForeColor ?? SystemColors.ControlText;
-                    return _fieldProperty?.ForeColor ?? SystemColors.WindowText;
+                        return _marcMetrics?.ReadOnlyForeColor ?? SystemColors.ControlText;
+                    return _marcMetrics?.ForeColor ?? SystemColors.WindowText;
                 },
                 GetBackColor = (o, highlight) =>
                 {
                     if (highlight)
-                        return _fieldProperty?.HighlightBackColor ?? SystemColors.Highlight;
+                        return _marcMetrics?.HighlightBackColor ?? SystemColors.Highlight;
                     var range = o as Range;
                     if (range != null
                         && range.Tag is MarcField.Tag tag
                         && tag.Delimeter)
                     {
-                        return _fieldProperty?.DelimeterBackColor ?? Metrics.DefaultDelimeterBackColor; // 子字段名文本为红色
+                        return _marcMetrics?.DelimeterBackColor ?? Metrics.DefaultDelimeterBackColor; // 子字段名文本为红色
                     }
                     if (range != null)
                         return Color.Transparent;
                     if (this._readonly)
                     {
-                        return _fieldProperty?.ReadOnlyBackColor ?? SystemColors.Control;
+                        return _marcMetrics?.ReadOnlyBackColor ?? SystemColors.Control;
                         // backColor = ControlPaint.Dark(backColor, 0.01F);
                     }
-                    var backColor = _fieldProperty?.BackColor ?? SystemColors.Window;
+                    var backColor = _marcMetrics?.BackColor ?? SystemColors.Window;
                     return backColor;
                 },
                 // PaintBack = _paintBackfunc,

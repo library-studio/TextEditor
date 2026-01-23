@@ -111,7 +111,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MarcControl\MarcControl.csproj">
-      <Project>{251DEE42-BCFA-4F53-8C6D-5BF242FDD16D}</Project>
+      <Project>{251dee42-bcfa-4f53-8c6d-5bf242fdd16d}</Project>
       <Name>MarcControl</Name>
     </ProjectReference>
     <ProjectReference Include="..\TextControl\TextControl.csproj">

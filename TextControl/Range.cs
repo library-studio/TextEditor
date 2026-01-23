@@ -125,6 +125,11 @@ namespace LibraryStudio.Forms
             string text,
             int pixel_width)
         {
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
             var result = new ReplaceTextResult();
 
             Paragraph.InitializeUspEnvironment();

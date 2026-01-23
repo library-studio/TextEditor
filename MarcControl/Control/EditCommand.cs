@@ -903,7 +903,7 @@ namespace LibraryStudio.Forms
                         var handle = e.Graphics.GetHdc();
                         using (var hdc = new SafeHDC(handle))
                         {
-                            int x = -_fieldProperty.SolidX;
+                            int x = -_marcMetrics.SolidX;
                             int y = 0;
                             foreach (var field in fields)
                             {

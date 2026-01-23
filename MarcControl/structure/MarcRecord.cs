@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+
 using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
 
@@ -14,7 +15,7 @@ namespace LibraryStudio.Forms
     /// 一个 MARC 记录编辑区域
     /// 由若干 MarcField 构成
     /// </summary>
-    public class MarcRecord : IBox, IEnumerable<MarcField>, IDisposable
+    public class MarcRecord : IViewBox, IEnumerable<MarcField>, IDisposable
     {
         public string Name { get; set; }
 
@@ -37,6 +38,19 @@ namespace LibraryStudio.Forms
 
         // 引用字段共同属性
         Metrics _fieldProperty;
+        public Metrics Metrics
+        {
+            get
+            {
+                return _fieldProperty;
+            }
+            set
+            {
+                _fieldProperty = value;
+            }
+        }
+
+        public ViewMode ViewMode { get; set; } = ViewMode.Expand;
 
         public MarcRecord(MarcControl control,
             Metrics fieldProperty)
@@ -915,6 +929,11 @@ namespace LibraryStudio.Forms
             string text,
             int pixel_width)
         {
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
             var update_rect = System.Drawing.Rectangle.Empty;
             /*
             scroll_rect = System.Drawing.Rectangle.Empty;
@@ -3225,7 +3244,12 @@ out int count)
             {
                 results.Add(child.GetViewModeTree());
             }
-            return new ViewModeTree { ChildViewModes = results };
+            return new ViewModeTree
+            {
+                Name = "!record",
+                ViewMode = ViewMode.Expand,
+                ChildViewModes = results
+            };
         }
     }
 }

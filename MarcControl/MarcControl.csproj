@@ -114,7 +114,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Structure\MarcSubfield.cs" />
     <Compile Include="Structure\MarcSubfieldCollection.cs" />
+    <Compile Include="Structure\OldTemplate.cs" />
     <Compile Include="Structure\Template.cs" />
+    <Compile Include="Structure\TemplateItem.cs" />
     <Compile Include="Structure\ViewModeTree.cs" />
     <Compile Include="UnitTest\MarcControlTests_NUnitStyle.cs" />
     <Compile Include="UnitTest\TestCompressMaskText.cs" />

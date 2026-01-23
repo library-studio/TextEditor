@@ -4,12 +4,10 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using LibraryStudio.Forms;
 
 using Vanara.PInvoke;
 
-namespace MarcControl.structure
+namespace LibraryStudio.Forms
 {
     /// <summary>
     /// MARC 子字段的集合容器
@@ -17,17 +15,35 @@ namespace MarcControl.structure
     public class MarcSubfieldCollection : Collection<MarcSubfield>
     {
         // TODO: 在 ReplaceText() 重载函数中为每个 Child 设置 Parent 和 Metrics
-        public Metrics Metrics { get; set; }
 
-        public MarcSubfieldCollection()
+        public MarcSubfieldCollection() : base()
         {
 
         }
 
-        public MarcSubfieldCollection(IBox parent, Metrics metrics)
+        public MarcSubfieldCollection(IBox parent, Metrics metrics) : base(parent, metrics)
         {
             this.Parent = parent;
             this.Metrics = metrics;
+        }
+
+        public override void Paint(IContext context, Gdi32.SafeHDC dc, int x, int y, Rectangle clipRect, int blockOffs1, int blockOffs2, int virtual_tail_length)
+        {
+            /*
+            base.PaintBack(context,
+                dc,
+                x,
+                y,
+                clipRect);
+            */
+            base.Paint(context,
+                dc,
+                x,
+                y,
+                clipRect,
+                blockOffs1,
+                blockOffs2,
+                virtual_tail_length);
         }
 
         public override ReplaceTextResult ReplaceText(IContext context, Gdi32.SafeHDC dc, int start, int end, string text, int pixel_width)
@@ -53,7 +69,8 @@ namespace MarcControl.structure
         /*
         public override MarcSubfield CreateChild(IContext context, int index)
         {
-            return base.CreateChild(context, index);
+            var result = base.CreateChild(context, index);
+            return result;
         }
         */
 

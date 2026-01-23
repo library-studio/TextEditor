@@ -369,18 +369,15 @@ namespace LibraryStudio.Forms
             int start,
             int end,
             string text,
-            int pixel_width/*,
-            out string replaced,
-            out Rectangle update_rect,
-            out Rectangle scroll_rect,
-            out int scroll_distance*/)
+            int pixel_width)
         {
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
             var update_rect = System.Drawing.Rectangle.Empty;
-            /*
-            scroll_rect = System.Drawing.Rectangle.Empty;
-            scroll_distance = 0;
-            replaced = "";
-            */
+
             var result = new ReplaceTextResult();
 
             // 先分别定位到 start 所在的 Paragraph，和 end 所在的 Paragraph

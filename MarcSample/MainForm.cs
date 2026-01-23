@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -47,8 +45,38 @@ namespace MarcSample
             this.marcControl1.ClientBoundsWidth = 0;
             // this.marcControl1.ClientBoundsWidth = 800;
             // this.marcControl1.ClientBoundsWidth = -1;
+            this.marcControl1.Metrics.GetStructure = (parent, name) =>
+            {
+                if (parent is MarcRecord)
+                {
+                    // 当前为字段
+                    if (name == "001")
+                    {
+                        return StructureInfo.FromChars(new int[] { 2, 3, 5, 10 });
+                    }
+                    else if (name == "100")
+                    {
+                        return StructureInfo.FromSubfields();
+                    }
+                    else if (name == "200")
+                    {
+                        return StructureInfo.FromSubfields();
+                    }
+                }
+                else if (parent is MarcField)
+                {
+                    // 当前为子字段
+                    var field = parent as MarcField;
+                    var parent_name = field.FieldName;
+                    if (parent_name == "100" && name == "a")
+                    {
+                        return StructureInfo.FromChars(new int[] { 2, 3, 5, 10 });
+                    }
+                }
 
+                return null;
 
+            };
 
             // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB";
             //this.marcControl1.Content = new string((char)31, 1) + "1";

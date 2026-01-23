@@ -10,9 +10,12 @@ namespace LibraryStudio.Forms
     /// </summary>
     public class ViewModeTree
     {
-        public ViewMode ViewMode { get; set; } = ViewMode.Plane;
+        public ViewMode ViewMode { get; set; } = ViewMode.None;
 
         public IEnumerable<ViewModeTree> ChildViewModes { get; set; }
+
+        // 用于调试
+        public string Name { get; set; }
     }
 
     public interface IViewMode

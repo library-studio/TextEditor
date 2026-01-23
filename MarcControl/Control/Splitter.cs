@@ -22,7 +22,7 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return _fieldProperty.CaptionPixelWidth;
+                return _marcMetrics.CaptionPixelWidth;
             }
             set
             {
@@ -34,9 +34,9 @@ namespace LibraryStudio.Forms
                     value = Metrics.DefaultSplitterPixelWidth;
                 }
 
-                if (_fieldProperty.CaptionPixelWidth != value)
+                if (_marcMetrics.CaptionPixelWidth != value)
                 {
-                    _fieldProperty.CaptionPixelWidth = value;
+                    _marcMetrics.CaptionPixelWidth = value;
                     // 迫使重新布局 Layout
                     Relayout(_record.MergeText());
                     // TODO: 折行位置发生变化，可能会让 _caretInfo.X 失效
@@ -81,7 +81,7 @@ namespace LibraryStudio.Forms
             // 计算差额
             var delta = _splitterX - _splitterStartX;
 
-            var changed = _fieldProperty.DeltaCaptionWidth(delta);
+            var changed = _marcMetrics.DeltaCaptionWidth(delta);
             /*
             _fieldProperty.CaptionPixelWidth += delta;
             _fieldProperty.CaptionPixelWidth = Math.Max(_fieldProperty.SplitterPixelWidth, _fieldProperty.CaptionPixelWidth);
@@ -136,7 +136,7 @@ namespace LibraryStudio.Forms
         int TestSplitterArea(int x)
         {
             x += this.HorizontalScroll.Value;   // 窗口坐标变换为内容坐标
-            return _fieldProperty.TestSplitterArea(x);
+            return _marcMetrics.TestSplitterArea(x);
         }
 
     }

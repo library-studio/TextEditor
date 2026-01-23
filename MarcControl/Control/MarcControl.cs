@@ -78,11 +78,11 @@ namespace LibraryStudio.Forms
             */
             _context = GetDefaultContext();
 
-            _fieldProperty = new Metrics()
+            _marcMetrics = new Metrics()
             {
                 GetReadOnly = (o) => this.ReadOnly,
             };
-            _record = new MarcRecord(this, _fieldProperty);
+            _record = new MarcRecord(this, _marcMetrics);
 
             #region 延迟刷新
             CreateTimer();
@@ -92,7 +92,7 @@ namespace LibraryStudio.Forms
 
             // _line_height = Line.InitialFonts(this.Font);
 
-            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
+            _marcMetrics.Refresh(this.Font, this.FixedSizeFont);
 
             _dpiXY = DpiUtil.GetDpiXY(this);
 
@@ -498,15 +498,15 @@ namespace LibraryStudio.Forms
             if (_caretInfo.ChildIndex >= this._record.FieldCount)
             {
                 var index = this._record.FieldCount;
-                return new Rectangle(_fieldProperty.NameBorderX,
+                return new Rectangle(_marcMetrics.NameBorderX,
                 this._record.GetFieldY(index),
-    AutoScrollMinSize.Width - _fieldProperty.NameBorderX,
+    AutoScrollMinSize.Width - _marcMetrics.NameBorderX,
     FontContext.DefaultFontHeight);
             }
             var field = this._record.GetField(_caretInfo.ChildIndex);
-            return new Rectangle(_fieldProperty.NameBorderX,
+            return new Rectangle(_marcMetrics.NameBorderX,
                 this._record.GetFieldY(_caretInfo.ChildIndex),
-                AutoScrollMinSize.Width - _fieldProperty.NameBorderX,
+                AutoScrollMinSize.Width - _marcMetrics.NameBorderX,
                 field.GetPixelHeight());
         }
 
@@ -596,10 +596,10 @@ namespace LibraryStudio.Forms
         [EditorBrowsable(EditorBrowsableState.Never)]
         public GetFieldCaptionFunc GetFieldCaption
         {
-            get { return _fieldProperty.GetFieldCaption; }
+            get { return _marcMetrics.GetFieldCaption; }
             set
             {
-                _fieldProperty.GetFieldCaption = value;
+                _marcMetrics.GetFieldCaption = value;
                 InvalidateCaptionArea();
             }
         }
@@ -992,7 +992,7 @@ out long left_width);
         {
             ClearFontGroups();
 
-            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
+            _marcMetrics.Refresh(this.Font, this.FixedSizeFont);
 
             var text = _record.MergeText();
             this._record.Clear();   // 清除所有 IBox 对象，释放所有对原有字体的引用
@@ -1060,7 +1060,7 @@ out long left_width);
 
         int GetLimitWidth()
         {
-            return _clientBoundsWidth == 0 ? Math.Max(this.ClientSize.Width - _fieldProperty.GapThickness, 0) : _clientBoundsWidth;   // Math.Max(this.ClientSize.Width, 30),
+            return _clientBoundsWidth == 0 ? Math.Max(this.ClientSize.Width - _marcMetrics.GapThickness, 0) : _clientBoundsWidth;   // Math.Max(this.ClientSize.Width, 30),
         }
 
         // parameters:
@@ -1636,7 +1636,7 @@ out long left_width);
                                     int x0 = this.HorizontalScroll.Value;
                                     info = _record.HitTest(
                                         e.KeyCode == Keys.Home ?
-                                        x0 + _fieldProperty.ContentX
+                                        x0 + _marcMetrics.ContentX
                                         : this.ClientSize.Width,
                                         _caretInfo.Y);
                                 }
@@ -1709,7 +1709,7 @@ out long left_width);
     value);
 
                             var caret_y = _caretInfo.Y + delta;
-                            var caret_x = Math.Max(_fieldProperty.ContentX + 1, _lastX);
+                            var caret_x = Math.Max(_marcMetrics.ContentX + 1, _lastX);
 
                             var hit_info = this._record.HitTest(caret_x, caret_y);
                             //SetCaretOffs(hit_info.Offs);
@@ -1898,7 +1898,7 @@ out long left_width);
         {
             hIMC = Imm32.ImmGetContext(this.Handle);
             // _line_height = Line.InitialFonts(this.Font);
-            _fieldProperty.Refresh(this.Font, this.FixedSizeFont);
+            _marcMetrics.Refresh(this.Font, this.FixedSizeFont);
             SetCompositionWindowPos();
             base.OnLoad(e);
         }

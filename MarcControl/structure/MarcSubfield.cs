@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
-
+using Vanara.Extensions;
 using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
@@ -33,7 +34,7 @@ namespace LibraryStudio.Forms
             Metrics = metrics;
         }
 
-        ViewMode _viewMode = ViewMode.Plane;
+        ViewMode _viewMode = ViewMode.None;
         public ViewMode ViewMode
         {
             get
@@ -46,9 +47,6 @@ namespace LibraryStudio.Forms
             }
         }
 
-        // 当前激活的视图模式
-        int _active_mode = 0;
-
         public string Name { get; set; }
 
         // 子字段节点的父节点可能是一个 MarcRecord 节点，也可能是一个 MarcField 节点(比如 UNIMARC 4XX 情形)
@@ -59,13 +57,13 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                if (_viewMode.HasFlag(ViewMode.Plane))
+                if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
                 {
                     return _content?.TextLength ?? 0;
                 }
-                if (_viewMode.HasFlag(ViewMode.Table))
+                if (_viewMode == ViewMode.Expand)
                 {
-                    EnsureNameAndTemplate();
+                    // EnsureNameAndTemplate();
                     return (_name?.TextLength ?? 0) + (_template?.TextLength ?? 0);
                 }
                 return 0;
@@ -78,7 +76,10 @@ namespace LibraryStudio.Forms
 
         int GetContentX(int x0 = 0)
         {
-            return x0 + Metrics?.ButtonWidth ?? 0;
+            // Debug.Assert(Metrics != null);
+            int button_width = Metrics?.ButtonWidth ?? 0;
+            int caption_width = Metrics?.CaptionPixelWidth ?? 0;
+            return x0 /*+ caption_width*/ + button_width;
         }
 
         int GetContentY(int y0 = 0)
@@ -86,12 +87,21 @@ namespace LibraryStudio.Forms
             return y0;
         }
 
+        int GetTemplateY(int y0 = 0)
+        {
+            return y0 + _name?.GetPixelHeight() ?? 0;
+        }
+
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
             IBox box;
-            if (_viewMode == ViewMode.Plane)
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
-                box = _content;
+                // box = _content;
+                return new Rectangle(x,
+y,
+Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
+FontContext.DefaultFontHeight);
             }
             else
             {
@@ -114,10 +124,12 @@ namespace LibraryStudio.Forms
 
         public bool CaretMoveDown(int x, int y, out HitInfo info)
         {
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
 
-            if (_active_mode == 0)
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 var ret = _content.CaretMoveDown(x - x0, y - y0, out HitInfo sub_info);
                 info = sub_info.Clone();
@@ -128,26 +140,36 @@ namespace LibraryStudio.Forms
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
-            else if (_active_mode == 1)
+            else if (_viewMode == ViewMode.Expand)
             {
-                int name_height = _name.GetPixelHeight();
+                int name_height = GetTemplateY();
                 if (y < name_height)
                 {
-                    var ret = _name.CaretMoveDown(x - x0, y - y0, out HitInfo sub_info);
-                    info = sub_info.Clone();
-                    info.X += x0;
-                    info.Y += y0;
-                    info.ChildIndex = (int)FieldRegion.Content;
-                    // 保持 info.LineHeight
-                    info.InnerHitInfo = sub_info;
-                    return ret;
+                    var ret = _name.CaretMoveDown(x - x0,
+                        y - y0,
+                        out HitInfo sub_info);
+                    if (ret == true)
+                    {
+                        info = sub_info.Clone();
+                        info.X += x0;
+                        info.Y += y0;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        // 保持 info.LineHeight
+                        info.InnerHitInfo = sub_info;
+                        return ret;
+                    }
+                    info = HitTest(x - x0,
+                        name_height);
+                    return true;
                 }
                 else
                 {
-                    var ret = _template.CaretMoveDown(x - x0, y - y0 - name_height, out HitInfo sub_info);
+                    var ret = _template.CaretMoveDown(x - x0,
+                        y - name_height,
+                        out HitInfo sub_info);
                     info = sub_info.Clone();
                     info.X += x0;
-                    info.Y += y0 + name_height;
+                    info.Y += name_height;
                     info.Offs += 2;
                     info.ChildIndex = (int)FieldRegion.Content;
                     // 保持 info.LineHeight
@@ -162,12 +184,16 @@ namespace LibraryStudio.Forms
 
         public bool CaretMoveUp(int x, int y, out HitInfo info)
         {
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
 
-            if (_active_mode == 0)
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
-                var ret = _content.CaretMoveUp(x - x0, y - y0, out HitInfo sub_info);
+                var ret = _content.CaretMoveUp(x - x0,
+                    y - y0,
+                    out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
@@ -176,12 +202,14 @@ namespace LibraryStudio.Forms
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
-            if (_active_mode == 1)
+            if (_viewMode == ViewMode.Expand)
             {
-                int name_height = _name.GetPixelHeight();
+                int name_height = GetTemplateY();
                 if (y < name_height)
                 {
-                    var ret = _name.CaretMoveUp(x - x0, y - y0, out HitInfo sub_info);
+                    var ret = _name.CaretMoveUp(x - x0,
+                        y - y0,
+                        out HitInfo sub_info);
                     info = sub_info.Clone();
                     info.X += x0;
                     info.Y += y0;
@@ -192,22 +220,23 @@ namespace LibraryStudio.Forms
                 }
                 else
                 {
-                    var ret = _template.CaretMoveUp(x - x0, y - y0 - name_height, out HitInfo sub_info);
-                    /*
-                    if (info != null)
+                    var ret = _template.CaretMoveUp(x - x0,
+                        y - name_height,
+                        out HitInfo sub_info);
+                    if (ret == true)
                     {
+                        info = sub_info.Clone();
+                        info.X += x0;
                         info.Y += name_height;
                         info.Offs += 2;
+                        info.ChildIndex = (int)FieldRegion.Content;
+                        // 保持 info.LineHeight
+                        info.InnerHitInfo = sub_info;
+                        return ret;
                     }
-                    */
-                    info = sub_info.Clone();
-                    info.X += x0;
-                    info.Y += y0 + name_height;
-                    info.Offs += 2;
-                    info.ChildIndex = (int)FieldRegion.Content;
-                    // 保持 info.LineHeight
-                    info.InnerHitInfo = sub_info;
-                    return ret;
+                    info = HitTest(x - x0,
+    name_height - 1);
+                    return true;
                 }
             }
 
@@ -249,16 +278,16 @@ namespace LibraryStudio.Forms
         {
             int height1 = 0;
             int height2 = 0;
-            if (_viewMode.HasFlag(ViewMode.Plane))
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
                     return 0;
                 height1 = _content.GetPixelHeight();
             }
-            if (_viewMode.HasFlag(ViewMode.Table))
+            if (_viewMode == ViewMode.Expand)
             {
-                EnsureNameAndTemplate();
-                height2 = _name.GetPixelHeight() + _template.GetPixelHeight();
+                // EnsureNameAndTemplate();
+                height2 = (_name?.GetPixelHeight() ?? 0) + (_template?.GetPixelHeight() ?? 0);
             }
             return height1 + height2;
         }
@@ -269,16 +298,16 @@ namespace LibraryStudio.Forms
 
             int width1 = 0;
             int width2 = 0;
-            if (_viewMode.HasFlag(ViewMode.Plane))
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
                     return 0;
                 width1 = _content.GetPixelWidth();
             }
-            if (_viewMode.HasFlag(ViewMode.Table))
+            if (_viewMode == ViewMode.Expand)
             {
-                EnsureNameAndTemplate();
-                width2 = Math.Max(_name.GetPixelWidth(), _template.GetPixelWidth());
+                // EnsureNameAndTemplate();
+                width2 = Math.Max(_name?.GetPixelWidth() ?? 0, _template?.GetPixelWidth() ?? 0);
             }
 
             return x0 + Math.Max(width1, width2);
@@ -286,20 +315,22 @@ namespace LibraryStudio.Forms
 
         public Region GetRegion(int start_offs = 0, int end_offs = int.MaxValue, int virtual_tail_length = 0)
         {
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
-            if (_active_mode == 0)
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
                 {
                     return null;
                 }
 
-                var region =  _content.GetRegion(start_offs, end_offs, virtual_tail_length);
+                var region = _content.GetRegion(start_offs, end_offs, virtual_tail_length);
                 region?.Offset(x0, y0);
                 return region;
             }
-            else if (_active_mode == 1)
+            else if (_viewMode == ViewMode.Expand)
             {
                 if (_name != null && _template != null)
                 {
@@ -318,7 +349,7 @@ namespace LibraryStudio.Forms
                         region2 = _template.GetRegion(Math.Max(0, start_offs - name_length),
                             end_offs - name_length,
                             virtual_tail_length);
-                        region2?.Offset(x0 + 0, y0 + _name.GetPixelHeight());
+                        region2?.Offset(x0 + 0, y0 + GetTemplateY());
                     }
                     if (region1 == null)
                     {
@@ -341,15 +372,18 @@ namespace LibraryStudio.Forms
 
         public HitInfo HitTest(int x, int y)
         {
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
             if (x < x0)
-                return new HitInfo { ChildIndex = (int)FieldRegion.Button};
-            if (_active_mode == 0)
+                return new HitInfo { ChildIndex = (int)FieldRegion.Button };
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
-                    return null;
-                var sub_info = _content?.HitTest(x - x0, y - y0) ?? null;
+                    return new HitInfo();
+                var sub_info = _content?.HitTest(x - x0,
+                    y - y0) ?? null;
                 var info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
@@ -357,14 +391,15 @@ namespace LibraryStudio.Forms
                 info.InnerHitInfo = sub_info;
                 return info;
             }
-            else if (_active_mode == 1)
+            else if (_viewMode == ViewMode.Expand)
             {
                 if (_name != null && _template != null)
                 {
-                    int name_height = _name.GetPixelHeight();
+                    int name_height = GetTemplateY();
                     if (y - y0 < name_height)
                     {
-                        var sub_info = _name.HitTest(x - x0, y - y0);
+                        var sub_info = _name.HitTest(x - x0,
+                            y - y0);
                         var info = sub_info.Clone();
                         info.X += x0;
                         info.Y += y0;
@@ -374,14 +409,8 @@ namespace LibraryStudio.Forms
                     }
                     else
                     {
-                        var sub_info = _template.HitTest(x - x0, y - y0 - name_height);
-                        /*
-                        if (info != null)
-                        {
-                            info.Offs += 2;
-                            info.Y += name_height;
-                        }
-                        */
+                        var sub_info = _template.HitTest(x - x0,
+                            y - name_height);
                         var info = sub_info.Clone();
                         info.X += x0;
                         info.Y += y0 + name_height;
@@ -398,17 +427,17 @@ namespace LibraryStudio.Forms
 
         public string MergeText(int start = 0, int end = int.MaxValue)
         {
-            if (_viewMode.HasFlag(ViewMode.Plane))
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
                     return "";
                 return _content.MergeText(start, end);
             }
-            else if (_viewMode.HasFlag(ViewMode.Table))
+            else if (_viewMode == ViewMode.Expand)
             {
-                EnsureNameAndTemplate();
-                string name_text = _name.MergeText(0, 2);
-                string template_text = _template.MergeText(2, end - 2);
+                // EnsureNameAndTemplate();
+                string name_text = _name?.MergeText(start, end) ?? "";
+                string template_text = _template?.MergeText(start - name_text.Length, end - name_text.Length) ?? "";
                 return name_text + template_text;
             }
             return "";
@@ -423,10 +452,12 @@ namespace LibraryStudio.Forms
         //      1   越过右边
         public int MoveByOffs(int offs, int direction, out HitInfo info)
         {
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
             // 疑问: 如果两个视图模式都启用了怎么办？插入符只能在其中一个上面
-            if (_active_mode == 0)
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content != null)
                 {
@@ -440,7 +471,7 @@ namespace LibraryStudio.Forms
                     return ret;
                 }
             }
-            else if (_active_mode == 1)
+            else if (_viewMode == ViewMode.Expand)
             {
                 if (_name != null && _template != null)
                 {
@@ -462,7 +493,7 @@ namespace LibraryStudio.Forms
                         // info.Offs += name_length;
                         info = sub_info.Clone();
                         info.X += x0;
-                        info.Y += y0;
+                        info.Y += GetTemplateY();
                         info.Offs += name_length;
                         info.ChildIndex = (int)FieldRegion.Content;
                         // 保持 info.LineHeight
@@ -488,6 +519,7 @@ namespace LibraryStudio.Forms
             var x0 = GetContentX();
             var y0 = GetContentY();
 
+            if (this._viewMode != ViewMode.Plane)
             {
                 var rect = GetButtonRect(x, y);
                 if (clipRect.IntersectsWith(rect))
@@ -495,12 +527,12 @@ namespace LibraryStudio.Forms
                     // FontContext.PaintExpandButton(dc, rect.X, rect.Y, this._viewMode == ViewMode.Table);
                     FontContext.DrawExpandIcon(dc, rect, 2,
                         Metrics?.BorderColor ?? Color.White,
-                        this._viewMode == ViewMode.Table);
+                        this._viewMode == ViewMode.Expand);
                 }
             }
 
             int y_offs = 0;
-            if (_viewMode.HasFlag(ViewMode.Plane)
+            if ((_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
                 && _content != null)
             {
                 _content.Paint(context,
@@ -511,9 +543,9 @@ namespace LibraryStudio.Forms
                     blockOffs1,
                     blockOffs2,
                     virtual_tail_length);
-                y_offs += _content.GetPixelHeight();
+                // y_offs += _content.GetPixelHeight();
             }
-            if (_viewMode.HasFlag(ViewMode.Table)
+            if (_viewMode == ViewMode.Expand
                 && _name != null && _template != null)
             {
                 _name.Paint(context,
@@ -527,7 +559,7 @@ virtual_tail_length);
                 _template.Paint(context,
     dc,
     x + x0,
-    y + y0 + y_offs + _name.GetPixelHeight(),
+    y + GetTemplateY() + y_offs,
     clipRect,
     blockOffs1 - 2,
     blockOffs2 - 2,
@@ -545,6 +577,125 @@ virtual_tail_length);
             throw new NotFiniteNumberException();
         }
 
+        public string SubfieldName
+        {
+            get
+            {
+                var name = GetSubfieldName();
+                return NormalizeName(name);
+            }
+        }
+
+        public static string NormalizeName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return "";
+            if (name[0] != Metrics.SubfieldCharDefault)
+                return "";
+            if (name.Length < 2)
+                return "";
+            return name.Substring(1, 1);
+        }
+
+        public string GetSubfieldName()
+        {
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+                return _content?.MergeText(0, 2) ?? "";
+            if (_viewMode == ViewMode.Expand)
+                return _name?.MergeText(0, 2);
+            return "";
+        }
+
+        bool EnsureContent(string name)
+        {
+            bool NewParagraph()
+            {
+                if (_content == null || !(_content is Paragraph))
+                {
+                    _content?.Dispose();
+                    _content = new Paragraph(this/*, _fieldProperty*/)
+                    {
+                        Name = "!content",
+                    };
+                    return true;
+                }
+                _name?.Dispose();
+                _template?.Dispose();
+                return false;
+            }
+
+            bool NewNameAndTemplate(StructureInfo info)
+            {
+                bool changed = false;
+                if (_name == null)
+                {
+                    _name?.Dispose();
+                    _name = new Line(this)
+                    {
+                        Name = "!name",
+                    };
+                    changed = true;
+                }
+                if (_template == null)
+                {
+                    _template?.Dispose();
+                    _template = new Template(this, Metrics)
+                    {
+                        Name = "!template",
+                        StructureInfo = info,
+                    };
+                    changed = true;
+                }
+
+                _content?.Dispose();
+                return changed;
+            }
+
+            // 应要求，不支持展开。或者暂时为收缩状态
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+            {
+                return NewParagraph();
+            }
+
+            // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
+            // 查询结构定义
+
+            // 查询之前对 name 进行修整
+            name = NormalizeName(name);
+            var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name);
+            // 无法获得结构定义，就用 Paragraph
+            if (struct_info == null
+                || struct_info.Units.Count == 0
+                || struct_info.IsUnknown())
+            {
+                _viewMode = ViewMode.Plane;
+                return NewParagraph();
+            }
+
+            if (_viewMode == ViewMode.Expand)
+            {
+                if (struct_info.IsChars())
+                {
+                    return NewNameAndTemplate(struct_info);
+                }
+                else if (struct_info.IsSubfield())
+                {
+                    throw new ArgumentException("Subfield 之下不应出现 Subfield 子结构");
+                }
+                else if (struct_info.IsField())
+                {
+                    throw new ArgumentException("Subfield 之下不应出现 Field 子结构");
+                }
+            }
+
+            if (_viewMode == ViewMode.None)
+            {
+                _viewMode = ViewMode.Collapse;
+            }
+
+            return NewParagraph();
+        }
+
         public ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
             IContext context,
@@ -559,12 +710,41 @@ virtual_tail_length);
             string new_text = "";
             string old_text = "";
 
+            if (end != -1 && start > end)
+            {
+                throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
+            }
+
+            old_text = this.MergeText();
+            if (end == -1)
+                end = old_text.Length;
+
+            new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
+            string name = new_text.Substring(0, Math.Min(2, new_text.Length));
+#if REMOVED
+            // 获得变化以后的 name。最多 2 字符
+            string name = this.MergeText(0, 2);
+            if (start < 2)
+            {
+                name = name.Substring(0, start)
+                    + content.Substring(start, Math.Min(content.Length, 2 - start));
+            }
+#endif
+
+            if (view_mode_tree != null)
+                this._viewMode = view_mode_tree.ViewMode;
+            EnsureContent(name);
+            Debug.Assert(_viewMode != ViewMode.None);
+
             var x0 = GetContentX();
             var y0 = GetContentY();
 
-            if (_viewMode.HasFlag(ViewMode.Plane))
+            // TODO: 是否要规定一个最小的宽度?
+            pixel_width = Math.Max(0, pixel_width - x0);
+
+            if (_viewMode == ViewMode.Plane
+                || _viewMode == ViewMode.Collapse)
             {
-                EnsureContent();
                 ret1 = _content.ReplaceText(context,
                     dc,
                     start,
@@ -572,14 +752,12 @@ virtual_tail_length);
                     content,
                     pixel_width);
             }
-            if (_viewMode.HasFlag(ViewMode.Table))
+            if (_viewMode == ViewMode.Expand)
             {
                 if (start < 0 || end < -1)
                 {
                     throw new ArgumentException($"start ({start}) 或 end ({end}) 不合法");
                 }
-
-                EnsureNameAndTemplate();
 
                 // 确保 start 是较小的一个
                 if (end != -1 && start > end)
@@ -594,10 +772,7 @@ virtual_tail_length);
                     end = Int32.MaxValue;
                 }
 
-                old_text = this.MergeText();
-                new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
 
-                var name = new_text.Substring(0, Math.Min(2, new_text.Length));
                 var name_ret = _name.ReplaceText(context,
                     dc,
                     0,
@@ -605,7 +780,10 @@ virtual_tail_length);
                     name,
                     pixel_width);
                 var template_text = new_text.Length > 2 ? new_text.Substring(2) : "";
-                var template_ret = _template.ReplaceText(context,
+                Debug.Assert(_template.StructureInfo != null);
+                var template_ret = _template.ReplaceText(
+                    view_mode_tree,
+                    context,
                     dc,
                     0,
                     -1,
@@ -630,12 +808,12 @@ virtual_tail_length);
                 return new ReplaceTextResult();
             }
 
-            var button_rect = GetButtonRect(0,0);
+            var button_rect = GetButtonRect(0, 0);
 
             if (ret1 != null && ret2 != null)
             {
                 // ret1 在上 ret2 在下
-                var name_height = _name.GetPixelHeight();
+                var name_height = GetTemplateY();
                 var rect2 = ret2.UpdateRect;
                 rect2.Offset(0, name_height);
                 var update_rect = Utility.Union(ret1.UpdateRect, rect2);
@@ -674,6 +852,7 @@ virtual_tail_length);
             return new ReplaceTextResult();
         }
 
+#if REMOVED
         void EnsureContent()
         {
             if (_content == null)
@@ -689,7 +868,9 @@ virtual_tail_length);
             if (_template == null)
                 _template = new Template(this, Metrics);
         }
+#endif
 
+#if REMOVED
         // 改变显示模式
         public ReplaceTextResult ChangeViewMode(IContext context,
             Gdi32.SafeHDC dc,
@@ -712,18 +893,66 @@ virtual_tail_length);
                 this.MergeText(0, this.TextLength),
                 pixel_width);
         }
+#endif
 
         public ViewModeTree GetViewModeTree()
         {
+            // 只要当前对象不是展开的状态，则没有必要再递归获得下级的状态
+            if (this._viewMode != ViewMode.Expand)
+            {
+                return null;
+            }
+
+            Debug.Assert(_template != null);
+            if (_template != null)
+            {
+                var result = _template.GetViewModeTree();
+                Debug.Assert(result.ViewMode == ViewMode.Expand);
+                Debug.Assert(this._viewMode == ViewMode.Expand);
+                result.ViewMode = this._viewMode;
+                result.Name = "!subfield";
+                return result;
+            }
             return null;
+            // return new ViewModeTree { ViewMode = this._viewMode != ViewMode.Expand ? ViewMode.None : this._viewMode };
         }
+
+        public ReplaceTextResult ToggleExpand(
+            HitInfo info,
+            IContext context,
+            Gdi32.SafeHDC dc,
+            int pixel_width)
+        {
+            ReplaceTextResult ret1 = null;
+            ReplaceTextResult ret2 = null;
+
+            if (info.ChildIndex == (int)FieldRegion.Button)
+            {
+                if (this._viewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+
+                var text = this.MergeText();
+                this._viewMode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                return ReplaceText(
+                    null,
+                    context,
+                    dc,
+                    0,
+                    -1,
+                    text,
+                    pixel_width);
+            }
+
+            return new ReplaceTextResult();
+        }
+
     }
 
-    [Flags]
     public enum ViewMode
     {
-        Plane = 0x01,   // 平面
-        Table = 0x02,   // 表格
-        Dual = 0x01 | 0x02,
+        None = 0,   // 尚未决定。需要查询结构定义，然后决定是 Plane 还是 Collapse Expand
+        Plane = 1,   // 平面。表示不允许展开。
+        Collapse = 2,   // 收缩。表示暂时收缩，未来可能展开
+        Expand = 3,   // 展开
     }
 }
