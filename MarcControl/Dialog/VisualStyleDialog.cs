@@ -69,20 +69,23 @@ namespace LibraryStudio.Forms.MarcControlDialog
                     this.marcControl_preview.CaptionPixelWidth = RefControl.CaptionPixelWidth;
                 }
 
-                this.marcControl_preview.GetFieldCaption += (field) =>
+                this.marcControl_preview.GetStructure += (parent, name, level) =>
                 {
                     if (RefControl != null)
                     {
-                        return RefControl.GetFieldCaption(field);
+                        return RefControl.GetStructure(parent, name, level);
                     }
                     else
                     {
+                        /*
                         if (field.IsHeader)
                         {
                             return $"头标区";
                         }
 
                         return $"字段 '{field.FieldName}' 的名称";
+                        */
+                        return null;
                     }
                 };
 

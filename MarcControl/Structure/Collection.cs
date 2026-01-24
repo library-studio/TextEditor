@@ -28,7 +28,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public StructureInfo StructureInfo { get; set; }
+        public UnitInfo StructureInfo { get; set; }
 
         public Metrics Metrics { get; set; }
 
@@ -457,10 +457,13 @@ namespace LibraryStudio.Forms
             foreach (var line in _lines)
             {
                 var current_length = line.TextLength;
-                builder.Append(line.MergeText(start - offs, end - offs));
+                var fragment = line.MergeText(start - offs, end - offs);
+                builder.Append(fragment);
                 offs += current_length;
                 if (offs > end)
+                {
                     break;
+                }
             }
 
             return builder.ToString();
@@ -784,7 +787,8 @@ namespace LibraryStudio.Forms
             var new_lines = new List<T>();
             // 下级元素的最大宽度
             int max_pixel_width = pixel_width;
-            if (string.IsNullOrEmpty(content) == false)
+            // 内容即便为空，也要经过 SplitChildren() 处理
+            if (true/*string.IsNullOrEmpty(content) == false*/)
             {
                 var strings = SplitChildren(content);
                 int j = 0;

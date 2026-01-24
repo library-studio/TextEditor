@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using Vanara.Extensions;
+
 using Vanara.PInvoke;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace LibraryStudio.Forms
 {
@@ -79,7 +80,7 @@ namespace LibraryStudio.Forms
             // Debug.Assert(Metrics != null);
             int button_width = Metrics?.ButtonWidth ?? 0;
             int caption_width = Metrics?.CaptionPixelWidth ?? 0;
-            return x0 /*+ caption_width*/ + button_width;
+            return x0 + caption_width + button_width;
         }
 
         int GetContentY(int y0 = 0)
@@ -94,11 +95,13 @@ namespace LibraryStudio.Forms
 
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
+            int caption_width = Metrics?.CaptionPixelWidth ?? 0;
+
             IBox box;
             if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 // box = _content;
-                return new Rectangle(x,
+                return new Rectangle(x + caption_width,
 y,
 Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
 FontContext.DefaultFontHeight);
@@ -109,12 +112,13 @@ FontContext.DefaultFontHeight);
             }
 
             {
+
                 var height = box?.GetPixelHeight() ?? 0;
                 if (height == 0)
                 {
                     height = FontContext.DefaultFontHeight;
                 }
-                return new Rectangle(x,
+                return new Rectangle(x + caption_width,
         y,
         Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
         height);
@@ -267,11 +271,16 @@ FontContext.DefaultFontHeight);
         public void Dispose()
         {
             _caption?.Dispose();
+            _caption = null;
 
             _content?.Dispose();
+            _content = null;
 
             _name?.Dispose();
+            _name = null;
+
             _template?.Dispose();
+            _template = null;
         }
 
         public int GetPixelHeight()
@@ -425,22 +434,37 @@ FontContext.DefaultFontHeight);
             return null;
         }
 
+        // 注: _viewMode 和三个组件之间的对应关系可能扭曲。只能说确保 _content 和 _name+_tamplte 两组组件之间只有一组不为 null 即可
         public string MergeText(int start = 0, int end = int.MaxValue)
         {
+            if (_content != null)
+                return _content.MergeText(start, end);
+            string name_fragment = _name?.MergeText(start, end) ?? "";
+            var name_text_length = _name?.TextLength ?? 0;
+            // 注意 name_fragment 可能只是 _name 文字中一部分，其长度可能比整个长度要短
+            string template_fragment = _template?.MergeText(start - name_text_length, end - name_text_length) ?? "";
+            return name_fragment + template_fragment;
+            /*
             if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
+                {
+                    Debug.Assert(false);
                     return "";
+                }
                 return _content.MergeText(start, end);
             }
             else if (_viewMode == ViewMode.Expand)
             {
+                Debug.Assert(_name != null);
+                Debug.Assert(_template != null);
                 // EnsureNameAndTemplate();
                 string name_text = _name?.MergeText(start, end) ?? "";
                 string template_text = _template?.MergeText(start - name_text.Length, end - name_text.Length) ?? "";
                 return name_text + template_text;
             }
             return "";
+            */
         }
 
         // parameters:
@@ -519,6 +543,17 @@ FontContext.DefaultFontHeight);
             var x0 = GetContentX();
             var y0 = GetContentY();
 
+            // 绘制提示文字
+            TemplateItem.PaintCaption(
+                context,
+                dc,
+                x,
+                y + y0,
+                clipRect,
+                _caption,
+                Metrics);
+
+            // 绘制 展开/收缩 按钮
             if (this._viewMode != ViewMode.Plane)
             {
                 var rect = GetButtonRect(x, y);
@@ -545,6 +580,7 @@ FontContext.DefaultFontHeight);
                     virtual_tail_length);
                 // y_offs += _content.GetPixelHeight();
             }
+
             if (_viewMode == ViewMode.Expand
                 && _name != null && _template != null)
             {
@@ -610,6 +646,10 @@ virtual_tail_length);
         {
             bool NewParagraph()
             {
+                _name?.Dispose();
+                _name = null;
+                _template?.Dispose();
+                _template = null;
                 if (_content == null || !(_content is Paragraph))
                 {
                     _content?.Dispose();
@@ -619,12 +659,10 @@ virtual_tail_length);
                     };
                     return true;
                 }
-                _name?.Dispose();
-                _template?.Dispose();
                 return false;
             }
 
-            bool NewNameAndTemplate(StructureInfo info)
+            bool NewNameAndTemplate(UnitInfo info)
             {
                 bool changed = false;
                 if (_name == null)
@@ -648,6 +686,7 @@ virtual_tail_length);
                 }
 
                 _content?.Dispose();
+                _content = null;
                 return changed;
             }
 
@@ -662,10 +701,10 @@ virtual_tail_length);
 
             // 查询之前对 name 进行修整
             name = NormalizeName(name);
-            var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name);
+            var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name, 2);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
-                || struct_info.Units.Count == 0
+                || struct_info.SubUnits.Count == 0
                 || struct_info.IsUnknown())
             {
                 _viewMode = ViewMode.Plane;
@@ -696,6 +735,18 @@ virtual_tail_length);
             return NewParagraph();
         }
 
+        void EnsureCaption()
+        {
+            if (_caption == null)
+                _caption = new Line(this)
+                {
+                    Name = "caption",
+                    TextAlign = TextAlign.None
+                };
+        }
+
+        internal string _initialCaptionText = null;
+
         public ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
             IContext context,
@@ -721,15 +772,6 @@ virtual_tail_length);
 
             new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
             string name = new_text.Substring(0, Math.Min(2, new_text.Length));
-#if REMOVED
-            // 获得变化以后的 name。最多 2 字符
-            string name = this.MergeText(0, 2);
-            if (start < 2)
-            {
-                name = name.Substring(0, start)
-                    + content.Substring(start, Math.Min(content.Length, 2 - start));
-            }
-#endif
 
             if (view_mode_tree != null)
                 this._viewMode = view_mode_tree.ViewMode;
@@ -738,6 +780,27 @@ virtual_tail_length);
 
             var x0 = GetContentX();
             var y0 = GetContentY();
+
+            var button_rect = GetButtonRect(0, 0);
+
+            if (_caption == null)
+            {
+                EnsureCaption();
+
+                var ret = _caption.ReplaceText(context,
+                    dc,
+                    0,
+                    -1,
+                    _initialCaptionText,
+                    int.MaxValue);
+                var caption_update_rect = ret.UpdateRect;
+                var rect = TemplateItem.GetCaptionRect(_caption, 0, 0, Metrics);
+
+                if (caption_update_rect != System.Drawing.Rectangle.Empty)
+                    caption_update_rect.Offset(rect.X, rect.Y);
+                button_rect = Utility.Union(button_rect, caption_update_rect);
+            }
+
 
             // TODO: 是否要规定一个最小的宽度?
             pixel_width = Math.Max(0, pixel_width - x0);
@@ -793,6 +856,7 @@ virtual_tail_length);
                     0,
                     Math.Max(_name.GetPixelWidth(), _template.GetPixelWidth()),
                     _name.GetPixelHeight() + _template.GetPixelHeight());
+                update_rect = Utility.Union(update_rect, button_rect);
                 ret2 = new ReplaceTextResult
                 {
                     MaxPixel = Math.Max(name_ret.MaxPixel, template_ret.MaxPixel),
@@ -807,8 +871,6 @@ virtual_tail_length);
             {
                 return new ReplaceTextResult();
             }
-
-            var button_rect = GetButtonRect(0, 0);
 
             if (ret1 != null && ret2 != null)
             {
@@ -932,9 +994,10 @@ virtual_tail_length);
                     return new ReplaceTextResult();
 
                 var text = this.MergeText();
-                this._viewMode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                var new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                // 此时 _content _name _template 和 this._viewMode 关系暂时扭曲了
                 return ReplaceText(
-                    null,
+                    new ViewModeTree { ViewMode = new_view_mode},
                     context,
                     dc,
                     0,

@@ -590,7 +590,7 @@ namespace LibraryStudio.Forms
             return text;
         }
 
-
+        /*
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -600,6 +600,21 @@ namespace LibraryStudio.Forms
             set
             {
                 _marcMetrics.GetFieldCaption = value;
+                InvalidateCaptionArea();
+            }
+        }
+        */
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public GetStructureFunc GetStructure
+        {
+            get { return _marcMetrics.GetStructure; }
+            set
+            {
+                _marcMetrics.GetStructure = value;
+                // TODO: 不仅仅更新第一层 caption
                 InvalidateCaptionArea();
             }
         }

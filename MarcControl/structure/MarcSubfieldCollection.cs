@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -73,6 +72,17 @@ namespace LibraryStudio.Forms
             return result;
         }
         */
+
+        public override MarcSubfield CreateChild(IContext context, int index)
+        {
+            var result = base.CreateChild(context, index);
+            int count = this.StructureInfo?.SubUnits?.Count ?? -1;
+            if (count > 0 && index > count - 1)
+                result._initialCaptionText = "(溢出)";
+            else
+                result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
+            return result;
+        }
 
         // 把文字内容按需切割为子结构所需的部分
         public override IEnumerable<string> SplitChildren(string text)

@@ -20,12 +20,14 @@ namespace MarcSample
         {
             InitializeComponent();
 
+            /*
             this.marcControl1.GetFieldCaption += (field) =>
             {
                 if (field.IsHeader)
                     return $"头标区";
                 return $"获得 '{field.FieldName}' 的值";
             };
+            */
 
             this.marcControl1.CaretMoved += (s, e) =>
             {
@@ -45,22 +47,24 @@ namespace MarcSample
             this.marcControl1.ClientBoundsWidth = 0;
             // this.marcControl1.ClientBoundsWidth = 800;
             // this.marcControl1.ClientBoundsWidth = -1;
-            this.marcControl1.Metrics.GetStructure = (parent, name) =>
+            this.marcControl1.Metrics.GetStructure = (parent, name, level) =>
             {
                 if (parent is MarcRecord)
                 {
                     // 当前为字段
                     if (name == "001")
                     {
-                        return StructureInfo.FromChars(new int[] { 2, 3, 5, 10 });
+                        return UnitInfo.FromChars(UnitType.Field,
+                            name,
+                            new int[] { 2, 3, 5, 10 });
                     }
                     else if (name == "100")
                     {
-                        return StructureInfo.FromSubfields();
+                        return UnitInfo.FromSubfields(name);
                     }
                     else if (name == "200")
                     {
-                        return StructureInfo.FromSubfields();
+                        return UnitInfo.FromSubfields(name);
                     }
                 }
                 else if (parent is MarcField)
@@ -70,7 +74,9 @@ namespace MarcSample
                     var parent_name = field.FieldName;
                     if (parent_name == "100" && name == "a")
                     {
-                        return StructureInfo.FromChars(new int[] { 2, 3, 5, 10 });
+                        return UnitInfo.FromChars(UnitType.Subfield,
+                            name,
+                            new int[] { 2, 3, 5, 10 });
                     }
                 }
 

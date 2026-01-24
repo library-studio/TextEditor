@@ -2,8 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
@@ -28,11 +27,11 @@ namespace LibraryStudio.Forms
             return SplitChars(text, this.StructureInfo);
         }
 
-        static List<string> SplitChars(string text, StructureInfo info)
+        static List<string> SplitChars(string text, UnitInfo info)
         {
             var results = new List<string>();
             int offs = 0;
-            foreach (var unit in info.Units)
+            foreach (var unit in info.SubUnits)
             {
                 string segment = text.Substring(offs, Math.Min(unit.Length, text.Length - offs));
                 results.Add(segment);
@@ -45,17 +44,21 @@ namespace LibraryStudio.Forms
                 results.Add(text.Substring(offs));
             }
 
+            if (results.Count == 0)
+            {
+                results.Add("");    // 至少要有一个元素
+            }
             return results;
         }
 
         public override TemplateItem CreateChild(IContext context, int index)
         {
             var result = base.CreateChild(context, index);
-            int count = this.StructureInfo?.Units?.Count ?? -1;
+            int count = this.StructureInfo?.SubUnits?.Count ?? -1;
             if (count > 0 && index > count - 1)
                 result._initialCaptionText = "(溢出)";
             else
-                result._initialCaptionText = this.StructureInfo?.Units?.ElementAtOrDefault(index)?.Caption;
+                result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
             return result;
         }
 

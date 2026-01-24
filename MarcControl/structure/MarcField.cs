@@ -39,6 +39,33 @@ namespace LibraryStudio.Forms
         // _content 可能是 Paragraph 或 MarcFieldCollection 或 MarcSubfieldCollection
         IBox _content;
 
+        UnitInfo _struct_info = null;   // 里面包含了 .Name
+        int _struct_level = 0;
+
+        void ClearStructureInfo()
+        {
+            _struct_info = null;
+            _struct_level = 0;
+        }
+
+        // TODO: 可以考虑集中做一个缓存所有结构信息的 Hashtable 共享
+        UnitInfo GetStructureInfo(string name, int level)
+        {
+            if (_struct_info != null
+                && _struct_info.Name == name
+                && _struct_level >= level)
+            {
+                return _struct_info;
+            }
+
+            {
+                var struct_info = _fieldProperty.GetStructure?.Invoke(this.Parent, name, level);
+                _struct_info = struct_info;
+                _struct_level = level;
+                return _struct_info;
+            }
+        }
+
         // 引用字段共同属性
         Metrics _fieldProperty;
         public Metrics Metrics
@@ -122,7 +149,7 @@ namespace LibraryStudio.Forms
                 return false;
             }
 
-            bool NewTemplate(StructureInfo info)
+            bool NewTemplate(UnitInfo info)
             {
                 if (_content == null || !(_content is Template))
                 {
@@ -137,7 +164,7 @@ namespace LibraryStudio.Forms
                 return true;
             }
 
-            bool NewSubfields(StructureInfo info)
+            bool NewSubfields(UnitInfo info)
             {
                 if (_content == null || !(_content is MarcSubfieldCollection))
                 {
@@ -160,10 +187,10 @@ namespace LibraryStudio.Forms
 
             // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
             // 查询结构定义
-            var struct_info = _fieldProperty.GetStructure?.Invoke(this.Parent, name);
+            var struct_info = GetStructureInfo(name, 2);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
-                || struct_info.Units.Count == 0
+                || struct_info.SubUnits.Count == 0
                 || struct_info.IsUnknown())
             {
                 _viewMode = ViewMode.Plane;
@@ -556,7 +583,7 @@ namespace LibraryStudio.Forms
             if (start == end)
                 return "";
             int offs = 0;
-            var name_text = _name?.MergeText(start, end);
+            var name_fragment = _name?.MergeText(start, end);
             if (_name != null)
             {
                 var current_length = _name.TextLength;
@@ -565,7 +592,7 @@ namespace LibraryStudio.Forms
                     end -= current_length;
                 offs += current_length;
             }
-            var indicator_text = _indicator?.MergeText(start, end);
+            var indicator_fragment = _indicator?.MergeText(start, end);
             if (_indicator != null)
             {
                 var current_length = _indicator.TextLength;
@@ -575,7 +602,7 @@ namespace LibraryStudio.Forms
                 offs += current_length;
             }
 
-            var content_text = _content?.MergeText(start, end);
+            var content_fragment = _content?.MergeText(start, end);
             if (_content != null)
             {
                 var current_length = _content?.TextLength ?? 0;
@@ -586,18 +613,18 @@ namespace LibraryStudio.Forms
             }
 
             // 除了头标区以外，每个字段末尾都有一个字段结束符
-            var terminator = "";
+            var terminator_fragment = "";
             if (IsHeader == false)
             {
                 if (InRange(0, start, end))
-                    terminator = new string(Metrics.FieldEndCharDefault, 1);
+                    terminator_fragment = new string(Metrics.FieldEndCharDefault, 1);
                 offs++;
             }
 
-            return (name_text ?? "")
-                + (indicator_text ?? "")
-                + (content_text ?? "")
-                + (terminator ?? "");
+            return (name_fragment ?? "")
+                + (indicator_fragment ?? "")
+                + (content_fragment ?? "")
+                + (terminator_fragment ?? "");
 
             bool InRange(int offs0, int start0, int end0)
             {
@@ -1877,12 +1904,9 @@ clipRect);
             out Rectangle update_rect)
         {
             EnsureCaption();
-            /*
-            var caption = field_name;
-            if (string.IsNullOrEmpty(caption) == false)
-                caption += " ";
-            */
-            var caption = _fieldProperty.GetFieldCaption?.Invoke(this);
+
+            // var caption = _fieldProperty.GetFieldCaption?.Invoke(this);
+            var caption = GetStructureInfo(this.FieldName, 1)?.Caption;
             var ret = _caption.ReplaceText(
                 context,
                 dc,
@@ -2007,7 +2031,7 @@ clipRect);
             }
 
             // 如果 Name 内容发生变化，要连带触发变化 Caption 的内容
-            if (_fieldProperty?.GetFieldCaption != null
+            if (_fieldProperty?.GetStructure != null
                 && name_value != old_name_value)
             {
                 RefreshCaptionText(
@@ -3160,6 +3184,9 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
             ReplaceTextResult ret1 = null;
             ReplaceTextResult ret2 = null;
 
+            bool changed = false;
+            var old_width = this.GetPixelWidth();
+            var old_height = this.GetPixelWidth();
             if (info.ChildIndex == (int)FieldRegion.Button)
             {
                 if (this._viewMode == ViewMode.Plane)
@@ -3175,6 +3202,7 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                     -1,
                     text,
                     pixel_width);
+                changed = true;
             }
 
             // 继续展开下级
@@ -3198,14 +3226,26 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_fieldProperty.ContentX), _fiel
                 if (ret1 != null)
                     ret2.UpdateRect = Utility.Union(ret2.UpdateRect, ret1.UpdateRect);
                 this.ClearCacheHeight();
-                return ret2;
+                // return ret2;
+                changed = true;
             }
             else
             {
                 if (ret1 == null)
                     return new ReplaceTextResult();
-                return ret1;
+                // return ret1;
             }
+
+            if (changed == true)
+            {
+                var rect = new Rectangle(0,
+                    0,
+                    Math.Max(old_width, this.GetPixelWidth()),
+                    Math.Max(old_height, this.GetPixelHeight()));
+                return new ReplaceTextResult { UpdateRect = rect };
+            }
+
+            return new ReplaceTextResult();
         }
 
         public ViewModeTree GetViewModeTree()

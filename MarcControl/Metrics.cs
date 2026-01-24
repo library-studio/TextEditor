@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Xml.Linq;
 
 namespace LibraryStudio.Forms
 {
@@ -10,7 +11,7 @@ namespace LibraryStudio.Forms
     {
         public GetReadOnlyFunc GetReadOnly { get; set; }
 
-        public GetFieldCaptionFunc GetFieldCaption { get; set; }
+        // public GetFieldCaptionFunc GetFieldCaption { get; set; }
 
         public GetStructureFunc GetStructure { get; set; }
 
@@ -221,12 +222,12 @@ namespace LibraryStudio.Forms
 
     }
 
-    public delegate string GetFieldCaptionFunc(MarcField field);
+    // public delegate string GetFieldCaptionFunc(MarcField field);
 
     public delegate bool GetReadOnlyFunc(IBox box);
 
     // 获得 box 下的结构信息
-    public delegate StructureInfo GetStructureFunc(IBox parent, string name);
+    public delegate UnitInfo GetStructureFunc(IBox parent, string name, int level);
 
     public class UnitInfo
     {
@@ -237,19 +238,25 @@ namespace LibraryStudio.Forms
 
         // 0 表示不确定长度
         public int Length { get; set; } = 0;
-    }
 
-    public class StructureInfo
-    {
-        public List<UnitInfo> Units { get; set; } = new List<UnitInfo>();
+        // 下级单元
+        public List<UnitInfo> SubUnits { get; set; } = new List<UnitInfo>();
 
-        public static StructureInfo FromChars(int[] length_list)
+        public static UnitInfo FromChars(
+            UnitType type,
+            string name,
+            int[] length_list)
         {
-            var result = new StructureInfo();
+            var result = new UnitInfo
+            {
+                Name = name,
+                Caption = $"caption of {name}",
+                Type = type
+            };
             int offs = 0;
             foreach (var l in length_list)
             {
-                result.Units.Add(new UnitInfo
+                result.SubUnits.Add(new UnitInfo
                 {
                     Caption = $"({offs}/{l})",
                     Length = l,
@@ -261,16 +268,27 @@ namespace LibraryStudio.Forms
             return result;
         }
 
-        public static StructureInfo FromSubfields()
+        public static UnitInfo FromSubfields(string name)
         {
-            var result = new StructureInfo();
+            List<string> names = new List<string>();
+            for (int i = 0; i < 26; i++)
             {
-                result.Units.Add(new UnitInfo
+                names.Add($"{(char)((int)'a' + i)}");
+            }
+            var result = new UnitInfo { Name = name,
+                Caption = $"caption of {name}",
+                Type = UnitType.Field};
+            {
+                foreach (var n in names)
                 {
-                    Name = "a",
-                    Length = 0,
-                    Type = UnitType.Subfield
-                });
+                    result.SubUnits.Add(new UnitInfo
+                    {
+                        Caption = $"子字段 ${n}",
+                        Name = n,
+                        Length = 0,
+                        Type = UnitType.Subfield
+                    });
+                }
             }
 
             return result;
@@ -278,12 +296,12 @@ namespace LibraryStudio.Forms
 
         public bool IsType(UnitType type)
         {
-            if (Units == null || Units.Count == 0)
+            if (SubUnits == null || SubUnits.Count == 0)
             {
                 return false;
             }
 
-            return Units[0].Type == type;
+            return SubUnits[0].Type == type;
         }
 
         public bool IsUnknown()

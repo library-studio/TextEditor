@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Vanara.PInvoke;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace LibraryStudio.Forms
 {
@@ -68,12 +69,14 @@ namespace LibraryStudio.Forms
 
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
+            int caption_width = Metrics?.CaptionPixelWidth ?? 0;
+
             var height = _content?.GetPixelHeight() ?? 0;
             if (height == 0)
             {
                 height = FontContext.DefaultFontHeight;
             }
-            return new Rectangle(x,
+            return new Rectangle(x + caption_width,
     y,
     Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
     height);
@@ -240,6 +243,15 @@ namespace LibraryStudio.Forms
             var y0 = GetContentY();
 
             // 绘制提示文字
+            PaintCaption(
+                context,
+                dc,
+                x,
+                y + y0,
+                clipRect,
+                _caption,
+                Metrics);
+#if REMOVED
             if (_caption != null)
             {
                 var rect = new Rectangle(x,
@@ -272,11 +284,12 @@ namespace LibraryStudio.Forms
                     }
                 }
             }
+#endif
 
             // 绘制展开/收缩按钮
             if (this._viewMode != ViewMode.Plane)
             {
-                var rect = GetButtonRect(x, y);
+                var rect = GetButtonRect(x + x0, y);
                 if (clipRect.IntersectsWith(rect))
                 {
                     // FontContext.PaintExpandButton(dc, rect.X, rect.Y, this._viewMode == ViewMode.Table);
@@ -300,6 +313,63 @@ namespace LibraryStudio.Forms
             }
         }
 
+
+        #region Paint() 辅助函数
+
+        public static Rectangle GetCaptionRect(
+            Line caption,
+            int x,
+            int y,
+            Metrics metrics)
+        {
+            return new Rectangle(x,
+y,
+Math.Max(0, (metrics?.CaptionPixelWidth ?? 0) - (metrics?.GapThickness ?? 0)),
+caption?.GetPixelHeight() ?? 0);
+        }
+
+        public static void PaintCaption(
+            IContext context,
+            Gdi32.SafeHDC dc,
+            int x,
+            int y,
+            Rectangle clipRect,
+            Line caption,
+            Metrics metrics)
+        {
+            // 绘制提示文字
+            if (caption != null)
+            {
+                var rect = GetCaptionRect(caption, x, y, metrics);
+
+                if (rect.Width > 0
+    && clipRect.IntersectsWith(rect))
+                {
+                    var getforecolor = context.GetForeColor;
+                    context.GetForeColor = (box, highlight) =>
+                    {
+                        return metrics?.CaptionForeColor ?? Metrics.DefaultCaptionForeColor;
+                    };
+                    try
+                    {
+                        caption.Paint(context,
+    dc,
+    x,
+    y,
+    clipRect,
+    0,
+    0,
+    0);
+                    }
+                    finally
+                    {
+                        context.GetForeColor = getforecolor;
+                    }
+                }
+            }
+        }
+
+        #endregion
 
         public ReplaceTextResult ReplaceText(IContext context, Gdi32.SafeHDC dc, int start, int end, string content, int pixel_width)
         {
@@ -353,7 +423,10 @@ namespace LibraryStudio.Forms
                     int.MaxValue);
                 update_rect = ret.UpdateRect;
                 if (update_rect != System.Drawing.Rectangle.Empty)
-                    update_rect.Offset(0, y0);
+                {
+                    var rect = GetCaptionRect(_caption, 0, 0, Metrics);
+                    update_rect.Offset(rect.X, rect.Y);
+                }
             }
 
 

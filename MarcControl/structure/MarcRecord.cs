@@ -1559,10 +1559,22 @@ namespace LibraryStudio.Forms
                     var start_length = Math.Max(start - offs, 0);   // 防止负数
                     var end_length = Math.Max((offs + length) - end, 0);
                     if (start_length > 0)
-                        left.Append(field.MergeFullText(0, start_length));
-                    middle.Append(field.MergeFullText(start_length, length - end_length));
+                    {
+                        var fragment = field.MergeFullText(0, start_length);
+                        Debug.Assert(fragment.Length == start_length);
+                        left.Append(fragment);
+                    }
+                    {
+                        var fragment = field.MergeFullText(start_length, length - end_length);
+                        Debug.Assert(fragment.Length == length - start_length - end_length);
+                        middle.Append(fragment);
+                    }
                     if (end_length > 0)
-                        right.Append(field.MergeFullText(length - end_length, length));
+                    {
+                        var fragment = field.MergeFullText(length - end_length, length);
+                        Debug.Assert(fragment.Length == end_length);
+                        right.Append(fragment);
+                    }
 
                     results.Add(field);
                     if (results.Count == 1)
