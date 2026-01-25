@@ -80,7 +80,8 @@ namespace LibraryStudio.Forms
             // Debug.Assert(Metrics != null);
             int button_width = Metrics?.ButtonWidth ?? 0;
             int caption_width = Metrics?.CaptionPixelWidth ?? 0;
-            return x0 + caption_width + button_width;
+            int gap_width = Metrics?.GapThickness ?? 0;
+            return x0 + caption_width + button_width + gap_width;
         }
 
         int GetContentY(int y0 = 0)
@@ -466,6 +467,22 @@ FontContext.DefaultFontHeight);
             return "";
             */
         }
+
+        public virtual string MergeTextMask(int start = 0, int end = int.MaxValue)
+        {
+            if (_content != null)
+                return _content.MergeText(start, end);
+
+            // name 中的字符都是允许删除的
+            string name_fragment = _name?.MergeText(start, end) ?? "";
+            var name_text_length = _name?.TextLength ?? 0;
+            // 注意 name_fragment 可能只是 _name 文字中一部分，其长度可能比整个长度要短
+
+            // 模板中可能存在不允许删除的区段
+            string template_fragment = _template?.MergeTextMask(start - name_text_length, end - name_text_length) ?? "";
+            return name_fragment + template_fragment;
+        }
+
 
         // parameters:
         //      offs    插入符在当前对象中的偏移

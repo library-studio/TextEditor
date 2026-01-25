@@ -28,13 +28,11 @@ namespace LibraryStudio.Forms
 
         public override void Paint(IContext context, Gdi32.SafeHDC dc, int x, int y, Rectangle clipRect, int blockOffs1, int blockOffs2, int virtual_tail_length)
         {
-            /*
             base.PaintBack(context,
                 dc,
                 x,
                 y,
                 clipRect);
-            */
             base.Paint(context,
                 dc,
                 x,

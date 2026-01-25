@@ -107,6 +107,7 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Structure\Collection.cs" />
+    <Compile Include="Structure\FixedLine.cs" />
     <Compile Include="Structure\MarcContext.cs" />
     <Compile Include="Structure\MarcField.cs" />
     <Compile Include="Structure\MarcRecord.cs" />

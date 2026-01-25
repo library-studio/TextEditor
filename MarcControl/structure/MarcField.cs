@@ -33,8 +33,8 @@ namespace LibraryStudio.Forms
         internal MarcRecord _record = null;
 
         Line _caption;
-        Line _name;
-        Line _indicator;
+        FixedLine _name;
+        FixedLine _indicator;
 
         // _content 可能是 Paragraph 或 MarcFieldCollection 或 MarcSubfieldCollection
         IBox _content;
@@ -108,7 +108,7 @@ namespace LibraryStudio.Forms
         void EnsureName()
         {
             if (_name == null)
-                _name = new Line(this)
+                _name = new FixedLine(this, 3)
                 {
                     Name = "name",
                     TextAlign = TextAlign.Left | TextAlign.OverflowCenter
@@ -118,7 +118,7 @@ namespace LibraryStudio.Forms
         void EnsureIndicator()
         {
             if (_indicator == null)
-                _indicator = new Line(this)
+                _indicator = new FixedLine(this, 2)
                 {
                     Name = "indicator",
                     TextAlign = TextAlign.Left | TextAlign.OverflowCenter
@@ -690,9 +690,31 @@ namespace LibraryStudio.Forms
             }
             indicator_text = GetMaskString(start, (char)0x04, indicator_text?.Length ?? 0);
 
+            /*
             var content_text = _content?.MergeText(start, end);
             if (this.IsHeader)
                 content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+            */
+            string content_text = "";
+            if (this.IsHeader)
+            {
+                content_text = _content?.MergeText(start, end);
+                content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+            }
+            else
+            {
+                // _content 中可能是复杂结构
+                if (_content is IViewBox)
+                {
+                    var view_box = _content as IViewBox;
+                    Debug.Assert(view_box != null);
+                    content_text = view_box?.MergeTextMask(start, end);
+                }
+                else
+                {
+                    content_text = _content?.MergeText(start, end);
+                }
+            }
 
             return (name_text ?? "")
                 + (indicator_text ?? "")
@@ -729,7 +751,7 @@ namespace LibraryStudio.Forms
 #endif
         }
 
-        public string MergeFullTextMask(int start = 0, int end = int.MaxValue)
+        public string MergeTextMask(int start = 0, int end = int.MaxValue)
         {
             if (Utility.Cross(start, end, 0, this.FullTextLength) == false)
                 return "";
@@ -751,7 +773,9 @@ namespace LibraryStudio.Forms
                 {
                     start -= _name.TextLength;
                     if (end != -1)
+                    {
                         end -= _name.TextLength;
+                    }
                 }
 
                 var indicator_text = _indicator?.MergeText(start, end);
@@ -760,12 +784,31 @@ namespace LibraryStudio.Forms
                 {
                     start -= _indicator.TextLength;
                     if (end != -1)
+                    {
                         end -= _indicator.TextLength;
+                    }
                 }
 
-                var content_text = _content?.MergeText(start, end);
-                //if (this.IsHeader)
-                //    content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+                string content_text = "";
+                if (this.IsHeader)
+                {
+                    content_text = _content?.MergeText(start, end);
+                    content_text = GetHeaderMaskString(content_text?.Length ?? 0); // TODO: 可以改进为最多转换 24 char 成为 mask char
+                }
+                else
+                {
+                    // _content 中可能是复杂结构
+                    if (_content is IViewBox)
+                    {
+                        var view_box = _content as IViewBox;
+                        Debug.Assert(view_box != null);
+                        content_text = view_box?.MergeTextMask(start, end);
+                    }
+                    else
+                    {
+                        content_text = _content?.MergeText(start, end);
+                    }
+                }
 
                 start -= _content?.TextLength ?? 0;
                 end -= _content?.TextLength ?? 0;

@@ -374,9 +374,14 @@ namespace LibraryStudio.Forms
             Debug.Assert(this._caret_offs == info.Offs);
 
             if (ch == '\b')
+            {
                 return false;   // ProcessBackspaceChar() 应该处理过了，这里避免重复处理
+            }
+
             if (!(ch >= 32 || ch == '\r' || ch == 31))
+            {
                 return false;
+            }
 
             // 检测键盘输入速度
             var delay = _keySpeedDetector.Detect();
@@ -386,9 +391,10 @@ namespace LibraryStudio.Forms
                 info = _caretInfo; // 更新 info 参数
             }
 
-            var action = "input";
+            // var action = "input";
             if (ch == '\r')
             {
+                // TODO: 在细部结构中回车起到插入分隔符的作用
                 return ProcessInputReturnChar(ch, info, delay);
 #if REMOVED
                 ch = (char)0x1e;

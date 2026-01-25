@@ -450,7 +450,7 @@ namespace LibraryStudio.Forms
             return new HitInfo { Area = Area.BottomBlank };
         }
 
-        public string MergeText(int start = 0, int end = int.MaxValue)
+        public virtual string MergeText(int start = 0, int end = int.MaxValue)
         {
             StringBuilder builder = new StringBuilder();
             int offs = 0;
@@ -600,8 +600,23 @@ namespace LibraryStudio.Forms
                     }
                 }
 
-                /*
                 // Solid 区
+                {
+                    var color = Metrics?.SolidColor ?? Metrics.DefaultSolidColor;
+                    if (color != Color.Transparent)
+                    {
+                        int width = (Metrics?.ButtonWidth ?? 0)
+                            + (Metrics?.GapThickness ?? 0);
+
+                        var left_rect = new Rectangle(
+                                x + Metrics.CaptionPixelWidth,
+                                y,
+                                width,
+                                height);
+                        MarcField.PaintBack(hdc, left_rect, clipRect, color);
+                    }
+                }
+                /*
                 {
                     var color = Metrics?.SolidColor ?? Metrics.DefaultSolidColor;
                     if (color != Color.Transparent)
@@ -1124,6 +1139,26 @@ namespace LibraryStudio.Forms
                 return y;
             }
         }
+
+        public virtual string MergeTextMask(int start = 0, int end = int.MaxValue)
+        {
+            StringBuilder builder = new StringBuilder();
+            int offs = 0;
+            foreach (var line in _lines)
+            {
+                var current_length = line.TextLength;
+                var fragment = line.MergeTextMask(start - offs, end - offs);
+                builder.Append(fragment);
+                offs += current_length;
+                if (offs > end)
+                {
+                    break;
+                }
+            }
+
+            return builder.ToString();
+        }
+
     }
 
 
@@ -1137,6 +1172,6 @@ namespace LibraryStudio.Forms
     SafeHDC dc,
     int pixel_width);
 
-        // string CaptionText { get; set; }
+        string MergeTextMask(int start = 0, int end = int.MaxValue);
     }
 }

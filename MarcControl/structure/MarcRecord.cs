@@ -619,7 +619,7 @@ namespace LibraryStudio.Forms
             {
                 var current_length = field.FullTextLength;
                 // mask char 规则: 0x01~0x03 表示字段名位置, 0x04~0x05 表示指示符位置, 0x06 表示头标区位置(最多 24 个字符都是这个值)
-                builder.Append(field.MergeFullTextMask(start - offs, end - offs));
+                builder.Append(field.MergeTextMask(start - offs, end - offs));
                 offs += current_length;
                 /*
                 // 除了头标区以外，每个字段末尾都有一个字段结束符
@@ -631,7 +631,10 @@ namespace LibraryStudio.Forms
                 }
                 */
                 if (offs > end)
+                {
                     break;
+                }
+
                 i++;
             }
 
@@ -2242,10 +2245,14 @@ out int max_pixel_width)
 
         public class InputInfo
         {
+            // 应执行替换的文字内容
             public string Text { get; set; }
+            // 替换的起始位置
             public int Start { get; set; }
+            // 替换的结束位置
             public int End { get; set; }
 
+            // 替换结束后插入符应该调整到的位置。-1 表示不用特意调整
             public int Caret { get; set; } = -1;
         }
 
@@ -2414,8 +2421,12 @@ out int max_pixel_width)
             else
             {
                 // 观察是否处在字段名、指示符位置
-                if ((field.IsControlField && caret_offs_in_field < 3)
-                    || (field.IsControlField == false && caret_offs_in_field < 5))
+                var mask = field.MergeTextMask(caret_offs_in_field, caret_offs_in_field + 1);
+                char m = string.IsNullOrEmpty(mask) ? (char)0 : mask[0];
+
+                //if ((field.IsControlField && caret_offs_in_field < 3)
+                //    || (field.IsControlField == false && caret_offs_in_field < 5))
+                if (m >= 0x1 && m <= 0x6)
                 {
                     // 填充
                     return new InputInfo
@@ -2611,8 +2622,12 @@ out int max_pixel_width)
             else
             {
                 // 观察是否处在字段名、指示符位置
-                if ((field.IsControlField && caret_offs_in_field < 3)
-                    || (field.IsControlField == false && caret_offs_in_field < 5))
+                var mask = field.MergeTextMask(caret_offs_in_field, caret_offs_in_field + 1);
+                char m = string.IsNullOrEmpty(mask) ? (char)0 : mask[0];
+
+                //if ((field.IsControlField && caret_offs_in_field < 3)
+                //    || (field.IsControlField == false && caret_offs_in_field < 5))
+                if (m >= 0x1 && m <= 0x6)
                 {
                     // 替换
                     return new InputInfo
@@ -2622,7 +2637,6 @@ out int max_pixel_width)
                         End = start + caret_offs_in_field + 1
                     };
                 }
-
 
                 // 其余位置插入
                 return new InputInfo

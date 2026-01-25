@@ -945,3 +945,22 @@ ReplaceText() 需要增加参数 x y。这样返回的 UpdateRect ScrollRect 可
 删除前一个字符，是否允许删除(如果不允许删除，应该就是覆盖模式，可以考虑执行替换为空格的操作)
 之所以要用 HitInfo 来查询，主要是考虑到如果用 offs 来指明位置，可能会在头标区末尾和 001 第一字符这种等同的
 位置，不同的位置有不同的语义，函数最好能提供精确的返回信息。
+
+~~~
+在 TemplateItem 上原始剪切之后，要重新定位 Caret 显示位置(因为最后一个字符不在了)
+
+
+~~~
+MergeText() 和 MergeTextMask() 中一进入函数的位置应该判断 start end 范围是否和当前对象不交叉，如果
+不交叉则尽快返回空字符串。
+
+            if (Utility.Cross(start, end, 0, this.TextLength) == false)
+                return "";
+
+建议首先单独判断 start，因为 start 不需要调用 TextLength，速度快
+
+~~~
+在模板中溢出的行，应该作为插入而不是替换模式处理。也就是说允许删除字符，插入字符。
+
+~~~
+现在看来，插入符表示出插入还是替换状态非常必要！

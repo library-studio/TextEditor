@@ -2,12 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 using Vanara.PInvoke;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace LibraryStudio.Forms
 {
@@ -16,6 +11,10 @@ namespace LibraryStudio.Forms
         Line _caption = null;
 
         Paragraph _content = null;
+
+        // 是否为溢出部分。
+        // 溢出部分是插入模式，允许插入和删除字符。而如果不是溢出部分，则是替换模式。
+        public bool Overflow { get; set; }
 
         public Metrics Metrics { get; set; }
 
@@ -70,7 +69,7 @@ namespace LibraryStudio.Forms
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
             int caption_width = Metrics?.CaptionPixelWidth ?? 0;
-
+            // int gap_width = Metrics?.GapThickness ?? 0;
             var height = _content?.GetPixelHeight() ?? 0;
             if (height == 0)
             {
@@ -87,7 +86,9 @@ namespace LibraryStudio.Forms
             Debug.Assert(Metrics != null);
             int button_width = Metrics?.ButtonWidth ?? 0;
             int caption_width = Metrics?.CaptionPixelWidth ?? 0;
-            return x0 + caption_width + button_width;
+            int gap_width = Metrics?.GapThickness ?? 0;
+
+            return x0 + caption_width + button_width + gap_width;
         }
 
         int GetContentY(int y0 = 0)
@@ -200,6 +201,24 @@ namespace LibraryStudio.Forms
             if (_content == null)
                 return "";
             return _content.MergeText(start, end);
+        }
+
+        public virtual string MergeTextMask(int start = 0, int end = int.MaxValue)
+        {
+            if (_content == null)
+                return "";
+
+            var content_fragment = _content?.MergeText(start, end);
+            if (this.Overflow)
+                return (content_fragment ?? "");
+
+            content_fragment = GetHeaderMaskString(content_fragment?.Length ?? 0); // TODO: 可以改进为最多转换模板定义的那么多个 char 成为 mask char
+            return (content_fragment ?? "");
+
+            string GetHeaderMaskString(int length)
+            {
+                return new string((char)0x06, length);
+            }
         }
 
         // parameters:
@@ -356,7 +375,7 @@ caption?.GetPixelHeight() ?? 0);
     dc,
     x,
     y,
-    clipRect,
+    Rectangle.Intersect(rect, clipRect),
     0,
     0,
     0);

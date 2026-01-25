@@ -56,9 +56,15 @@ namespace LibraryStudio.Forms
             var result = base.CreateChild(context, index);
             int count = this.StructureInfo?.SubUnits?.Count ?? -1;
             if (count > 0 && index > count - 1)
+            {
                 result._initialCaptionText = "(溢出)";
+                result.Overflow = true;
+            }
             else
+            {
                 result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
+                result.Overflow = false;
+            }
             return result;
         }
 
