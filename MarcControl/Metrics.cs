@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Xml.Linq;
 
 namespace LibraryStudio.Forms
 {
@@ -15,8 +14,63 @@ namespace LibraryStudio.Forms
 
         public GetStructureFunc GetStructure { get; set; }
 
+        List<int> _caption_widths = new List<int>();
+        public int GetCaptionPixelWidth(int level)
+        {
+            if (level < 0)
+            {
+                throw new ArgumentException($"level ({level}) 不允许小于 0");
+            }
+
+            if (level >= _caption_widths.Count)
+            {
+                return DefaultSplitterPixelWidth + DefaultCaptionPixelWidth;
+            }
+            return _caption_widths[level];
+        }
+
+        public void SetCaptionPixelWidth(int level, int value)
+        {
+            if (level < 0)
+            {
+                throw new ArgumentException($"level ({level}) 不允许小于 0");
+            }
+            if (level > _caption_widths.Count - 1)
+            {
+                while (_caption_widths.Count - 1 < level)
+                {
+                    _caption_widths.Add(DefaultSplitterPixelWidth + DefaultCaptionPixelWidth);
+                }
+            }
+            _caption_widths[level] = value;
+        }
+
+        public int GetCaptionPixelWidth(IBox box)
+        {
+            var level = CountCaptionLevel(box);
+            return GetCaptionPixelWidth(level);
+        }
+
+        public void SetCaptionPixelWidth(IBox box, int value)
+        {
+            var level = CountCaptionLevel(box);
+            SetCaptionPixelWidth(level, value);
+        }
+
+
         // 字段名称注释的像素宽度
-        public int CaptionPixelWidth { get; set; } = DefaultSplitterPixelWidth + DefaultCaptionPixelWidth;
+        public int CaptionPixelWidth
+        {
+            get
+            {
+                return GetCaptionPixelWidth(1);
+            }
+            set
+            {
+                SetCaptionPixelWidth(1, value);
+            }
+        }
+        // public int CaptionPixelWidth { get; set; } = DefaultSplitterPixelWidth + DefaultCaptionPixelWidth;
 
         // 字段名称的像素宽度
         public int NamePixelWidth { get; set; }
@@ -211,6 +265,7 @@ namespace LibraryStudio.Forms
             }
         }
 
+#if OLD
         public bool DeltaCaptionWidth(int delta)
         {
             var old_value = this.CaptionPixelWidth;
@@ -219,7 +274,38 @@ namespace LibraryStudio.Forms
 
             return this.CaptionPixelWidth != old_value;
         }
+#endif
 
+        public bool DeltaCaptionWidth(IBox box, int delta)
+        {
+            int level = CountCaptionLevel(box);
+            return DeltaCaptionWidth(level, delta);
+        }
+
+        public bool DeltaCaptionWidth(int level, int delta)
+        {
+            var old_value = this.GetCaptionPixelWidth(level);
+            var new_value = old_value + delta;
+            new_value = Math.Max(this.SplitterPixelWidth, new_value);
+
+            this.SetCaptionPixelWidth(level, new_value);
+
+            return new_value != old_value;
+        }
+
+        // 统计从 box 到祖先的层级中有多少层具有 _caption 组件
+        public static int CountCaptionLevel(IBox box)
+        {
+            int count = 0;
+            var current = box;
+            while(current != null)
+            {
+                if (current is ICaption)
+                    count++;
+                current = current.Parent;
+            }
+            return count;
+        }
     }
 
     // public delegate string GetFieldCaptionFunc(MarcField field);

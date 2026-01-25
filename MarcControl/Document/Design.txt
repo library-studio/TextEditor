@@ -936,6 +936,8 @@ Template 中使用 Line 还是 Paragraph 可以思考一下
 ~~~
 caption 区域的宽度，要分级存储。修改一个级别的宽度，其它级的宽度不变。
 
+多个层级的宽度，要都序列化到 UiStateJson 中
+
 ~~~
 ReplaceText() 需要增加参数 x y。这样返回的 UpdateRect ScrollRect 可以预先进行偏移，避免调主再
 重算偏移一次了。

@@ -586,6 +586,9 @@ namespace LibraryStudio.Forms
 
                 var height = this.GetPixelHeight() /*- this._blankLineHeigh*/;
 
+                // 用于获取 caption pixel 所用的层次值，要比当前这个容器作为起点获得的 level 多一层
+                int level = Metrics.CountCaptionLevel(this) + 1;
+                var caption_pixel = Metrics.GetCaptionPixelWidth(level);
                 // 绘制提示文字区的底色
                 {
                     var color = Metrics?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor;
@@ -594,7 +597,7 @@ namespace LibraryStudio.Forms
                         var left_rect = new Rectangle(
                                 x,
                                 y,
-                                Metrics.CaptionPixelWidth,
+                                caption_pixel,
                                 height);
                         MarcField.PaintBack(hdc, left_rect, clipRect, color);
                     }
@@ -609,7 +612,7 @@ namespace LibraryStudio.Forms
                             + (Metrics?.GapThickness ?? 0);
 
                         var left_rect = new Rectangle(
-                                x + Metrics.CaptionPixelWidth,
+                                x + caption_pixel,
                                 y,
                                 width,
                                 height);
@@ -1173,5 +1176,10 @@ namespace LibraryStudio.Forms
     int pixel_width);
 
         string MergeTextMask(int start = 0, int end = int.MaxValue);
+    }
+
+    public interface ICaption
+    {
+        Line Caption { get; }
     }
 }

@@ -23,11 +23,12 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return (IBox)_marcControl;
+                return null;
+                // return (IBox)_marcControl;
             }
             set
             {
-                _marcControl = value as MarcControl;
+                // _marcControl = value as MarcControl;
             }
         }
 
@@ -1832,6 +1833,7 @@ namespace LibraryStudio.Forms
 
                 // var height = this.AutoScrollMinSize.Height - FontContext.DefaultFontHeight;
                 var height = this.GetPixelHeight() - this._blankLineHeigh;
+                var caption_pixel = _fieldProperty.GetCaptionPixelWidth(1);
 
                 // 绘制提示文字区的底色
                 {
@@ -1841,7 +1843,7 @@ namespace LibraryStudio.Forms
                         var left_rect = new Rectangle(
                                 x,
                                 y,
-                                _fieldProperty.CaptionPixelWidth,
+                                caption_pixel,
                                 height);
                         MarcField.PaintBack(hdc, left_rect, clipRect, color);
                     }
@@ -1853,9 +1855,9 @@ namespace LibraryStudio.Forms
                     if (color != Color.Transparent)
                     {
                         var left_rect = new Rectangle(
-                            x + _fieldProperty.CaptionPixelWidth,
+                            x + caption_pixel,
                             y,
-                            _fieldProperty.ContentBorderX - _fieldProperty.CaptionPixelWidth,
+                            _fieldProperty.ContentBorderX - caption_pixel,
                             height);
                         MarcField.PaintBack(hdc, left_rect, clipRect, color);
                     }

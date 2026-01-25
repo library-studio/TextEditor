@@ -14,7 +14,7 @@ namespace LibraryStudio.Forms
     /// MARC 字段编辑区域
     /// 由一个 Line(字段名)，一个 Line(字段指示符)，一个 Paragraph (字段内容) 构成
     /// </summary>
-    public class MarcField : IViewBox, IDisposable
+    public class MarcField : IViewBox, ICaption, IDisposable
     {
         public string Name { get; set; }
 
@@ -27,6 +27,14 @@ namespace LibraryStudio.Forms
             set
             {
                 _record = value as MarcRecord;
+            }
+        }
+
+        public Line Caption
+        {
+            get
+            {
+                return _caption;
             }
         }
 
@@ -442,9 +450,10 @@ namespace LibraryStudio.Forms
         {
             Debug.Assert(FieldRegion.Caption != 0);
             Debug.Assert(FieldRegion.Splitter != 0);
+            var caption_pixel = _fieldProperty.GetCaptionPixelWidth(this);
             int caption_area_hitted = 0;
             // 点击到了左边 Caption 区域
-            if (x < _fieldProperty.CaptionPixelWidth - _fieldProperty.SplitterPixelWidth)
+            if (x < caption_pixel - _fieldProperty.SplitterPixelWidth)
             {
                 /*
                 return new HitInfo
@@ -465,7 +474,7 @@ namespace LibraryStudio.Forms
             }
 
             // 点击到了 Caption 区域和 Name 区域的缝隙位置
-            else if (x < _fieldProperty.CaptionPixelWidth) // _fieldProperty.NameBorderX - _fieldProperty.ButtonWidth
+            else if (x < caption_pixel) // _fieldProperty.NameBorderX - _fieldProperty.ButtonWidth
             {
                 /*
                 return new HitInfo
@@ -483,7 +492,7 @@ namespace LibraryStudio.Forms
             }
 
             // 点击到了字段名左边的按钮
-            else if (x < _fieldProperty.CaptionPixelWidth + _fieldProperty.ButtonWidth)
+            else if (x < caption_pixel + _fieldProperty.ButtonWidth)
             {
                 caption_area_hitted = (int)FieldRegion.Button;
             }
@@ -1690,7 +1699,7 @@ clipRect);
                 {
                     height = FontContext.DefaultFontHeight;
                 }
-                return new Rectangle(x + _fieldProperty.CaptionPixelWidth,
+                return new Rectangle(x + _fieldProperty.GetCaptionPixelWidth(this),
         (int)(y + _baseLine - (box?.BaseLine ?? 0)) + 0,
         _fieldProperty.ButtonWidth,
         height);
@@ -1798,7 +1807,7 @@ clipRect);
                 // Debug.WriteLine($"_caption y={y}");
                 rect = new Rectangle(x,
                     y + (this.IsHeader ? GetContentY() : GetNameRect().Y),
-                    Math.Max(0, _fieldProperty.CaptionPixelWidth - _fieldProperty.GapThickness),
+                    Math.Max(0, _fieldProperty.GetCaptionPixelWidth(this) - _fieldProperty.GapThickness),
                     _caption?.GetPixelHeight() ?? 0);
 
                 if (rect.Width > 0
@@ -2081,7 +2090,7 @@ clipRect);
                 context,
                 dc,
                 out Rectangle update_rect_caption); // 返回前 update_rect_caption 已经被平移过了
-                update_rect_caption.Width = Math.Min(update_rect_caption.Width, _fieldProperty.CaptionPixelWidth);
+                update_rect_caption.Width = Math.Min(update_rect_caption.Width, _fieldProperty.GetCaptionPixelWidth(this));
 
                 update_rect = Utility.Union(update_rect, update_rect_caption);
                 max_pixel_width = Math.Max(max_pixel_width,

@@ -14,7 +14,7 @@ namespace LibraryStudio.Forms
     /// </summary>
     public partial class MarcControl
     {
-        // 分割条位置
+        // 顶级分割条位置
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -81,7 +81,7 @@ namespace LibraryStudio.Forms
             // 计算差额
             var delta = _splitterX - _splitterStartX;
 
-            var changed = _marcMetrics.DeltaCaptionWidth(delta);
+            var changed = _marcMetrics.DeltaCaptionWidth(1, delta);
             /*
             _fieldProperty.CaptionPixelWidth += delta;
             _fieldProperty.CaptionPixelWidth = Math.Max(_fieldProperty.SplitterPixelWidth, _fieldProperty.CaptionPixelWidth);

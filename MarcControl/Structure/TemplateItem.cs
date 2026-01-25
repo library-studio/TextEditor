@@ -6,9 +6,16 @@ using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
 {
-    public class TemplateItem : IViewBox
+    public class TemplateItem : IViewBox, ICaption
     {
         Line _caption = null;
+        public Line Caption
+        {
+            get
+            {
+                return _caption;
+            }
+        }
 
         Paragraph _content = null;
 
@@ -68,7 +75,7 @@ namespace LibraryStudio.Forms
 
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
-            int caption_width = Metrics?.CaptionPixelWidth ?? 0;
+            int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
             // int gap_width = Metrics?.GapThickness ?? 0;
             var height = _content?.GetPixelHeight() ?? 0;
             if (height == 0)
@@ -85,7 +92,7 @@ namespace LibraryStudio.Forms
         {
             Debug.Assert(Metrics != null);
             int button_width = Metrics?.ButtonWidth ?? 0;
-            int caption_width = Metrics?.CaptionPixelWidth ?? 0;
+            int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
             int gap_width = Metrics?.GapThickness ?? 0;
 
             return x0 + caption_width + button_width + gap_width;
@@ -343,7 +350,7 @@ namespace LibraryStudio.Forms
         {
             return new Rectangle(x,
 y,
-Math.Max(0, (metrics?.CaptionPixelWidth ?? 0) - (metrics?.GapThickness ?? 0)),
+Math.Max(0, (metrics?.GetCaptionPixelWidth(caption) ?? 0) - (metrics?.GapThickness ?? 0)),
 caption?.GetPixelHeight() ?? 0);
         }
 
