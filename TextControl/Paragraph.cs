@@ -1617,9 +1617,15 @@ tag);
         {
             // 2025/12/3
             if (y < 0)
-                return new HitInfo { Area = Area.TopBlank };
+            {
+                return new HitInfo
+                {
+                    Area = Area.TopBlank,
+                    Box = this
+                };
+            }
 
-            var result = new HitInfo();
+            var result = new HitInfo { Box = this };
             int current_y = 0;
             int offs = 0;
             for (int i = 0; i < _lines.Count; i++)
@@ -1642,6 +1648,7 @@ tag);
                         Offs = offs + sub_info.Offs,
                         LineHeight = sub_info.LineHeight,
                         Area = y < current_y + line.GetPixelHeight() ? Area.Text : Area.BottomBlank,
+                        Box = this,
                         InnerHitInfo = sub_info,
                     };
                 }
@@ -1651,7 +1658,11 @@ tag);
             }
 
             // 空白内容
-            return new HitInfo { Area = Area.BottomBlank };
+            return new HitInfo
+            {
+                Area = Area.BottomBlank,
+                Box = this
+            };
         }
 
 
@@ -1680,7 +1691,7 @@ tag);
         public HitInfo HitByGlobalOffs(int offs_param,
             bool trailing)
         {
-            HitInfo info = new HitInfo();
+            var info = new HitInfo { Box = this };
             int offs = 0;
             Line line = null;
             RangeWrapper range = null;
@@ -1854,7 +1865,7 @@ tag);
             int direction,
             out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
 
             var infos = new List<HitInfo>();
 
@@ -1884,6 +1895,7 @@ tag);
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
+                            Box = this,
                             InnerHitInfo = hit_info,
                         };
 
@@ -2039,7 +2051,7 @@ tag);
             int y,
             out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
 
             if (y < 0)
                 y = 0;
@@ -2066,7 +2078,7 @@ tag);
     int y,
     out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
 
             // 找到 x, y 所在的 line
             var line = HitLine(x, y);

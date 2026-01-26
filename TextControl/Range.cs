@@ -341,13 +341,13 @@ namespace LibraryStudio.Forms
 
         public bool CaretMoveDown(int x, int y, out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
         public bool CaretMoveUp(int x, int y, out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -363,7 +363,7 @@ namespace LibraryStudio.Forms
         public int MoveByOffs(int offs, int direction, out HitInfo info)
         {
             int ret = 0;
-            info = new HitInfo();
+            info = new HitInfo { Box = this};
 
             Debug.Assert(this._text.Length == this._displayText.Length);
 

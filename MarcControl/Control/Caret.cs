@@ -22,7 +22,7 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return _caretInfo?.Clone() ?? new HitInfo();
+                return _caretInfo?.Clone() ?? new HitInfo{ Box = this };
             }
         }
 

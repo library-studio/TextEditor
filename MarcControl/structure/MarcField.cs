@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
-
+using NUnit.Framework.Constraints;
 using Vanara.PInvoke;
 using static Vanara.PInvoke.Gdi32;
 
@@ -57,6 +57,7 @@ namespace LibraryStudio.Forms
         }
 
         // TODO: 可以考虑集中做一个缓存所有结构信息的 Hashtable 共享
+        // TODO: 头标区的 name 符合表达。包括 UnitInfo.Name 中的要一致
         UnitInfo GetStructureInfo(string name, int level)
         {
             if (_struct_info != null
@@ -67,6 +68,7 @@ namespace LibraryStudio.Forms
             }
 
             {
+                // 如果 name 为 null，表示这是头标区
                 var struct_info = _fieldProperty.GetStructure?.Invoke(this.Parent, name, level);
                 _struct_info = struct_info;
                 _struct_level = level;
@@ -108,7 +110,7 @@ namespace LibraryStudio.Forms
             if (_caption == null)
                 _caption = new Line(this)
                 {
-                    Name = "caption",
+                    Name = "!caption",
                     TextAlign = TextAlign.None
                 };
         }
@@ -188,14 +190,16 @@ namespace LibraryStudio.Forms
             }
 
             // 应要求，不支持展开。或者暂时为收缩状态
-            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+            if (_struct_info != null &&
+                (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+                )
             {
                 return NewParagraph();
             }
 
             // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
             // 查询结构定义
-            var struct_info = GetStructureInfo(name, 2);
+            var struct_info = GetStructureInfo(this.IsHeader ? null : name, 2);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
@@ -311,6 +315,7 @@ namespace LibraryStudio.Forms
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Name;
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -327,6 +332,7 @@ namespace LibraryStudio.Forms
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Indicator;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -343,11 +349,12 @@ namespace LibraryStudio.Forms
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -366,6 +373,7 @@ namespace LibraryStudio.Forms
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Name;
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -382,6 +390,7 @@ namespace LibraryStudio.Forms
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Indicator;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -399,11 +408,12 @@ namespace LibraryStudio.Forms
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight()
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -476,25 +486,17 @@ namespace LibraryStudio.Forms
             // 点击到了 Caption 区域和 Name 区域的缝隙位置
             else if (x < caption_pixel) // _fieldProperty.NameBorderX - _fieldProperty.ButtonWidth
             {
-                /*
-                return new HitInfo
-                {
-                    X = x,
-                    Y = y,
-                    ChildIndex = -1, // -1 表示 caption 和 name 之间的缝隙
-                    TextIndex = 0,
-                    Offs = 0,
-                    LineHeight = Line.GetLineHeight(),
-                    Area = Area.LeftBlank,
-                };
-                */
                 caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
             }
 
             // 点击到了字段名左边的按钮
             else if (x < caption_pixel + _fieldProperty.ButtonWidth)
             {
-                caption_area_hitted = (int)FieldRegion.Button;
+                var button_rect = GetButtonRect();
+                if (Utility.PtInRect(new Point(x, y), button_rect))
+                {
+                    caption_area_hitted = (int)FieldRegion.Button;
+                }
             }
 
 
@@ -513,6 +515,7 @@ namespace LibraryStudio.Forms
                 info.TextIndex = info.Offs;
                 info.Offs += 0; // 保持原来的偏移量
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return info;
             }
@@ -531,6 +534,7 @@ namespace LibraryStudio.Forms
                 info.TextIndex = info.Offs;
                 info.Offs += NameTextLength;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return info;
             }
@@ -548,12 +552,13 @@ namespace LibraryStudio.Forms
                 info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content; // 2 表示 _content
                 info.TextIndex = info.Offs;
                 info.Offs += NameTextLength + IndicatorTextLength;
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 // 保持 info.LineHeight
                 return info;
             }
 
-            return new HitInfo();
+            return new HitInfo { Box = this };
         }
 
         int NameTextLength
@@ -878,7 +883,7 @@ namespace LibraryStudio.Forms
             var offs_original = offs;
             if (offs + direction < 0)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return -1;
             }
 
@@ -929,6 +934,7 @@ namespace LibraryStudio.Forms
                 //info.Offs += _name.TextLength;
                 info.Offs += offs_original - offs; // 保持原来的偏移量
                 info.LineHeight = FirstLineCaretHeight(_indicator);
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 if (_indicator.TextLength < 2 && this.IsControlField == false)
                     return ret;
@@ -962,6 +968,7 @@ namespace LibraryStudio.Forms
                 info.Offs += offs_original - offs; // 保持原来的偏移量
                                                    // 保持 info.LineHeight
 
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 // return ret;
                 infos.Add(info);
@@ -981,7 +988,7 @@ namespace LibraryStudio.Forms
                 return 0;
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return 1;
         }
 
@@ -1694,11 +1701,7 @@ clipRect);
             }
 
             {
-                var height = box?.GetPixelHeight() ?? 0;
-                if (height == 0)
-                {
-                    height = FontContext.DefaultFontHeight;
-                }
+                var height = FontContext.DefaultFontHeight;
                 return new Rectangle(x + _fieldProperty.GetCaptionPixelWidth(this),
         (int)(y + _baseLine - (box?.BaseLine ?? 0)) + 0,
         _fieldProperty.ButtonWidth,
@@ -1958,7 +1961,7 @@ clipRect);
             EnsureCaption();
 
             // var caption = _fieldProperty.GetFieldCaption?.Invoke(this);
-            var caption = GetStructureInfo(this.FieldName, 1)?.Caption;
+            var caption = GetStructureInfo(this.IsHeader ? null : this.FieldName, 1)?.Caption;
             var ret = _caption.ReplaceText(
                 context,
                 dc,

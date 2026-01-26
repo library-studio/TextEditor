@@ -297,7 +297,8 @@ namespace LibraryStudio.Forms
                     TextIndex = 0,
                     Offs = 0,
                     LineHeight = line_height,
-                    Area = Area.Text
+                    Area = Area.Text,
+                    Box = this,
                 };
             }
 
@@ -341,7 +342,12 @@ namespace LibraryStudio.Forms
                             Offs = start_offs + 0,
                             LineHeight = line_height,
                             Area = isRightBlank ? Area.RightBlank : Area.Text,
-                            InnerHitInfo = new HitInfo { X = 0 },
+                            Box = this,
+                            InnerHitInfo = new HitInfo
+                            {
+                                X = 0,
+                                Box = range
+                            },
                         };
 
                     var result = ScriptXtoCP(x - current_x,
@@ -385,7 +391,12 @@ namespace LibraryStudio.Forms
                         Offs = start_offs + cp_index,
                         LineHeight = line_height,
                         Area = isRightBlank ? Area.RightBlank : Area.Text,
-                        InnerHitInfo = new HitInfo { X = hit_x_in_range },
+                        Box = this,
+                        InnerHitInfo = new HitInfo
+                        {
+                            X = hit_x_in_range,
+                            Box = range
+                        },
                     };
                 }
             }
@@ -399,6 +410,7 @@ namespace LibraryStudio.Forms
                 Offs = 0,
                 LineHeight = line_height,
                 Area = Area.RightBlank,
+                Box = this,
                 InnerHitInfo = null,
             };
         }
@@ -430,13 +442,15 @@ namespace LibraryStudio.Forms
             int direction,
             out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             if (offs + direction < 0)
+            {
                 return -1;
+            }
             /*
-            if (direction == -1 && offs <= 0)
-                return -1;
-            */
+if (direction == -1 && offs <= 0)
+   return -1;
+*/
             int start_offs = 0;
             int i = 0;
             foreach (var range in Ranges)
@@ -469,10 +483,11 @@ namespace LibraryStudio.Forms
                         info.X = range.Left + hit_x_in_range; // + current_x;
                         info.Y = 0;
                         info.ChildIndex = i;
-                        info.Box = range;
+                        info.Box = this;    // range;
                         info.InnerHitInfo = new HitInfo
                         {
                             X = hit_x_in_range,
+                            Box = range,
                         };
 
                         if (is_zero_width(range.sva, pos, direction >= 1) == false)   // range.advances.Where(o => o == 0).Any() == false
@@ -499,6 +514,7 @@ namespace LibraryStudio.Forms
                     info.TextIndex = offs1;
                     info.Area = Area.Text;
                     info.LineHeight = this.GetPixelHeight();
+                    info.Box = this;
                     return 0;
                 }
 
@@ -517,6 +533,7 @@ namespace LibraryStudio.Forms
                 info.TextIndex = 0;
                 info.Area = Area.Text;
                 info.LineHeight = this.GetPixelHeight();
+                info.Box = this;
                 return 0;
             }
 
@@ -604,7 +621,7 @@ namespace LibraryStudio.Forms
     int y,
     out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -613,7 +630,7 @@ namespace LibraryStudio.Forms
             int y,
             out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 

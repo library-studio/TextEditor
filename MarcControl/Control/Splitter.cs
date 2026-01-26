@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -49,15 +50,23 @@ namespace LibraryStudio.Forms
         int _splitterX = 0;
         int _splitterStartX = 0;
         bool _splitting = false;
+        int _splitterLevel = 1;
 
-        void StartSplitting(int x)
+        void StartSplitting(int x, IBox box)
         {
             _splitterX = x;
             _splitterStartX = x;
 
             _splitting = true;
 
+            // 通过 info 探知 Caption 的级数
+            if (box != null)
+                _splitterLevel = Metrics.CountSplitterLevel(box);
+            else
+                _splitterLevel = 1;
+
             DrawTraker();
+            return;
         }
 
         void MoveSplitting(int x)
@@ -81,7 +90,7 @@ namespace LibraryStudio.Forms
             // 计算差额
             var delta = _splitterX - _splitterStartX;
 
-            var changed = _marcMetrics.DeltaCaptionWidth(1, delta);
+            var changed = _marcMetrics.DeltaCaptionWidth(_splitterLevel, delta);
             /*
             _fieldProperty.CaptionPixelWidth += delta;
             _fieldProperty.CaptionPixelWidth = Math.Max(_fieldProperty.SplitterPixelWidth, _fieldProperty.CaptionPixelWidth);

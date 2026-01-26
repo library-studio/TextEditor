@@ -306,6 +306,43 @@ namespace LibraryStudio.Forms
             }
             return count;
         }
+
+        public static int CountSplitterLevel(IBox box)
+        {
+            int count = 0;
+            var current = box;
+            while (current != null)
+            {
+                if (current is ICaption)
+                    count++;
+                current = current.Parent;
+            }
+            return count;
+        }
+
+        public static bool IsAncestorFixed(IBox box, bool include_myself)
+        {
+            var current = include_myself ? box : box.Parent;
+            while (current != null)
+            {
+                if (current is IFixed)
+                    return true;
+                current = current.Parent;
+            }
+            return false;
+        }
+
+        public static MarcField GetAncestorField(IBox box, bool include_myself)
+        {
+            var current = include_myself ? box : box.Parent;
+            while (current != null)
+            {
+                if (current is MarcField)
+                    return current as MarcField;
+                current = current.Parent;
+            }
+            return null;
+        }
     }
 
     // public delegate string GetFieldCaptionFunc(MarcField field);
@@ -313,6 +350,7 @@ namespace LibraryStudio.Forms
     public delegate bool GetReadOnlyFunc(IBox box);
 
     // 获得 box 下的结构信息
+    // 如果 box 为 MarcRecord 类型并且 name 值为 null，表示这是头标区
     public delegate UnitInfo GetStructureFunc(IBox parent, string name, int level);
 
     public class UnitInfo

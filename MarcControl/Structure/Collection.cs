@@ -84,7 +84,7 @@ namespace LibraryStudio.Forms
         {
             if (this._lines == null)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -93,7 +93,7 @@ namespace LibraryStudio.Forms
             var index = temp.ChildIndex;
             if (index < 0 || index >= _lines.Count)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -109,7 +109,7 @@ namespace LibraryStudio.Forms
                 y = info.Y + start_y;
                 if (y >= this.GetPixelHeight())
                 {
-                    info = new HitInfo();
+                    info = new HitInfo { Box = this };
                     return false;
                 }
                 info = this.HitTest(x, y);
@@ -128,7 +128,7 @@ namespace LibraryStudio.Forms
                     return true;
                 }
                 */
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -148,7 +148,7 @@ namespace LibraryStudio.Forms
                 // 如果越过整个 Collection 下沿
                 if (y >= this.GetPixelHeight())
                 {
-                    info = new HitInfo();
+                    info = new HitInfo { Box = this };
                     return false;
                 }
                 info = this.HitTest(x, y);
@@ -160,7 +160,7 @@ namespace LibraryStudio.Forms
         {
             if (this._lines == null)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -176,7 +176,7 @@ namespace LibraryStudio.Forms
             }
             if (index < 0 || index >= _lines.Count)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -189,11 +189,11 @@ namespace LibraryStudio.Forms
             if (ret == true)
             {
                 // 能成功 Move
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 y -= 1; // Line.GetLineHeight();
                 if (y < 0)
                 {
-                    info = new HitInfo();
+                    info = new HitInfo { Box = this };
                     return false;
                 }
                 info = this.HitTest(x, y);
@@ -202,7 +202,7 @@ namespace LibraryStudio.Forms
 
             if (index == 0)
             {
-                info = new HitInfo();
+                info = new HitInfo { Box = this };
                 return false;
             }
 
@@ -223,7 +223,7 @@ namespace LibraryStudio.Forms
 
                 if (y < 0)
                 {
-                    info = new HitInfo();
+                    info = new HitInfo { Box = this };
                     return false;
                 }
                 info = this.HitTest(x, y);
@@ -413,9 +413,15 @@ namespace LibraryStudio.Forms
         {
             // 2025/12/3
             if (y < 0)
-                return new HitInfo { Area = Area.TopBlank };
+            {
+                return new HitInfo
+                {
+                    Area = Area.TopBlank,
+                    Box = this
+                };
+            }
 
-            var result = new HitInfo();
+            var result = new HitInfo { Box = this };
             int current_y = 0;
             int offs = 0;
             for (int i = 0; i < _lines.Count; i++)
@@ -438,6 +444,7 @@ namespace LibraryStudio.Forms
                         Offs = offs + sub_info.Offs,
                         LineHeight = sub_info.LineHeight,
                         Area = y < current_y + line.GetPixelHeight() ? Area.Text : Area.BottomBlank,
+                        Box = this,
                         InnerHitInfo = sub_info,
                     };
                 }
@@ -447,7 +454,11 @@ namespace LibraryStudio.Forms
             }
 
             // 空白内容
-            return new HitInfo { Area = Area.BottomBlank };
+            return new HitInfo
+            {
+                Area = Area.BottomBlank,
+                Box = this
+            };
         }
 
         public virtual string MergeText(int start = 0, int end = int.MaxValue)
@@ -482,7 +493,7 @@ namespace LibraryStudio.Forms
             int direction,
             out HitInfo info)
         {
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
 
             var infos = new List<HitInfo>();
 
@@ -512,6 +523,7 @@ namespace LibraryStudio.Forms
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
+                            Box = this,
                             InnerHitInfo = hit_info,
                         };
 
@@ -1181,5 +1193,10 @@ namespace LibraryStudio.Forms
     public interface ICaption
     {
         Line Caption { get; }
+    }
+
+    public interface IFixed
+    {
+        int FixedLength { get; set; }
     }
 }

@@ -59,20 +59,12 @@ namespace LibraryStudio.Forms
         void MonitorMouse()
         {
             var p = this.PointToClient(Control.MousePosition);
-            if (PtInRect(p, this.ClientRectangle) == false)
+            if (Utility.PtInRect(p, this.ClientRectangle) == false)
             {
                 OnMouseMove(new MouseEventArgs(MouseButtons.None, 0, p.X, p.Y, 0));
             }
         }
 
-        public static bool PtInRect(Point p,
-Rectangle rect)
-        {
-            return p.X >= rect.X
-                && p.X < rect.Right
-                && p.Y >= rect.Y
-                && p.Y < rect.Bottom;
-        }
 
         void DestroyMouseTimer()
         {
@@ -135,9 +127,10 @@ Rectangle rect)
                     return;
                 }
                 // 点击 Splitter
-                if (splitter_test == -1)
+                var hit_box = HitSplitter(result);
+                if (hit_box != null/*splitter_test == -1*/)
                 {
-                    StartSplitting(e.X);
+                    StartSplitting(e.X, hit_box);
                     base.OnMouseDown(e);
                     return;
                 }
@@ -174,10 +167,30 @@ Rectangle rect)
 
         static bool HitButton(HitInfo info)
         {
+            return HitPart(info, FieldRegion.Button);
+        }
+
+        static IBox HitSplitter(HitInfo info)
+        {
             var current = info;
             while (current != null)
             {
-                if (current.ChildIndex == (int)FieldRegion.Button)
+                if (current.ChildIndex == (int)FieldRegion.Splitter)
+                {
+                    return current.Box as IBox;
+                }
+
+                current = current.InnerHitInfo;
+            }
+            return null;
+        }
+
+        static bool HitPart(HitInfo info, FieldRegion part)
+        {
+            var current = info;
+            while (current != null)
+            {
+                if (current.ChildIndex == (int)part)
                 {
                     return true;
                 }
@@ -393,8 +406,10 @@ e.Y + this.VerticalScroll.Value);
             {
                 var splitter_test = TestSplitterArea(e.X);
 
-                if (splitter_test == -1)
+                if (HitSplitter(result) != null/*splitter_test == -1*/)
+                {
                     Cursor = Cursors.SizeWE;
+                }
                 else if (splitter_test >= 0)
                 {
                     // 判断光标是否在 selection region 范围内
@@ -482,7 +497,7 @@ e.Y + this.VerticalScroll.Value);
 
             if (update_rect != System.Drawing.Rectangle.Empty)
             {
-                Debug.Assert( update_rect.Width < int.MaxValue, "不允许用极大值来 Invalidate");
+                Debug.Assert(update_rect.Width < int.MaxValue, "不允许用极大值来 Invalidate");
                 update_rect.Offset(x, y);
                 this.Invalidate(update_rect);
                 // this.Invalidate();

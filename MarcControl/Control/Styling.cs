@@ -138,31 +138,48 @@ namespace LibraryStudio.Forms
 
                     // TODO: 可以考虑把英文空格和中文空格显示为易于辨识的特殊字符
                     if (_highlightBlankChar != ' ')
+                    {
                         return text.Replace("\x001f", "▼").Replace("\x001e", "ꜜ").Replace(' ', _highlightBlankChar);
+                    }
+
                     return text.Replace("\x001f", "▼").Replace("\x001e", "ꜜ");
                 },
                 GetForeColor = (o, highlight) =>
                 {
                     if (highlight)
+                    {
                         return _marcMetrics?.HightlightForeColor ?? SystemColors.HighlightText;
+                    }
+
                     var range = o as Range;
                     if (range != null
                         && range.Tag is MarcField.Tag tag)
                     {
                         // 子字段名文本为红色
                         if (tag.Delimeter)
+                        {
                             return _marcMetrics?.DelimeterForeColor ?? Metrics.DefaultDelimeterForeColor;
+                        }
+
                         if (range.Text == " ")
+                        {
                             return _marcMetrics?.BlankCharForeColor ?? Metrics.DefaultBlankCharForeColor;
+                        }
                     }
                     if (this._readonly)
+                    {
                         return _marcMetrics?.ReadOnlyForeColor ?? SystemColors.ControlText;
+                    }
+
                     return _marcMetrics?.ForeColor ?? SystemColors.WindowText;
                 },
                 GetBackColor = (o, highlight) =>
                 {
                     if (highlight)
+                    {
                         return _marcMetrics?.HighlightBackColor ?? SystemColors.Highlight;
+                    }
+
                     var range = o as Range;
                     if (range != null
                         && range.Tag is MarcField.Tag tag
@@ -171,7 +188,10 @@ namespace LibraryStudio.Forms
                         return _marcMetrics?.DelimeterBackColor ?? Metrics.DefaultDelimeterBackColor; // 子字段名文本为红色
                     }
                     if (range != null)
+                    {
                         return Color.Transparent;
+                    }
+
                     if (this._readonly)
                     {
                         return _marcMetrics?.ReadOnlyBackColor ?? SystemColors.Control;
@@ -185,23 +205,50 @@ namespace LibraryStudio.Forms
                 {
                     if (t is MarcField.Tag tag
                         && tag.Delimeter)
+                    {
                         return FixedFontGroup;
+                    }
 
                     if (o is IBox)
                     {
-                        var line = o as IBox;
-                        if (line.Name == "name" || line.Name == "indicator")
-                            return FixedFontGroup;
-                        else if (line.Name == "caption")
-                            return CaptionFontGroup;
-                        else if (line.Name == "content")
+                        var box = o as IBox;
+                        if (Metrics.IsAncestorFixed(o, true)/*line.Name == "name" || line.Name == "indicator"*/)
                         {
-                            var field = line.Parent as MarcField;
+                            return FixedFontGroup;
+                        }
+                        else if (box.Name == "!caption")
+                        {
+                            return CaptionFontGroup;
+                        }
+                        else if (box.Name == "!content")
+                        {
+                            var field = Metrics.GetAncestorField(box, false);
                             if (field.IsHeader || field.IsControlField
                             || field.FieldName.StartsWith("1")) // 1XX 字段是否一定是固定长的子字段，要看具体 MARC 格式的情况，比如 MARC21 要查一下
+                            {
                                 return FixedFontGroup;
+                            }
                             else
+                            {
                                 return ContentFontGroup;
+                            }
+
+#if REMOVED
+                            if (box.Parent is MarcField)
+                            {
+                                var field = box.Parent as MarcField;
+
+                                if (field.IsHeader || field.IsControlField
+                                || field.FieldName.StartsWith("1")) // 1XX 字段是否一定是固定长的子字段，要看具体 MARC 格式的情况，比如 MARC21 要查一下
+                                {
+                                    return FixedFontGroup;
+                                }
+                                else
+                                {
+                                    return ContentFontGroup;
+                                }
+                            }
+#endif
                         }
                     }
                     return ContentFontGroup;

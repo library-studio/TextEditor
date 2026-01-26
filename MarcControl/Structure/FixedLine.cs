@@ -11,7 +11,7 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 具有固定内容长度的 Line
     /// </summary>
-    public class FixedLine : Line
+    public class FixedLine : Line, IFixed
     {
         public int FixedLength { get; set; }
 

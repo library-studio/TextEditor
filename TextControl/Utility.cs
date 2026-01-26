@@ -32,6 +32,15 @@ namespace LibraryStudio.Forms
     public class Utility
     {
 
+        public static bool PtInRect(Point p,
+Rectangle rect)
+        {
+            return p.X >= rect.X
+                && p.X < rect.Right
+                && p.Y >= rect.Y
+                && p.Y < rect.Bottom;
+        }
+
         public class CompareResult
         {
             // 头部相同的字符数

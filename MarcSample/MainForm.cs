@@ -47,12 +47,19 @@ namespace MarcSample
             this.marcControl1.ClientBoundsWidth = 0;
             // this.marcControl1.ClientBoundsWidth = 800;
             // this.marcControl1.ClientBoundsWidth = -1;
-            this.marcControl1.Metrics.GetStructure = (parent, name, level) =>
+            this.marcControl1.GetStructure = (parent, name, level) =>
             {
                 if (parent is MarcRecord)
                 {
+                    // 头标区
+                    if (name == null)
+                    {
+                        return UnitInfo.FromChars(UnitType.Field,
+                            name,
+                            new int[] { 5, 3, 5, 10 });
+                    }
                     // 当前为字段
-                    if (name == "001")
+                    else if (name == "001")
                     {
                         return UnitInfo.FromChars(UnitType.Field,
                             name,

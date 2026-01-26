@@ -6,8 +6,10 @@ using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
 {
-    public class TemplateItem : IViewBox, ICaption
+    public class TemplateItem : IViewBox, ICaption, IFixed
     {
+        public int FixedLength { get; set; }
+
         Line _caption = null;
         public Line Caption
         {
@@ -77,11 +79,7 @@ namespace LibraryStudio.Forms
         {
             int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
             // int gap_width = Metrics?.GapThickness ?? 0;
-            var height = _content?.GetPixelHeight() ?? 0;
-            if (height == 0)
-            {
-                height = FontContext.DefaultFontHeight;
-            }
+            var height = FontContext.DefaultFontHeight;
             return new Rectangle(x + caption_width,
     y,
     Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
@@ -114,6 +112,7 @@ namespace LibraryStudio.Forms
             info.Y += y0;
             info.ChildIndex = (int)FieldRegion.Content;
             // 保持 info.LineHeight
+            info.Box = this;
             info.InnerHitInfo = sub_info;
             return ret;
 
@@ -130,6 +129,7 @@ namespace LibraryStudio.Forms
             info.Y += y0;
             info.ChildIndex = (int)FieldRegion.Content;
             // 保持 info.LineHeight
+            info.Box = this;
             info.InnerHitInfo = sub_info;
             return ret;
         }
@@ -191,14 +191,36 @@ namespace LibraryStudio.Forms
             var x0 = GetContentX();
             var y0 = GetContentY();
             if (x < x0)
-                return new HitInfo { ChildIndex = (int)FieldRegion.Button };
+            {
+                var button_rect = GetButtonRect();
+                if (Utility.PtInRect(new Point(x, y), button_rect))
+                {
+                    return new HitInfo
+                    {
+                        ChildIndex = (int)FieldRegion.Button,
+                        Box = this
+                    };
+                }
+                else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
+                {
+                    return new HitInfo
+                    {
+                        ChildIndex = (int)FieldRegion.Splitter,
+                        Box = this
+                    };
+                }
+            }
             if (_content == null)
-                return new HitInfo();
+            {
+                return new HitInfo { Box = this };
+            }
+
             var sub_info = _content.HitTest(x - x0, y - y0);
             var info = sub_info.Clone();
             info.X += x0;
             info.Y += y0;
             info.ChildIndex = (int)FieldRegion.Content;
+            info.Box = this;
             info.InnerHitInfo = sub_info;
             return info;
         }
@@ -248,11 +270,12 @@ namespace LibraryStudio.Forms
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return 0;
         }
 
@@ -407,7 +430,7 @@ caption?.GetPixelHeight() ?? 0);
             if (_caption == null)
                 _caption = new Line(this)
                 {
-                    Name = "caption",
+                    Name = "!caption",
                     TextAlign = TextAlign.None
                 };
         }

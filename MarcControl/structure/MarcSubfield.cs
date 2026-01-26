@@ -26,7 +26,7 @@ namespace LibraryStudio.Forms
 
         Paragraph _content = null;
 
-        Line _name = null;
+        FixedLine _name = null;
         Template _template = null;
 
         public Metrics Metrics { get; set; }
@@ -121,11 +121,7 @@ FontContext.DefaultFontHeight);
 
             {
 
-                var height = box?.GetPixelHeight() ?? 0;
-                if (height == 0)
-                {
-                    height = FontContext.DefaultFontHeight;
-                }
+                var height = FontContext.DefaultFontHeight;
                 return new Rectangle(x + caption_width,
         y,
         Metrics?.ButtonWidth ?? FontContext.DefaultReturnWidth,
@@ -149,6 +145,7 @@ FontContext.DefaultFontHeight);
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -167,6 +164,7 @@ FontContext.DefaultFontHeight);
                         info.Y += y0;
                         info.ChildIndex = (int)FieldRegion.Content;
                         // 保持 info.LineHeight
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return ret;
                     }
@@ -185,12 +183,13 @@ FontContext.DefaultFontHeight);
                     info.Offs += 2;
                     info.ChildIndex = (int)FieldRegion.Content;
                     // 保持 info.LineHeight
+                    info.Box = this;
                     info.InnerHitInfo = sub_info;
                     return ret;
                 }
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -211,6 +210,7 @@ FontContext.DefaultFontHeight);
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
                 // 保持 info.LineHeight
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
@@ -227,6 +227,7 @@ FontContext.DefaultFontHeight);
                     info.Y += y0;
                     info.ChildIndex = (int)FieldRegion.Content;
                     // 保持 info.LineHeight
+                    info.Box = this;
                     info.InnerHitInfo = sub_info;
                     return ret;
                 }
@@ -243,6 +244,7 @@ FontContext.DefaultFontHeight);
                         info.Offs += 2;
                         info.ChildIndex = (int)FieldRegion.Content;
                         // 保持 info.LineHeight
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return ret;
                     }
@@ -252,7 +254,7 @@ FontContext.DefaultFontHeight);
                 }
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return false;
         }
 
@@ -397,17 +399,34 @@ FontContext.DefaultFontHeight);
             {
                 if (x < x0)
                 {
-                    return new HitInfo { ChildIndex = (int)FieldRegion.Button };
+                    var button_rect = GetButtonRect();
+                    if (Utility.PtInRect(new Point(x, y), button_rect))
+                    {
+                        return new HitInfo
+                        {
+                            ChildIndex = (int)FieldRegion.Button,
+                            Box = this
+                        };
+                    }
+                    else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
+                    {
+                        return new HitInfo
+                        {
+                            ChildIndex = (int)FieldRegion.Splitter,
+                            Box = this
+                        };
+                    }
                 }
 
                 if (_content == null)
-                    return new HitInfo();
+                    return new HitInfo { Box = this };
                 var sub_info = _content?.HitTest(x - x0,
                     y - y0) ?? null;
                 var info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
+                info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return info;
             }
@@ -430,7 +449,15 @@ FontContext.DefaultFontHeight);
                 // 点击到了字段名左边的按钮
                 else if (x < caption_pixel + Metrics?.ButtonWidth)
                 {
-                    caption_area_hitted = (int)FieldRegion.Button;
+                    var button_rect = GetButtonRect();
+                    if (Utility.PtInRect(new Point(x, y), button_rect))
+                    {
+                        caption_area_hitted = (int)FieldRegion.Button;
+                    }
+                    else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
+                    {
+                        caption_area_hitted = (int)FieldRegion.Splitter;
+                    }
                 }
 
                 if (_name != null && _template != null)
@@ -444,6 +471,7 @@ FontContext.DefaultFontHeight);
                         info.X += x0;
                         info.Y += y0;
                         info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content;
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return info;
                     }
@@ -456,6 +484,7 @@ FontContext.DefaultFontHeight);
                         info.Y += y0 + name_height;
                         info.Offs += 2;
                         info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content;
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return info;
                     }
@@ -538,6 +567,7 @@ FontContext.DefaultFontHeight);
                     info.Y += y0;
                     info.ChildIndex = (int)FieldRegion.Content;
                     // 保持 info.LineHeight
+                    info.Box = this;
                     info.InnerHitInfo = sub_info;
                     return ret;
                 }
@@ -555,6 +585,7 @@ FontContext.DefaultFontHeight);
                         info.Y += y0;
                         info.ChildIndex = (int)FieldRegion.Content;
                         // 保持 info.LineHeight
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return ret;
                     }
@@ -568,13 +599,14 @@ FontContext.DefaultFontHeight);
                         info.Offs += name_length;
                         info.ChildIndex = (int)FieldRegion.Content;
                         // 保持 info.LineHeight
+                        info.Box = this;
                         info.InnerHitInfo = sub_info;
                         return ret;
                     }
                 }
             }
 
-            info = new HitInfo();
+            info = new HitInfo { Box = this };
             return 0;
         }
 
@@ -715,7 +747,7 @@ virtual_tail_length);
                 if (_name == null)
                 {
                     _name?.Dispose();
-                    _name = new Line(this)
+                    _name = new FixedLine(this)
                     {
                         Name = "!name",
                     };
@@ -787,7 +819,7 @@ virtual_tail_length);
             if (_caption == null)
                 _caption = new Line(this)
                 {
-                    Name = "caption",
+                    Name = "!caption",
                     TextAlign = TextAlign.None
                 };
         }
@@ -1044,7 +1076,7 @@ virtual_tail_length);
                 var new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
                 // 此时 _content _name _template 和 this._viewMode 关系暂时扭曲了
                 return ReplaceText(
-                    new ViewModeTree { ViewMode = new_view_mode},
+                    new ViewModeTree { ViewMode = new_view_mode },
                     context,
                     dc,
                     0,
