@@ -69,11 +69,11 @@ namespace LibraryStudio.Forms.MarcControlDialog
                     this.marcControl_preview.CaptionPixelWidth = RefControl.CaptionPixelWidth;
                 }
 
-                this.marcControl_preview.GetStructure += (parent, name, level) =>
+                this.marcControl_preview.GetStructure += (path, level) =>
                 {
                     if (RefControl != null)
                     {
-                        return RefControl.GetStructure(parent, name, level);
+                        return RefControl.GetStructure(path, level);
                     }
                     else
                     {

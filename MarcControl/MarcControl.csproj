@@ -106,6 +106,7 @@
     <Compile Include="Control\EditCommand.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Structure\Base.cs" />
     <Compile Include="Structure\Collection.cs" />
     <Compile Include="Structure\FixedLine.cs" />
     <Compile Include="Structure\MarcContext.cs" />

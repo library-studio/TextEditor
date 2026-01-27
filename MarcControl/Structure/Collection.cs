@@ -12,7 +12,7 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 容纳若干 IBox 对象的容器
     /// </summary>
-    public class Collection<T> : IViewBox, IDisposable
+    public class Collection<T> : Base, IViewBox, IDisposable
         where T : IViewBox, IDisposable, new()
     {
         List<T> _lines = new List<T>();
@@ -28,9 +28,9 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public UnitInfo StructureInfo { get; set; }
+        //public UnitInfo StructureInfo { get; set; }
 
-        public Metrics Metrics { get; set; }
+        //public Metrics Metrics { get; set; }
 
         public Collection()
         {
@@ -47,7 +47,7 @@ namespace LibraryStudio.Forms
 
         public string Name { get; set; }
 
-        public IBox Parent { get; set; }
+        // public IBox Parent { get; set; }
 
         public int TextLength => _lines.Sum(c => c.TextLength);
 
@@ -825,7 +825,7 @@ namespace LibraryStudio.Forms
                 foreach (var s in strings)
                 {
                     // var child = new T();
-                    var child = CreateChild(context, j);
+                    var child = CreateChild(context, j, s);
                     child.Parent = this;
                     child.Metrics = this.Metrics;
                     // collection 会直接把 context 中的 ViewModeTree 不做修改就传递下去
@@ -904,7 +904,7 @@ namespace LibraryStudio.Forms
             return result;
         }
 
-        public virtual T CreateChild(IContext context, int index)
+        public virtual T CreateChild(IContext context, int index, string text)
         {
             var result = new T();
             result.Parent = this;

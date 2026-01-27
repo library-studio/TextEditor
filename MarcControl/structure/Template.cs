@@ -19,12 +19,13 @@ namespace LibraryStudio.Forms
 
         public override IEnumerable<string> SplitChildren(string text)
         {
-            if (this.StructureInfo == null)
+            var container_info = this.GetStructureInfoByBox(this.Parent, 2);
+            if (container_info == null)
             {
                 return base.SplitChildren(text);
             }
 
-            return SplitChars(text, this.StructureInfo);
+            return SplitChars(text, container_info);
         }
 
         static List<string> SplitChars(string text, UnitInfo info)
@@ -51,18 +52,22 @@ namespace LibraryStudio.Forms
             return results;
         }
 
-        public override TemplateItem CreateChild(IContext context, int index)
+        public override TemplateItem CreateChild(IContext context, int index, string text)
         {
-            var result = base.CreateChild(context, index);
-            int count = this.StructureInfo?.SubUnits?.Count ?? -1;
+            var result = base.CreateChild(context, index, text);
+            var container_info = this.GetStructureInfoByBox(this.Parent, 2);
+            int count = container_info?.SubUnits?.Count ?? -1;
             if (count > 0 && index > count - 1)
             {
-                result._initialCaptionText = "(溢出)";
+                // result._initialCaptionText = "(溢出)";
                 result.Overflow = true;
             }
             else
             {
-                result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
+                var info = container_info?.SubUnits?.ElementAtOrDefault(index);
+                result.ItemName = info?.Name;
+                result.SetStructureInfo(info, 1);
+                // result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
                 result.Overflow = false;
             }
             return result;

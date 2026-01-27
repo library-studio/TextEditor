@@ -298,7 +298,7 @@ namespace LibraryStudio.Forms
         {
             int count = 0;
             var current = box;
-            while(current != null)
+            while (current != null)
             {
                 if (current is ICaption)
                     count++;
@@ -350,8 +350,72 @@ namespace LibraryStudio.Forms
     public delegate bool GetReadOnlyFunc(IBox box);
 
     // 获得 box 下的结构信息
-    // 如果 box 为 MarcRecord 类型并且 name 值为 null，表示这是头标区
-    public delegate UnitInfo GetStructureFunc(IBox parent, string name, int level);
+    // 头标区的 Name 为 "###"
+    public delegate UnitInfo GetStructureFunc(UnitNode [] path, int level);
+
+    public class UnitNode
+    {
+        public string Name { get; set; }
+        public UnitType Type { get; set; }
+
+        // parameters:
+        //      name    在 box 对象下级附加的最后一级的 Name。如果为 null，表示 box 已经是最后一级
+        public static UnitNode[] BuildPath(IBox box,
+            string last_level_name,
+            UnitType last_level_type = UnitType.Unkown)
+        {
+            var results = new List<UnitNode>();
+            var current = box;
+            while (current != null)
+            {
+                var type = UnitType.Unkown;
+                var name = "";
+                if (current is MarcRecord)
+                {
+                    type = UnitType.Record;
+                    name = "";
+                }
+                else if (current is MarcField)
+                {
+                    var field = (MarcField)current;
+                    type = UnitType.Field;
+                    name = field.IsHeader? "###" : field.FieldName;
+                }
+                else if (current is MarcSubfield)
+                {
+                    type = UnitType.Subfield;
+                    name = ((MarcSubfield)current).SubfieldName;
+                }
+                else if (current is TemplateItem)
+                {
+                    type = UnitType.Chars;
+                    name = ((TemplateItem)current).ItemName;
+                }
+                else
+                    goto CONTINUE;
+
+                results.Insert(0, new UnitNode
+                {
+                    Name = name,
+                    Type = type
+                });
+            CONTINUE:
+                current = current.Parent;
+            }
+
+            if (last_level_name != null)
+            {
+                results.Add(new UnitNode
+                {
+                    Name = last_level_name,
+                    Type = last_level_type
+                });
+            }
+
+            return results.ToArray();
+        }
+
+    }
 
     public class UnitInfo
     {
@@ -382,7 +446,8 @@ namespace LibraryStudio.Forms
             {
                 result.SubUnits.Add(new UnitInfo
                 {
-                    Caption = $"({offs}/{l})",
+                    Name = $"({offs}/{l})",
+                    Caption = $"caption ({offs}/{l})",
                     Length = l,
                     Type = UnitType.Chars
                 });
@@ -399,15 +464,18 @@ namespace LibraryStudio.Forms
             {
                 names.Add($"{(char)((int)'a' + i)}");
             }
-            var result = new UnitInfo { Name = name,
+            var result = new UnitInfo
+            {
+                Name = name,
                 Caption = $"caption of {name}",
-                Type = UnitType.Field};
+                Type = UnitType.Field
+            };
             {
                 foreach (var n in names)
                 {
                     result.SubUnits.Add(new UnitInfo
                     {
-                        Caption = $"子字段 ${n}",
+                        Caption = $"子字段 ${n} ({name})",
                         Name = n,
                         Length = 0,
                         Type = UnitType.Subfield
@@ -452,8 +520,9 @@ namespace LibraryStudio.Forms
     public enum UnitType
     {
         Unkown = 0,
-        Field = 1,
-        Subfield = 2,
-        Chars = 3,
+        Record = 1,
+        Field = 2,
+        Subfield = 3,
+        Chars = 4,
     }
 }

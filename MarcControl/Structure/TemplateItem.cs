@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Xml.Linq;
 using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
 {
-    public class TemplateItem : IViewBox, ICaption, IFixed
+    public class TemplateItem : Base, IViewBox, ICaption, IFixed
     {
         public int FixedLength { get; set; }
 
@@ -25,7 +26,7 @@ namespace LibraryStudio.Forms
         // 溢出部分是插入模式，允许插入和删除字符。而如果不是溢出部分，则是替换模式。
         public bool Overflow { get; set; }
 
-        public Metrics Metrics { get; set; }
+        // public Metrics Metrics { get; set; }
 
         public TemplateItem()
         {
@@ -37,6 +38,8 @@ namespace LibraryStudio.Forms
             Parent = parent;
             Metrics = metrics;
         }
+
+        public string ItemName { get; set; }
 
         public string Name { get; set; }
         public IBox Parent { get; set; }
@@ -435,7 +438,7 @@ caption?.GetPixelHeight() ?? 0);
                 };
         }
 
-        internal string _initialCaptionText = null;
+        // internal string _initialCaptionText = null;
 
         public ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
@@ -464,11 +467,19 @@ caption?.GetPixelHeight() ?? 0);
             {
                 EnsureCaption();
 
+                var caption_text = "";
+
+                if (this.Overflow)
+                    caption_text = "(溢出)";
+                else if (this.ItemName == null)
+                    caption_text = "";
+                else
+                    caption_text = GetCaptionText(this.ItemName, UnitType.Chars);
                 var ret = _caption.ReplaceText(context,
                     dc,
                     0,
                     -1,
-                    _initialCaptionText,
+                    caption_text,
                     int.MaxValue);
                 update_rect = ret.UpdateRect;
                 if (update_rect != System.Drawing.Rectangle.Empty)

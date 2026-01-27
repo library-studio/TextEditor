@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Drawing;
 
 using Vanara.PInvoke;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace LibraryStudio.Forms
 {
@@ -13,7 +12,7 @@ namespace LibraryStudio.Forms
     /// 有两种模式: 平面、表格
     /// 表格模式下，如果 _name 内容为空，表示这是一个字段的指示符后面到第一个子字段之间的文本。这部分文本没有子字段名 
     /// </summary>
-    public class MarcSubfield : IViewBox, ICaption, IDisposable
+    public class MarcSubfield : Base, IViewBox, ICaption, IDisposable
     {
         Line _caption = null;
         public Line Caption
@@ -29,7 +28,7 @@ namespace LibraryStudio.Forms
         FixedLine _name = null;
         Template _template = null;
 
-        public Metrics Metrics { get; set; }
+        // public Metrics Metrics { get; set; }
 
         public MarcSubfield()
         {
@@ -58,7 +57,7 @@ namespace LibraryStudio.Forms
         public string Name { get; set; }
 
         // 子字段节点的父节点可能是一个 MarcRecord 节点，也可能是一个 MarcField 节点(比如 UNIMARC 4XX 情形)
-        public IBox Parent { get; set; }
+        // public IBox Parent { get; set; }
 
 
         public int TextLength
@@ -279,6 +278,11 @@ FontContext.DefaultFontHeight);
         }
 
         public void Dispose()
+        {
+            DisposeContent();
+        }
+
+        void DisposeContent()
         {
             _caption?.Dispose();
             _caption = null;
@@ -721,7 +725,7 @@ virtual_tail_length);
             return "";
         }
 
-        bool EnsureContent(string name)
+        bool EnsureContent(string name, bool name_changed)
         {
             bool NewParagraph()
             {
@@ -759,7 +763,7 @@ virtual_tail_length);
                     _template = new Template(this, Metrics)
                     {
                         Name = "!template",
-                        StructureInfo = info,
+                        // StructureInfo = info,
                     };
                     changed = true;
                 }
@@ -770,9 +774,17 @@ virtual_tail_length);
             }
 
             // 应要求，不支持展开。或者暂时为收缩状态
-            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+            if (name_changed == false &&
+                (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+                )
             {
                 return NewParagraph();
+            }
+
+            // 名字变化并且是展开状态，要迫使 _content 彻底重建
+            if (name_changed && _viewMode == ViewMode.Expand)
+            {
+                this.DisposeContent();
             }
 
             // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
@@ -780,13 +792,21 @@ virtual_tail_length);
 
             // 查询之前对 name 进行修整
             name = NormalizeName(name);
-            var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name, 2);
+            // var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name, 2);
+            var struct_info = GetStructureInfo(name, UnitType.Subfield, 2);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
                 || struct_info.IsUnknown())
             {
                 _viewMode = ViewMode.Plane;
+                return NewParagraph();
+            }
+
+            // 以前是 Plane，但现在重新获得了 structure，重新分配调整
+            if (name_changed && _viewMode == ViewMode.Plane)
+            {
+                _viewMode = ViewMode.Collapse;
                 return NewParagraph();
             }
 
@@ -810,7 +830,6 @@ virtual_tail_length);
             {
                 _viewMode = ViewMode.Collapse;
             }
-
             return NewParagraph();
         }
 
@@ -824,7 +843,7 @@ virtual_tail_length);
                 };
         }
 
-        internal string _initialCaptionText = null;
+        // internal string _initialCaptionText = null;
 
         public ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
@@ -848,13 +867,14 @@ virtual_tail_length);
             old_text = this.MergeText();
             if (end == -1)
                 end = old_text.Length;
+            string old_name = old_text.Substring(0, Math.Min(2, old_text.Length));
 
             new_text = old_text.Substring(0, start) + content + old_text.Substring(end);
             string name = new_text.Substring(0, Math.Min(2, new_text.Length));
 
             if (view_mode_tree != null)
                 this._viewMode = view_mode_tree.ViewMode;
-            EnsureContent(name);
+            EnsureContent(name, old_name != name);
             Debug.Assert(_viewMode != ViewMode.None);
 
             var x0 = GetContentX();
@@ -862,21 +882,23 @@ virtual_tail_length);
 
             var button_rect = GetButtonRect(0, 0);
 
-            if (_caption == null)
+            if (_caption == null || old_name != name)
             {
                 EnsureCaption();
-
                 var ret = _caption.ReplaceText(context,
                     dc,
                     0,
                     -1,
-                    _initialCaptionText,
+                    GetCaptionText(NormalizeName(name), UnitType.Subfield),
                     int.MaxValue);
                 var caption_update_rect = ret.UpdateRect;
                 var rect = TemplateItem.GetCaptionRect(_caption, 0, 0, Metrics);
 
                 if (caption_update_rect != System.Drawing.Rectangle.Empty)
+                {
                     caption_update_rect.Offset(rect.X, rect.Y);
+                }
+
                 button_rect = Utility.Union(button_rect, caption_update_rect);
             }
 
@@ -922,7 +944,7 @@ virtual_tail_length);
                     name,
                     pixel_width);
                 var template_text = new_text.Length > 2 ? new_text.Substring(2) : "";
-                Debug.Assert(_template.StructureInfo != null);
+                // Debug.Assert(_template.StructureInfo != null);
                 var template_ret = _template.ReplaceText(
                     view_mode_tree,
                     context,

@@ -47,48 +47,14 @@ namespace MarcSample
             this.marcControl1.ClientBoundsWidth = 0;
             // this.marcControl1.ClientBoundsWidth = 800;
             // this.marcControl1.ClientBoundsWidth = -1;
-            this.marcControl1.GetStructure = (parent, name, level) =>
+            this.marcControl1.GetStructure = (path, level) =>
             {
-                if (parent is MarcRecord)
-                {
-                    // 头标区
-                    if (name == null)
-                    {
-                        return UnitInfo.FromChars(UnitType.Field,
-                            name,
-                            new int[] { 5, 3, 5, 10 });
-                    }
-                    // 当前为字段
-                    else if (name == "001")
-                    {
-                        return UnitInfo.FromChars(UnitType.Field,
-                            name,
-                            new int[] { 2, 3, 5, 10 });
-                    }
-                    else if (name == "100")
-                    {
-                        return UnitInfo.FromSubfields(name);
-                    }
-                    else if (name == "200")
-                    {
-                        return UnitInfo.FromSubfields(name);
-                    }
-                }
-                else if (parent is MarcField)
-                {
-                    // 当前为子字段
-                    var field = parent as MarcField;
-                    var parent_name = field.FieldName;
-                    if (parent_name == "100" && name == "a")
-                    {
-                        return UnitInfo.FromChars(UnitType.Subfield,
-                            name,
-                            new int[] { 2, 3, 5, 10 });
-                    }
-                }
-
-                return null;
-
+                var root = BuildTree();
+                var result = FindPath(root, path);
+                if (result == null)
+                    return null;
+                CutLevel(result, level);
+                return result;
             };
 
             // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB";
@@ -104,6 +70,58 @@ namespace MarcSample
 
             LoadState();
             LoadMarc();
+        }
+
+        static UnitInfo FindPath(UnitInfo root,
+            UnitNode[] path)
+        {
+            var current = root;
+            Debug.Assert(path[0].Type == UnitType.Record);
+            if (root.Type != path[0].Type)
+                return null;
+            foreach(var node in path.Skip(1))
+            {
+                var sub = current.SubUnits.Where(o => o.Name == node.Name).FirstOrDefault();
+                if (sub == null)
+                    return null;
+                current = sub;
+            }
+            return current;
+        }
+
+        static void CutLevel(UnitInfo info, int level)
+        {
+            if (level <= 1)
+                info.SubUnits = null;
+            else
+            {
+                foreach (var child in info.SubUnits)
+                {
+                    CutLevel(child, level - 1);
+                }
+            }
+        }
+
+        static UnitInfo BuildTree()
+        {
+            var info_100 = UnitInfo.FromSubfields("100");
+            info_100.SubUnits.RemoveAt(0);
+            info_100.SubUnits.Insert(0, UnitInfo.FromChars(UnitType.Subfield, "a", new int[] { 2, 3, 5, 10 }));
+            return new UnitInfo
+            {
+                Type = UnitType.Record,
+                SubUnits = new List<UnitInfo>
+                {
+                    UnitInfo.FromChars(UnitType.Field,
+                            "###",
+                            new int[] { 5, 3, 5, 10 }),
+                    UnitInfo.FromChars(UnitType.Field,
+                            "001",
+                            new int[] { 2, 3, 5, 10 }),
+                    info_100,
+                    UnitInfo.FromSubfields("200"),
+                },
+            };
         }
 
         private void MenuItem_testSetCallback_Click(object sender, EventArgs e)
