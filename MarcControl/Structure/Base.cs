@@ -97,5 +97,10 @@ namespace LibraryStudio.Forms
         {
             return GetStructureInfo(name, type, 1)?.Caption ?? "";
         }
+
+        public IEnumerable<ValueItem> GetValueList(IBox box)
+        {
+            return _metrics.GetValueList?.Invoke(UnitNode.BuildPath(box, null));
+        }
     }
 }

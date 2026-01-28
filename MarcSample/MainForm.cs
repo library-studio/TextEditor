@@ -57,6 +57,11 @@ namespace MarcSample
                 return result;
             };
 
+            this.marcControl1.GetValueList = (path) =>
+            {
+                return FindValueList(path);
+            };
+
             // this.marcControl1.Content = "012345678901234567890123abc12ABC\u001faAAA\u001fbBBB";
             //this.marcControl1.Content = new string((char)31, 1) + "1";
             // this.marcControl1.Content = "ش12345678901234567890123";
@@ -79,7 +84,7 @@ namespace MarcSample
             Debug.Assert(path[0].Type == UnitType.Record);
             if (root.Type != path[0].Type)
                 return null;
-            foreach(var node in path.Skip(1))
+            foreach (var node in path.Skip(1))
             {
                 var sub = current.SubUnits.Where(o => o.Name == node.Name).FirstOrDefault();
                 if (sub == null)
@@ -122,6 +127,55 @@ namespace MarcSample
                     UnitInfo.FromSubfields("200"),
                 },
             };
+        }
+
+        IEnumerable<ValueItem> FindValueList(UnitNode[] path)
+        {
+            var text = ToString(path);
+            switch (text)
+            {
+                case "###|(0/5)":
+                    return new List<ValueItem>
+                    {
+                        new ValueItem {
+                            Value = "11",
+                            Comment = "comment 11"
+                        },
+                        new ValueItem {
+                            Value = "22",
+                            Comment = "comment 22"
+                        },
+
+                    };
+                case "100|a|(0/2)":
+                    return new List<ValueItem>
+                    {
+                        new ValueItem {
+                            Value = "11",
+                            Comment = "comment 11"
+                        },
+                        new ValueItem {
+                            Value = "22",
+                            Comment = "comment 22"
+                        },
+
+                    };
+            }
+
+            return null;
+        }
+
+        static string ToString(UnitNode[] path)
+        {
+            var text = new StringBuilder();
+            foreach (var node in path)
+            {
+                if (text.Length > 0)
+                    text.Append("|");
+                text.Append(node.Name);
+            }
+
+            return text.ToString();
         }
 
         private void MenuItem_testSetCallback_Click(object sender, EventArgs e)
@@ -511,4 +565,5 @@ namespace MarcSample
             }));
         }
     }
+
 }

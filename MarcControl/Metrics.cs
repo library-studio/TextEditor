@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 
 namespace LibraryStudio.Forms
 {
@@ -11,6 +12,8 @@ namespace LibraryStudio.Forms
         public GetReadOnlyFunc GetReadOnly { get; set; }
 
         // public GetFieldCaptionFunc GetFieldCaption { get; set; }
+
+        public GetValueListFunc GetValueList { get; set; }
 
         public GetStructureFunc GetStructure { get; set; }
 
@@ -349,9 +352,18 @@ namespace LibraryStudio.Forms
 
     public delegate bool GetReadOnlyFunc(IBox box);
 
+    public delegate IEnumerable<ValueItem> GetValueListFunc(UnitNode [] path);
+
     // 获得 box 下的结构信息
     // 头标区的 Name 为 "###"
     public delegate UnitInfo GetStructureFunc(UnitNode [] path, int level);
+
+    public class ValueItem
+    {
+        public string Value { get; set; }
+        public string Comment { get; set; }
+
+    }
 
     public class UnitNode
     {
@@ -362,13 +374,13 @@ namespace LibraryStudio.Forms
         //      name    在 box 对象下级附加的最后一级的 Name。如果为 null，表示 box 已经是最后一级
         public static UnitNode[] BuildPath(IBox box,
             string last_level_name,
-            UnitType last_level_type = UnitType.Unkown)
+            UnitType last_level_type = UnitType.Unknown)
         {
             var results = new List<UnitNode>();
             var current = box;
             while (current != null)
             {
-                var type = UnitType.Unkown;
+                var type = UnitType.Unknown;
                 var name = "";
                 if (current is MarcRecord)
                 {
@@ -392,7 +404,9 @@ namespace LibraryStudio.Forms
                     name = ((TemplateItem)current).ItemName;
                 }
                 else
+                {
                     goto CONTINUE;
+                }
 
                 results.Insert(0, new UnitNode
                 {
@@ -422,7 +436,7 @@ namespace LibraryStudio.Forms
         public string Name { get; set; }
         public string Caption { get; set; }
 
-        public UnitType Type { get; set; } = UnitType.Unkown;
+        public UnitType Type { get; set; } = UnitType.Unknown;
 
         // 0 表示不确定长度
         public int Length { get; set; } = 0;
@@ -498,7 +512,7 @@ namespace LibraryStudio.Forms
 
         public bool IsUnknown()
         {
-            return IsType(UnitType.Unkown);
+            return IsType(UnitType.Unknown);
         }
 
         public bool IsChars()
@@ -519,7 +533,7 @@ namespace LibraryStudio.Forms
 
     public enum UnitType
     {
-        Unkown = 0,
+        Unknown = 0,
         Record = 1,
         Field = 2,
         Subfield = 3,

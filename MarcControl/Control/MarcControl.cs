@@ -1,16 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
 using System.Drawing;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 using Vanara.PInvoke;
-using static System.Net.Mime.MediaTypeNames;
 using static Vanara.PInvoke.Gdi32;
 using static Vanara.PInvoke.Imm32;
 using static Vanara.PInvoke.User32;
@@ -95,7 +91,6 @@ namespace LibraryStudio.Forms
             _marcMetrics.Refresh(this.Font, this.FixedSizeFont);
 
             _dpiXY = DpiUtil.GetDpiXY(this);
-
         }
 
         void _paintBackfunc(object o,
@@ -651,6 +646,20 @@ namespace LibraryStudio.Forms
             }
         }
 
+
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public GetValueListFunc GetValueList
+        {
+            get { return _marcMetrics.GetValueList; }
+            set
+            {
+                _marcMetrics.GetValueList = value;
+            }
+        }
+
+
         // List<Line> _lines = new List<Line>();
         MarcRecord _record = null;  // new MarcRecord(_fieldProperty);
 
@@ -681,67 +690,6 @@ namespace LibraryStudio.Forms
                     _selectOffs2 = text.Length;
             }
 
-#if REMOVED
-            /*
-    public static extern HRESULT ScriptItemize([MarshalAs(UnmanagedType.LPWStr)] string pwcInChars,
-            int cInChars, int cMaxItems, [Optional][In] IntPtr psControl, [Optional][In] IntPtr psState, [Out][MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 2)] SCRIPT_ITEM[] pItems, out int pcItems);
-             * 
-             * */
-
-            if (sp == null)
-                InitializeEnvironment();
-
-            int cMaxItems = _content.Length + 1;
-            var pItems = new SCRIPT_ITEM[cMaxItems + 1];
-
-            /*
-             * 
-
-返回值
-如果成功，则返回 0。 如果函数不成功，则返回非零 HRESULT 值。
-
-如果 pwcInChars 设置为 NULL、 cInChars 为 0、 pItems 设置为 NULL 或 cMaxItems< 2，则该函数将返回E_INVALIDARG。
-
-如果 cMaxItems 的值不足，函数将返回E_OUTOFMEMORY。 与所有错误情况一样，不会完全处理任何项，并且输出数组中没有任何部分包含定义的值。 如果函数返回E_OUTOFMEMORY，则应用程序可以使用更大的 pItems 缓冲区再次调用它。
-            * */
-            var result = ScriptItemize(_content,
-                _content.Length,
-                cMaxItems,
-                sc,
-                ss,
-                pItems,
-                out int pcItems);
-            result.ThrowIfFailed();
-
-            Array.Resize(ref pItems, pcItems);
-            for (int i = 0; i < pcItems; i++)
-            {
-                var item = pItems[i];
-                if (sp[item.a.eScript].fComplex)
-                {
-                    // requiring glyph shaping
-                }
-                else
-                {
-
-                }
-            }
-
-
-            _lines = SplitLines(dc,// e.Graphics.GetHdc(),
-                pItems,
-                _content,
-                (long)Math.Max(this.ClientSize.Width, 30));
-#endif
-            /*
-            var max_pixel_width = _record.Initialize(dc,
-                text,
-                Math.Max(this.ClientSize.Width, 30),
-                (content) =>
-                {
-                    return SimpleText.SplitSubfields(content);
-                });
-            */
             var ret = _record.ReplaceText(
                 _record.GetViewModeTree(),
                 _context,
@@ -750,11 +698,7 @@ namespace LibraryStudio.Forms
                 -1,
                 text,
                 GetLimitWidth()    //_clientBoundsWidth == 0 ? this.ClientSize.Width : _clientBoundsWidth   // Math.Max(this.ClientSize.Width, 30),
-                /*,
-                out string _,
-                out Rectangle update_rect,
-                out Rectangle scroll_rect,
-                out int scroll_distance*/);
+                );
             _context?.ClearFontCache();
 
             var max_pixel_width = ret.MaxPixel;
@@ -1324,6 +1268,17 @@ out long left_width);
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            //Debug.WriteLine($"OnKeyDown() e.KeyCode={e.KeyCode}");
+
+            // 如果候选弹窗存在并需要按键处理，优先交给弹窗
+            if (_suggestionPopup?.Visible == true && HandlePopupKeyDown(e))
+            {
+                //Debug.WriteLine($"key {e.KeyCode.ToString()} OnKeyDown");
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+
             switch (e.KeyCode)
             {
                 case Keys.Left:
@@ -1502,6 +1457,12 @@ out long left_width);
                     // 整块选择字段
                     if (controlPressed)
                     {
+                        if (OpenValueListWindow(_caretInfo) == true)
+                        {
+                            e.Handled = true;
+                            break;
+                        }
+
                         if (InSelectingField() == false)
                         {
                             BeginFieldSelect(_caretInfo.ChildIndex);
@@ -1803,6 +1764,15 @@ out long left_width);
 
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
+            //Debug.WriteLine($"OnKeyPress() e.KeyChar={e.KeyChar}");
+            // 弹窗可能需要处理 Escape 等字符，优先处理
+            if (_suggestionPopup?.Visible == true && HandlePopupKeyPress(e))
+            {
+                //Debug.WriteLine($"key {e.KeyChar.ToString()} OnKeyPress");
+                e.Handled = true;
+                return;
+            }
+
             switch (e.KeyChar)
             {
                 case (char)Keys.Escape:

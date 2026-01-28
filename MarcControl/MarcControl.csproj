@@ -55,6 +55,9 @@
     <Compile Include="Control\DragBlock.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Control\MarcControl.Suggestions.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="Control\Mouse.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -69,6 +72,9 @@
     </Compile>
     <Compile Include="Control\Styling.cs">
       <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Control\SuggestionPopup.cs">
+      <SubType>Form</SubType>
     </Compile>
     <Compile Include="DelayTrigger.cs" />
     <Compile Include="Dialog\DeletingFieldDialog.cs">

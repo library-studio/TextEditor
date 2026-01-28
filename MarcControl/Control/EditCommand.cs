@@ -383,6 +383,11 @@ namespace LibraryStudio.Forms
                 return false;
             }
 
+            /*
+            if (ch == '1')
+                ShowSuggestion(new List<string> { "item1", "item2" });
+            */
+
             // 检测键盘输入速度
             var delay = _keySpeedDetector.Detect();
 

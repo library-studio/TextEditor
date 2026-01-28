@@ -22,7 +22,7 @@ namespace LibraryStudio.Forms
         {
             get
             {
-                return _caretInfo?.Clone() ?? new HitInfo{ Box = this };
+                return _caretInfo?.Clone() ?? new HitInfo { Box = this };
             }
         }
 
@@ -184,6 +184,9 @@ namespace LibraryStudio.Forms
             {
                 OnCaretMoved(EventArgs.Empty);
             }
+
+            HideSuggestion();
+            // TryOpenValueListWindow(_caretInfo);
         }
 
         public virtual void OnCaretMoved(EventArgs e)
@@ -270,5 +273,69 @@ namespace LibraryStudio.Forms
             _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
         }
 
+        bool OpenValueListWindow(HitInfo info)
+        {
+            var template_item = FindTemplateItem(_caretInfo, out HitInfo hit_info);
+            if (template_item == null)
+            {
+                return false;
+            }
+
+            if (template_item.Overflow)
+            {
+                return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
+            }
+            
+
+            var ret = OpenValueListWindow(template_item, out int item_text_length);
+            if (ret == true && item_text_length > 0)
+            {
+                var offs = info.Offs - hit_info.Offs + ((hit_info.Offs / item_text_length) * item_text_length);
+                _suggestion_caret_offs = offs;
+            }
+            else
+            {
+                HideSuggestion();
+                // return false;
+                return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
+            }
+            // return ret;
+            return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
+        }
+
+        bool OpenValueListWindow(TemplateItem template_item,
+            out int item_text_length)
+        {
+            item_text_length = 0;
+            var list = template_item.GetValueList(template_item);
+            if (list == null)
+            {
+                return false;
+            }
+
+            item_text_length = list.FirstOrDefault()?.Value.Length ?? 0;
+            // int item_width = template_item.GetPixelWidth();
+            ShowSuggestion(list.Select(o => o.Value),
+                0,  // -hit_info.X + item_width,
+                0 /*-hit_info.Y*/);
+            return true;
+        }
+
+        TemplateItem FindTemplateItem(HitInfo info,
+            out HitInfo hit_info)
+        {
+            hit_info = null;
+            var current = info;
+            while (current != null)
+            {
+                if (current.Box is TemplateItem)
+                {
+                    hit_info = current;
+                    return current.Box as TemplateItem;
+                }
+                current = current.InnerHitInfo;
+            }
+            return null;
+        }
     }
 }

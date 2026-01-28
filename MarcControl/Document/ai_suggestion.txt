@@ -94,3 +94,726 @@ Related Work Items
 最可能的根本原因是 Uniscribe 在本机层写入了超出 `log` 缓冲区的内容（glyph vs char 长度不一致），导致堆损坏并在随后分配 `sva` 时触发 `FatalExecutionEngineError`。优先修复：把 `log` 的长度改为 `max`，并在 `ScriptShape` 返回后对 `c` 做边界检查。
 
 **要我把 log 长度改为 max 吗？**
+
+
+==========================
+我想在 MarcControl 中动态浮动显示一个小列表窗口，显示一些辅助信息，但键盘输入依然主要在原有窗口中进行(偶尔会在小列表窗口中选择一些事项)，原有编辑功能不变。根据条件变化，可以自动随时打开和关闭这个小列表窗口。请给出一个实现方案。
+
+GitHub Copilot
+
+深吸一口气。下面给出一个可在当前代码库中直接采用的、稳健且对现有编辑流程影响最小的实现方案和代码。方案要点：
+
+- 使用一个轻量级浮动弹出（popup）来显示候选项（建议列表）。用 `ToolStripDropDown` + `ToolStripControlHost(ListBox)` 或自定义 popup 控件实现，便于无缝显示在光标附近。
+- 弹出窗口显示时：默认让输入焦点仍留在 `MarcControl`（通过在弹出后恢复焦点），这样常规键入、IME 等继续送到 `MarcControl`。当用户需要在列表中选择时，可用鼠标点击（ListBox 会获得焦点）或通过 `MarcControl` 的键处理把上下/回车等键路由给列表。
+- 在 `MarcControl` 中添加一组封装方法：`ShowSuggestion(...)`、`HideSuggestion()`、`HandlePopupKeyDown/HandlePopupKeyPress(...)`，用于显示/关闭弹窗并在按键时决定是否把键转给弹窗处理。
+- 弹窗选中确认后，由 `MarcControl` 插入文本（或触发回调），弹窗自动关闭。
+- 弹窗位置基于当前 caret 的客户端坐标计算（使用现有 `_caretInfo.X/_caretInfo.Y` 与滚动偏移），在可见区域空间不足时自动向上显示。
+
+下面提供可直接复制粘贴的实现代码（增加为新的文件，使用 partial 扩展 MarcControl，避免直接修改大量现有代码），并说明需要在两个已有的按键处理函数（`OnKeyDown` / `OnKeyPress`）顶部插入的微小改动。
+
+文件 1 — 新建弹出实现 `SuggestionPopup.cs`：
+```csharp
+csharp MarcControl\Control\SuggestionPopup.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    /// <summary>
+    /// 简单的候选弹出框。基于 ToolStripDropDown + ListBoxHost，
+    /// 可在不长期抢占编辑控件焦点的情况下显示候选项。
+    /// </summary>
+    internal class SuggestionPopup : ToolStripDropDown
+    {
+        readonly ListBox _listBox;
+        readonly ToolStripControlHost _host;
+
+        public event EventHandler<string> ItemChosen;
+        public event EventHandler Cancelled;
+
+        public bool AutoResize { get; set; } = true;
+        public int MaxVisibleItems { get; set; } = 8;
+
+        public SuggestionPopup()
+        {
+            DoubleBuffered = true;
+            _listBox = new ListBox
+            {
+                BorderStyle = BorderStyle.None,
+                IntegralHeight = false,
+                SelectionMode = SelectionMode.One,
+                TabStop = false
+            };
+            _listBox.MouseClick += (s, e) =>
+            {
+                AcceptSelected();
+            };
+            _listBox.KeyDown += (s, e) =>
+            {
+                // 当 ListBox 有焦点且用户按 Enter 时确认
+                if (e.KeyCode == Keys.Enter)
+                {
+                    AcceptSelected();
+                    e.Handled = true;
+                }
+                else if (e.KeyCode == Keys.Escape)
+                {
+                    Cancel();
+                    e.Handled = true;
+                }
+            };
+
+            _host = new ToolStripControlHost(_listBox)
+            {
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                AutoSize = false
+            };
+            this.Items.Add(_host);
+
+            this.AutoClose = true;
+            this.Margin = Padding.Empty;
+            this.Padding = Padding.Empty;
+            this.RenderMode = ToolStripRenderMode.System;
+        }
+
+        public void SetItems(IEnumerable<string> items)
+        {
+            var arr = items?.ToArray() ?? Array.Empty<string>();
+            _listBox.BeginUpdate();
+            _listBox.Items.Clear();
+            foreach (var s in arr) _listBox.Items.Add(s);
+            _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+            _listBox.EndUpdate();
+
+            if (AutoResize)
+            {
+                ResizeToFit();
+            }
+        }
+
+        void ResizeToFit()
+        {
+            int w = 120;
+            using (var g = _listBox.CreateGraphics())
+            {
+                foreach (var obj in _listBox.Items)
+                {
+                    var s = obj?.ToString() ?? "";
+                    var sz = TextRenderer.MeasureText(g, s, _listBox.Font);
+                    w = Math.Max(w, sz.Width + SystemInformation.VerticalScrollBarWidth + 8);
+                }
+            }
+            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, _listBox.Items.Count));
+            int h = visibleCount * (_listBox.ItemHeight) + 4;
+            _host.Size = new Size(w, h);
+            this.Size = _host.Size;
+        }
+
+        public void ShowAt(Point screenLocation)
+        {
+            // 显示并确保不影响调用者再恢复焦点
+            // Show at absolute screen coordinates: use Show without owner (ToolStripDropDown API)
+            // Convert screen to owner client is not needed; caller computes screen coordinate.
+            this.Show(screenLocation);
+        }
+
+        /// <summary>
+        /// 选择上一个条目，返回是否改变选择
+        /// </summary>
+        public bool SelectPrev()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Max(0, _listBox.SelectedIndex - 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                return true;
+            }
+            return false;
+        }
+
+        public bool SelectNext()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageUp()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Max(0, _listBox.SelectedIndex - page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageDown()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                return true;
+            }
+            return false;
+        }
+
+        public string GetSelectedItem()
+        {
+            return _listBox.SelectedItem?.ToString();
+        }
+
+        public void AcceptSelected()
+        {
+            var item = GetSelectedItem();
+            if (item != null)
+            {
+                ItemChosen?.Invoke(this, item);
+            }
+            this.Close();
+        }
+
+        public void Cancel()
+        {
+            Cancelled?.Invoke(this, EventArgs.Empty);
+            this.Close();
+        }
+    }
+}
+```
+
+文件 2 — 为 `MarcControl` 添加 partial 支持（新文件 `MarcControl.Suggestions.cs`）。它包含：弹窗字段、显示/隐藏方法、按键路由以及弹窗选中回调的处理逻辑（将在编辑器插入文本）：
+```csharp
+csharp MarcControl\Control\MarcControl.Suggestions.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    public partial class MarcControl
+    {
+        SuggestionPopup _suggestionPopup;
+
+        void EnsureSuggestionPopup()
+        {
+            if (_suggestionPopup != null)
+                return;
+            _suggestionPopup = new SuggestionPopup();
+            _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
+            _suggestionPopup.Cancelled += (s, e) => { /* nothing by default */ };
+        }
+
+        void SuggestionPopup_ItemChosen(object sender, string chosen)
+        {
+            if (string.IsNullOrEmpty(chosen))
+                return;
+
+            // 把选中的内容插入到当前 caret 位置
+            // 注意：ReplaceText 的 start/end 采用当前 caret_offs
+            // caret_offs 是 private field（partial 同一类可访问）
+            ReplaceText(_caret_offs, _caret_offs, chosen, delay_update: true, auto_adjust_caret_and_selection: true, add_history: true);
+
+            // 隐藏弹窗
+            HideSuggestion();
+            // 重新聚焦到编辑控件，确保继续输入到 MarcControl
+            try { this.Focus(); } catch { }
+        }
+
+        /// <summary>
+        /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
+        /// caretClientOffset 为光标的 client 坐标（通常用 _caretInfo 来生成）
+        /// </summary>
+        public void ShowSuggestion(IEnumerable<string> items)
+        {
+            var arr = (items ?? Enumerable.Empty<string>()).ToArray();
+            if (arr.Length == 0)
+            {
+                HideSuggestion();
+                return;
+            }
+
+            EnsureSuggestionPopup();
+            _suggestionPopup.SetItems(arr);
+
+            // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示，否则上方
+            var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value,
+                                        _caretInfo.Y - this.VerticalScroll.Value);
+            var screenCaret = this.PointToScreen(caretClient);
+
+            int belowY = screenCaret.Y + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+            Rectangle screenBounds = Screen.FromControl(this).WorkingArea;
+            // 先尝试下方
+            _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
+            // 尝试恢复焦点给编辑器，避免弹窗长期抢占输入；按键由 MarcControl 决定是否转发
+            this.Focus();
+        }
+
+        public void HideSuggestion()
+        {
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                try { _suggestionPopup.Close(); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 在 OnKeyDown 顶部调用：如果弹窗可见并且按键是弹窗相关的（上下/翻页/回车/ESC/TAB），则处理并返回 true（表示已处理）
+        /// </summary>
+        public bool HandlePopupKeyDown(KeyEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Up:
+                    if (_suggestionPopup.SelectPrev()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Down:
+                    if (_suggestionPopup.SelectNext()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageUp:
+                    if (_suggestionPopup.PageUp()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageDown:
+                    if (_suggestionPopup.PageDown()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Enter:
+                case Keys.Tab:
+                    // 确认当前选中项
+                    _suggestionPopup.AcceptSelected();
+                    e.Handled = true;
+                    return true;
+                case Keys.Escape:
+                    HideSuggestion();
+                    e.Handled = true;
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 在 OnKeyPress 顶部调用：处理 Enter/Escape 等字符型事件（若需要）
+        /// </summary>
+        public bool HandlePopupKeyPress(KeyPressEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            if (e.KeyChar == (char)Keys.Escape)
+            {
+                HideSuggestion();
+                e.Handled = true;
+                return true;
+            }
+            // 其余字符一般仍交给 MarcControl（插入文本时会关闭或保留弹窗，按需）
+            return false;
+        }
+    }
+}
+```
+
+需要对现有 `MarcControl` 的两个方法做非常小的改动（仅在函数开头加入调用），以便在弹窗可见时优先由弹窗来处理某些按键。请在当前 `MarcControl` 文件里的 `OnKeyDown` 与 `OnKeyPress` 的开头添加如下两行检查（位置：函数体最顶部，紧接着函数签名后的第一行）：
+
+- OnKeyDown 开始处加：
+```csharp
+// 如果候选弹窗存在并需要按键处理，优先交给弹窗
+if (_suggestionPopup?.Visible == true && HandlePopupKeyDown(e))
+    return;
+```
+
+- OnKeyPress 开始处加：
+```csharp
+// 鼠标/键盘按字符时，弹窗可能需要处理 Escape 等
+if (_suggestionPopup?.Visible == true && HandlePopupKeyPress(e))
+    return;
+```
+
+说明（为什么这样实现）
+- 使用 ToolStripDropDown+ListBox 的优点：易实现、外观与系统菜单一致、能用鼠标直接点击选择。把弹窗作为独立 UI 元素但不强制长期抢占焦点，能保证 IME、键入等仍在 `MarcControl` 中工作。
+- 通过在 `MarcControl` 的键处理顶部短路并调用 `HandlePopupKeyDown/Press`，把方向键、回车、ESC 等和候选框交互需求集中处理。默认情况下普通字符继续由 `MarcControl` 处理，不会被拦截，从而保证编辑不受影响。
+- 插入选中项使用已有的 `ReplaceText`，能保证历史、光标与渲染行为与现有编辑一致。
+
+额外建议/注意事项
+- 如果你需要更精细外观（带分隔、图标、分组等），把 `ListBox` 换成 `ListView` 或自定义绘制控件即可，保持 `ToolStripControlHost` 包装方式不变。
+- 在高 DPI 或跨屏环境中，弹窗宽度 / 文本测量要考虑 DPI；这里使用的是标准 WinForms 测量，通常足够。必要时根据 `GetDpiXY(this)` 调整。
+- 弹窗显示/隐藏时应考虑随滚动/重绘更新位置或自动关闭（当前实现中推荐：在 `OnScroll`、`OnResize`、或 `OnLostFocus` 时调用 `HideSuggestion()`，或在需要时 reposition）。
+- 如果希望弹窗显示时完全不改变激活窗口（不触发 WM_ACTIVATE），可以改为使用一个带 WS_EX_NOACTIVATE 的无边框 Form 并用 P/Invoke ShowWindow(SW_SHOWNOACTIVATE)，但那涉及更多 P/Invoke 代码。当前方案在大多数场景下更简单、可靠。
+
+如果你要我，我可以：
+- 把上面的两份文件直接提交为 patch（或者直接在仓库新建这两个文件）。
+- 将 `OnKeyDown/OnKeyPress` 的修改直接打到 `MarcControl.cs`（我会把插入位置精确给出或直接修改文件）。
+- 为弹窗增加定位改进（上下空间判断、超出屏幕调整）、以及在 `OnScroll`/`OnResize` 中自动 reposition 或关闭的实现。
+
+你想让我直接把这两个文件加入项目并修改 `OnKeyDown`/`OnKeyPress` 吗？
+
+
+==========================
+
+GitHub Copilot
+
+深吸一口气。
+
+我已把弹窗从 `ToolStripDropDown` 改为“无激活”的轻量级 `Form`（使用 WS_EX_NOACTIVATE），并在显示/关闭时处理 IME 合成位置（调用现有的 `SetCompositionWindowPos()`）。这样弹窗不再激活窗口，不会切换输入焦点，输入法上下文和键盘输入仍然留在 `MarcControl` 中；你可以用 MarcControl 的键处理逻辑把上下/回车等键路由给弹窗选择，也可用鼠标点击选择项。
+
+下面是两个文件的替换实现。把原来 `MarcControl\Control\SuggestionPopup.cs` 覆盖为第一个文件；`MarcControl.Suggestions.cs` 做了小修改来配合无激活弹窗（主要在显示/隐藏后调用 `SetCompositionWindowPos()`，不再强制 Focus）。
+
+请新建/覆盖文件后编译测试。
+
+```csharp
+csharp MarcControl\Control\SuggestionPopup.cs
+using System;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    /// <summary>
+    /// 无激活的候选弹出框（使用 WS_EX_NOACTIVATE）。
+    /// 不会激活窗口，保证输入焦点仍留在编辑控件（MarcControl）。
+    /// </summary>
+    internal class SuggestionPopup : Form
+    {
+        readonly ListBox _listBox;
+
+        public event EventHandler<string> ItemChosen;
+        public event EventHandler Cancelled;
+
+        public bool AutoResize { get; set; } = true;
+        public int MaxVisibleItems { get; set; } = 8;
+
+        public SuggestionPopup()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.Manual;
+            TopMost = true;
+            DoubleBuffered = true;
+
+            // 建立 ListBox
+            _listBox = new ListBox
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                IntegralHeight = false,
+                SelectionMode = SelectionMode.One,
+                TabStop = false
+            };
+
+            _listBox.MouseClick += (s, e) =>
+            {
+                AcceptSelected();
+            };
+            // 鼠标双击也确认
+            _listBox.DoubleClick += (s, e) =>
+            {
+                AcceptSelected();
+            };
+
+            // 即便该窗体不激活，也可以响应鼠标、滚轮等
+            this.Controls.Add(_listBox);
+        }
+
+        // 确保窗体窗口样式包含 WS_EX_NOACTIVATE & WS_EX_TOOLWINDOW
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                const int WS_EX_NOACTIVATE = 0x08000000;
+                const int WS_EX_TOOLWINDOW = 0x00000080;
+                var cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+                return cp;
+            }
+        }
+
+        public void SetItems(System.Collections.Generic.IEnumerable<string> items)
+        {
+            var arr = items?.ToArray() ?? new string[0];
+            _listBox.BeginUpdate();
+            _listBox.Items.Clear();
+            foreach (var s in arr) _listBox.Items.Add(s);
+            _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+            _listBox.EndUpdate();
+
+            if (AutoResize)
+                ResizeToFit();
+        }
+
+        void ResizeToFit()
+        {
+            int w = 120;
+            using (var g = _listBox.CreateGraphics())
+            {
+                foreach (var obj in _listBox.Items.OfType<object>())
+                {
+                    var s = obj?.ToString() ?? "";
+                    var sz = TextRenderer.MeasureText(g, s, _listBox.Font);
+                    w = Math.Max(w, sz.Width + SystemInformation.VerticalScrollBarWidth + 12);
+                }
+            }
+            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, _listBox.Items.Count));
+            int h = visibleCount * Math.Max(16, _listBox.ItemHeight) + 6;
+            _listBox.Location = new Point(2, 2);
+            _listBox.Size = new Size(w, h);
+            this.ClientSize = new Size(w + 4, h + 4);
+        }
+
+        /// <summary>
+        /// 在屏幕坐标显示（不会激活）。
+        /// </summary>
+        public void ShowAt(Point screenLocation)
+        {
+            this.Location = screenLocation;
+            if (!this.Visible)
+                this.Show();   // Show 不会激活（CreateParams 指定了 NOACTIVATE）
+            else
+                this.Refresh();
+        }
+
+        public bool SelectPrev()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Max(0, _listBox.SelectedIndex - 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool SelectNext()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageUp()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Max(0, _listBox.SelectedIndex - page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageDown()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        void EnsureVisible(int index)
+        {
+            if (index >= 0 && index < _listBox.Items.Count)
+                _listBox.TopIndex = Math.Max(0, index - Math.Max(0, _listBox.Height / _listBox.ItemHeight / 2));
+        }
+
+        public string GetSelectedItem()
+        {
+            return _listBox.SelectedItem?.ToString();
+        }
+
+        public void AcceptSelected()
+        {
+            var item = GetSelectedItem();
+            if (item != null)
+            {
+                ItemChosen?.Invoke(this, item);
+            }
+            // 关闭窗体但不要尝试激活其它窗口（调用 Close 会触发 Closed；MarcControl 会处理 IME）
+            try { this.Hide(); } catch { }
+        }
+
+        public void Cancel()
+        {
+            Cancelled?.Invoke(this, EventArgs.Empty);
+            try { this.Hide(); } catch { }
+        }
+
+        // Visible 包装
+        public new bool Visible => base.Visible;
+    }
+}
+```
+```csharp
+csharp MarcControl\Control\MarcControl.Suggestions.cs
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    public partial class MarcControl
+    {
+        SuggestionPopup _suggestionPopup;
+
+        void EnsureSuggestionPopup()
+        {
+            if (_suggestionPopup != null)
+                return;
+            _suggestionPopup = new SuggestionPopup();
+            _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
+            _suggestionPopup.Cancelled += (s, e) => { /* nothing by default */ };
+        }
+
+        void SuggestionPopup_ItemChosen(object sender, string chosen)
+        {
+            if (string.IsNullOrEmpty(chosen))
+                return;
+
+            // 把选中的内容插入到当前 caret 位置
+            ReplaceText(_caret_offs, _caret_offs, chosen, delay_update: true, auto_adjust_caret_and_selection: true, add_history: true);
+
+            // 关闭弹窗后需要重新定位 IME 合成窗口
+            try { _suggestionPopup.Hide(); } catch { }
+            try { SetCompositionWindowPos(); } catch { }
+        }
+
+        /// <summary>
+        /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
+        /// 弹窗不会激活窗口（WS_EX_NOACTIVATE），因此输入焦点、IME 保持在 MarcControl。
+        /// </summary>
+        public void ShowSuggestion(IEnumerable<string> items)
+        {
+            var arr = (items ?? Enumerable.Empty<string>()).ToArray();
+            if (arr.Length == 0)
+            {
+                HideSuggestion();
+                return;
+            }
+
+            EnsureSuggestionPopup();
+            _suggestionPopup.SetItems(arr);
+
+            // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示，否则上方
+            var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value,
+                                        _caretInfo.Y - this.VerticalScroll.Value);
+            var screenCaret = this.PointToScreen(caretClient);
+            int belowY = screenCaret.Y + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+
+            // 使用屏幕坐标显示无激活窗体
+            _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
+
+            // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置
+            try { SetCompositionWindowPos(); } catch { }
+
+            Debug.Assert(_suggestionPopup.Visible == true);
+        }
+
+        public void HideSuggestion()
+        {
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                try { _suggestionPopup.Hide(); } catch { }
+            }
+
+            // 关闭后也更新 IME 合成窗口位置
+            try { SetCompositionWindowPos(); } catch { }
+        }
+
+        public bool HandlePopupKeyDown(KeyEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Up:
+                    if (_suggestionPopup.SelectPrev()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Down:
+                    if (_suggestionPopup.SelectNext()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageUp:
+                    if (_suggestionPopup.PageUp()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageDown:
+                    if (_suggestionPopup.PageDown()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Enter:
+                case Keys.Tab:
+                    // 确认当前选中项
+                    _suggestionPopup.AcceptSelected();
+                    e.Handled = true;
+                    return true;
+                case Keys.Escape:
+                    HideSuggestion();
+                    e.Handled = true;
+                    return true;
+            }
+            return false;
+        }
+
+        public bool HandlePopupKeyPress(KeyPressEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            if (e.KeyChar == (char)Keys.Escape)
+            {
+                HideSuggestion();
+                e.Handled = true;
+                return true;
+            }
+            return false;
+        }
+    }
+}
+```
+
+要点说明（简短）
+- 无激活窗体通过覆盖 CreateParams 并设置 WS_EX_NOACTIVATE 实现，不会切换输入焦点；因此 IME 和键盘消息仍到 `MarcControl`。  
+- 显示/关闭后调用 `SetCompositionWindowPos()`，确保 IME 合成窗口显示在 caret 附近。  
+- 键盘选择仍由 `MarcControl` 的 `HandlePopupKeyDown/KeyPress` 路由；鼠标点击由弹窗内部的 ListBox 处理并通过 `ItemChosen` 通知 `MarcControl`。  
+
+如果你需要，我可以：
+- 把点击选择时弹窗直接隐藏改为 Close（Hide 已满足通常需求）；  
+- 在 `ShowSuggestion` 中自动判断屏幕空间并在上方显示（当前实现总优先下方）；  
+- 把 ListBox 改为自定义样式（OwnerDraw）或支持键盘重复按键加速等。
+
+需要我把这些改动提交为 patch 吗？
