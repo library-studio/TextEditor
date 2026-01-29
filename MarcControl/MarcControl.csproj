@@ -76,6 +76,7 @@
     <Compile Include="Control\SuggestionPopup.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Control\SuggestionPopupOld.cs" />
     <Compile Include="DelayTrigger.cs" />
     <Compile Include="Dialog\DeletingFieldDialog.cs">
       <SubType>Form</SubType>

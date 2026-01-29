@@ -1,197 +1,16 @@
-#if NO
+// csharp MarcControl\Control\SuggestionPopup.cs
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Windows.Forms;
-
-namespace LibraryStudio.Forms
-{
-    /// <summary>
-    /// 简单的候选弹出框。基于 ToolStripDropDown + ListBoxHost，
-    /// 可在不长期抢占编辑控件焦点的情况下显示候选项。
-    /// </summary>
-    internal class SuggestionPopup : ToolStripDropDown
-    {
-        readonly ListBox _listBox;
-        readonly ToolStripControlHost _host;
-
-        public event EventHandler<string> ItemChosen;
-        public event EventHandler Cancelled;
-
-        public bool AutoResize { get; set; } = true;
-        public int MaxVisibleItems { get; set; } = 8;
-
-        public SuggestionPopup()
-        {
-            DoubleBuffered = true;
-            _listBox = new ListBox
-            {
-                BorderStyle = BorderStyle.None,
-                IntegralHeight = false,
-                SelectionMode = SelectionMode.One,
-                TabStop = false
-            };
-            _listBox.MouseClick += (s, e) =>
-            {
-                AcceptSelected();
-            };
-            _listBox.KeyDown += (s, e) =>
-            {
-                // 当 ListBox 有焦点且用户按 Enter 时确认
-                if (e.KeyCode == Keys.Enter)
-                {
-                    AcceptSelected();
-                    e.Handled = true;
-                }
-                else if (e.KeyCode == Keys.Escape)
-                {
-                    Cancel();
-                    e.Handled = true;
-                }
-            };
-
-            _host = new ToolStripControlHost(_listBox)
-            {
-                Margin = Padding.Empty,
-                Padding = Padding.Empty,
-                AutoSize = false
-            };
-            this.Items.Add(_host);
-
-            this.AutoClose = true;
-            this.Margin = Padding.Empty;
-            this.Padding = Padding.Empty;
-            this.RenderMode = ToolStripRenderMode.System;
-        }
-
-        public void SetItems(IEnumerable<string> items)
-        {
-            var arr = items?.ToArray() ?? Array.Empty<string>();
-            _listBox.BeginUpdate();
-            _listBox.Items.Clear();
-            foreach (var s in arr) _listBox.Items.Add(s);
-            _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
-            _listBox.EndUpdate();
-
-            if (AutoResize)
-            {
-                ResizeToFit();
-            }
-        }
-
-        void ResizeToFit()
-        {
-            int w = 120;
-            using (var g = _listBox.CreateGraphics())
-            {
-                foreach (var obj in _listBox.Items)
-                {
-                    var s = obj?.ToString() ?? "";
-                    var sz = TextRenderer.MeasureText(g, s, _listBox.Font);
-                    w = Math.Max(w, sz.Width + SystemInformation.VerticalScrollBarWidth + 8);
-                }
-            }
-            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, _listBox.Items.Count));
-            int h = visibleCount * (_listBox.ItemHeight) + 4;
-            _host.Size = new Size(w, h);
-            this.Size = _host.Size;
-        }
-
-        public void ShowAt(Point screenLocation)
-        {
-            // 显示在屏幕坐标
-            this.Show(screenLocation);
-        }
-
-        /// <summary>
-        /// 选择上一个条目，返回是否改变选择
-        /// </summary>
-        public bool SelectPrev()
-        {
-            if (_listBox.Items.Count == 0) return false;
-            int i = Math.Max(0, _listBox.SelectedIndex - 1);
-            if (i != _listBox.SelectedIndex)
-            {
-                _listBox.SelectedIndex = i;
-                return true;
-            }
-            return false;
-        }
-
-        public bool SelectNext()
-        {
-            if (_listBox.Items.Count == 0) return false;
-            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + 1);
-            if (i != _listBox.SelectedIndex)
-            {
-                _listBox.SelectedIndex = i;
-                return true;
-            }
-            return false;
-        }
-
-        public bool PageUp()
-        {
-            if (_listBox.Items.Count == 0) return false;
-            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
-            int i = Math.Max(0, _listBox.SelectedIndex - page);
-            if (i != _listBox.SelectedIndex)
-            {
-                _listBox.SelectedIndex = i;
-                return true;
-            }
-            return false;
-        }
-
-        public bool PageDown()
-        {
-            if (_listBox.Items.Count == 0) return false;
-            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
-            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + page);
-            if (i != _listBox.SelectedIndex)
-            {
-                _listBox.SelectedIndex = i;
-                return true;
-            }
-            return false;
-        }
-
-        public string GetSelectedItem()
-        {
-            return _listBox.SelectedItem?.ToString();
-        }
-
-        public void AcceptSelected()
-        {
-            var item = GetSelectedItem();
-            if (item != null)
-            {
-                ItemChosen?.Invoke(this, item);
-            }
-            this.Close();
-        }
-
-        public void Cancel()
-        {
-            Cancelled?.Invoke(this, EventArgs.Empty);
-            this.Close();
-        }
-    }
-}
-
-// csharp MarcControl\Control\SuggestionPopup.cs
-#endif
-using System;
-using System.Drawing;
-using System.Linq;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace LibraryStudio.Forms
 {
     /// <summary>
     /// 无激活的候选弹出框（使用 WS_EX_NOACTIVATE）。
-    /// 不会激活窗口，保证输入焦点仍留在编辑控件（MarcControl）。
+    /// ListBox 使用 OwnerDraw，实现左右两列显示 ValueItem 的两个成员。
     /// </summary>
     internal class SuggestionPopup : Form
     {
@@ -203,34 +22,74 @@ namespace LibraryStudio.Forms
         public bool AutoResize { get; set; } = true;
         public int MaxVisibleItems { get; set; } = 8;
 
-        public SuggestionPopup()
+        bool _has_focus = false;
+        // 是否具有键盘输入焦点。如果为 false，表示不具备焦点，处在 floating 状态。
+        public bool HasFocus
         {
+            get
+            {
+                return _has_focus;
+            }
+            set
+            {
+                if (_has_focus != value)
+                {
+                    _has_focus = value;
+                    _listBox.Invalidate();
+                }
+            }
+        }
+
+        Metrics _metrics = null;
+        Font _value_font = null;
+        Font _comment_font = null;
+
+        public SuggestionPopup(Metrics metrics,
+            Font value_font,
+            Font comment_font)
+        {
+            _metrics = metrics;
+            _value_font = value_font;
+            _comment_font = comment_font;
+
+
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
             TopMost = true;
             DoubleBuffered = true;
+            BackColor = metrics.BackColor;
 
-            // 建立 ListBox
             _listBox = new ListBox
             {
-                BorderStyle = BorderStyle.FixedSingle,
+                BorderStyle = BorderStyle.FixedSingle, // .FixedSingle,
                 IntegralHeight = false,
                 SelectionMode = SelectionMode.One,
-                TabStop = false
+                TabStop = false,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                BackColor = metrics.BackColor,
             };
+
+            // 固定项高度，留出一点内边距
+            // _listBox.ItemHeight = Math.Max(18, this.Font.Height + 6);
+            var font_height = Math.Max(
+                _value_font == null ? _listBox.Font.Height : _value_font.Height,
+                _comment_font == null ? _listBox.Font.Height : _comment_font.Height);
+            _listBox.ItemHeight = font_height + 6;
+
+            // 自绘事件
+            _listBox.DrawItem += ListBox_DrawItem;
+            _listBox.MeasureItem += ListBox_MeasureItem;
 
             _listBox.MouseClick += (s, e) =>
             {
                 AcceptSelected();
             };
-            // 鼠标双击也确认
             _listBox.DoubleClick += (s, e) =>
             {
                 AcceptSelected();
             };
 
-            // 即便该窗体不激活，也可以响应鼠标、滚轮等
             this.Controls.Add(_listBox);
         }
 
@@ -247,40 +106,77 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public void SetItems(System.Collections.Generic.IEnumerable<string> items)
+        public void SetItems(IEnumerable<ValueItem> items,
+            string selected_item_text)
         {
-            var arr = items?.ToArray() ?? new string[0];
-            _listBox.BeginUpdate();
-            _listBox.Items.Clear();
-            foreach (var s in arr)
-            {
-                _listBox.Items.Add(s);
-            }
-
-            _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
-            _listBox.EndUpdate();
-
             if (AutoResize)
-                ResizeToFit();
+                ResizeToFit(items);
+
+            // var arr = items?.ToArray() ?? new object[0];
+            _listBox.BeginUpdate();
+            try
+            {
+                _listBox.Items.Clear();
+                _listBox.SelectedIndex = -1;
+                int i = 0;
+                foreach (var s in items)
+                {
+                    _listBox.Items.Add(s);
+                    if (s.Value == selected_item_text)
+                        _listBox.SelectedIndex = i;
+                    i++;
+                }
+                if (_listBox.SelectedIndex == -1)
+                    _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+            }
+            finally
+            {
+                _listBox.EndUpdate();
+            }
         }
 
-        void ResizeToFit()
+        int _left_width = 0;
+        int _right_width = 0;
+
+        void ResizeToFit(IEnumerable<ValueItem> items)
         {
-            int w = 120;
+            int leftColMin = 120;
+            int rightColMin = 60;
+            int leftWidth = leftColMin;
+            int rightWidth = rightColMin;
+
+            int count = 0;
             using (var g = _listBox.CreateGraphics())
             {
-                foreach (var obj in _listBox.Items.OfType<object>())
+                foreach (var obj in items/*_listBox.Items.OfType<ValueItem>()*/)
                 {
-                    var s = obj?.ToString() ?? "";
-                    var sz = TextRenderer.MeasureText(g, s, _listBox.Font);
-                    w = Math.Max(w, sz.Width + SystemInformation.VerticalScrollBarWidth + 12);
+                    var left = obj.Value;   // GetLeftText(obj);
+                    var right = obj.Comment;    // GetRightText(obj);
+
+                    var leftSize = TextRenderer.MeasureText(g, left,
+                        _value_font == null ? _listBox.Font : _value_font);
+                    var rightSize = TextRenderer.MeasureText(g, right,
+                        _comment_font == null ? _listBox.Font : _comment_font);
+
+                    leftWidth = Math.Max(leftWidth, leftSize.Width);
+                    rightWidth = Math.Max(rightWidth, rightSize.Width);
+
+                    count++;
                 }
             }
-            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, _listBox.Items.Count));
-            int h = visibleCount * Math.Max(16, _listBox.ItemHeight) + 6;
+
+            _left_width = leftWidth;
+            _right_width = rightWidth;
+
+            // 增加一些间距与滚动条宽度
+            int padding = 12;
+            int totalW = leftWidth + rightWidth + padding + SystemInformation.VerticalScrollBarWidth;
+            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, count/*_listBox.Items.Count*/));
+            int h = visibleCount * _listBox.ItemHeight + 4;
+
             _listBox.Location = new Point(2, 2);
-            _listBox.Size = new Size(w, h);
-            this.ClientSize = new Size(w + 4, h + 4);
+            _listBox.Size = new Size(totalW - 4, h);
+            this.ClientSize = new Size(totalW + 2, h + 4);
         }
 
         /// <summary>
@@ -295,6 +191,150 @@ namespace LibraryStudio.Forms
                 this.Refresh();
         }
 
+        // 绘制每一项（左右两列）
+        void ListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= _listBox.Items.Count)
+                return;
+
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            bool selected = (e.State & DrawItemState.Selected) != 0;
+            //Color back = selected ? SystemColors.Highlight : SystemColors.Window;
+            //Color fore = selected ? SystemColors.HighlightText : SystemColors.WindowText;
+            Color back = selected && _has_focus ? _metrics.HighlightBackColor : _metrics.BackColor;
+            Color fore = selected && _has_focus ? _metrics.HightlightForeColor : _metrics.ForeColor;
+
+            using (var b = new SolidBrush(back))
+            {
+                e.Graphics.FillRectangle(b, e.Bounds);
+            }
+
+            if (selected)
+            {
+                var focus_color = _metrics.FocusColor;
+                using (var b = new SolidBrush(focus_color))
+                {
+                    var rect = new Rectangle(e.Bounds.X,
+                        e.Bounds.Y,
+                        _metrics.GapThickness,
+                        e.Bounds.Height);
+                    e.Graphics.FillRectangle(b, rect);
+                }
+            }
+
+            var item = _listBox.Items[e.Index] as ValueItem;
+            var left = item.Value;  // GetLeftText(item);
+            var right = item.Comment;   // GetRightText(item);
+
+            // 左列从左边缘的偏移
+            int padding = 6;
+            int leftX = e.Bounds.Left + padding;
+            int rightPadding = 6;
+
+            /*
+            // 右列宽度预估：以文本测量为准，右对齐
+            Size rightSize = TextRenderer.MeasureText(right, _listBox.Font);
+            int rightX = e.Bounds.Right - rightSize.Width - rightPadding;
+
+            // 左列可用宽度，避免与右列重叠
+            int leftWidth = Math.Max(10, rightX - leftX - 6);
+
+            var leftRect = new Rectangle(leftX, e.Bounds.Top, leftWidth, e.Bounds.Height);
+            var rightRect = new Rectangle(rightX, e.Bounds.Top, rightSize.Width, e.Bounds.Height);
+
+            TextFormatFlags leftFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+            TextFormatFlags rightFlags = TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+
+            TextRenderer.DrawText(e.Graphics, left, _listBox.Font, leftRect, fore, leftFlags);
+
+            // 右列使用灰色文字以示次要信息
+            var rightColor = selected ? SystemColors.HighlightText : SystemColors.GrayText;
+            TextRenderer.DrawText(e.Graphics, right, _listBox.Font, rightRect, rightColor, rightFlags);
+            */
+
+            TextFormatFlags leftFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+            TextFormatFlags rightFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+
+            int rightX = leftX + _left_width + 8;   // 左右列之间的最小间隔 8
+
+            var leftRect = new Rectangle(leftX, e.Bounds.Top, _left_width, e.Bounds.Height);
+            var rightRect = new Rectangle(rightX, e.Bounds.Top, _right_width, e.Bounds.Height);
+
+            TextRenderer.DrawText(e.Graphics,
+                left,
+                _value_font == null ? _listBox.Font : _value_font,
+                leftRect,
+                fore,
+                leftFlags);
+
+            // 右列使用灰色文字以示次要信息
+            // var rightColor = selected ? SystemColors.HighlightText : SystemColors.GrayText;
+            TextRenderer.DrawText(e.Graphics,
+                right,
+                _comment_font == null ? _listBox.Font : _comment_font,
+                rightRect, fore/*rightColor*/,
+                rightFlags);
+
+            /*
+            // 焦点矩形（如果需要）
+            if ((e.State & DrawItemState.Focus) != 0)
+                e.DrawFocusRectangle();
+            */
+
+        }
+
+        // 保持固定高度即可，但保留 MeasureItem 以防以后扩展
+        void ListBox_MeasureItem(object sender, MeasureItemEventArgs e)
+        {
+            e.ItemHeight = _listBox.ItemHeight;
+        }
+
+#if REMOVED
+        // 辅助：尽量从对象读取左列文本（优先 Value / Key / Code），否则 ToString()
+        static string GetLeftText(object obj)
+        {
+            if (obj == null) return "";
+            var t = obj.GetType();
+
+            var candidates = new[] { "Value", "Key", "Code", "Name" };
+            foreach (var n in candidates)
+            {
+                var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p != null)
+                {
+                    var v = p.GetValue(obj);
+                    if (v != null) return v.ToString();
+                }
+            }
+
+            // fallback
+            return obj.ToString();
+        }
+
+        // 辅助：尽量从对象读取右列文本（优先 Caption / Text / Label / Description / SubValue）
+        static string GetRightText(object obj)
+        {
+            if (obj == null) return "";
+            var t = obj.GetType();
+
+            var candidates = new[] { "Comment", "Caption", "Text", "Label", "Description", "SubValue", "Detail" };
+            foreach (var n in candidates)
+            {
+                var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p != null)
+                {
+                    var v = p.GetValue(obj);
+                    if (v != null) return v.ToString();
+                }
+            }
+
+            // fallback: if there's a Value property and ToString() returns that, try other properties
+            // 最后退回空字符串（避免重复显示主文本）
+            return "";
+        }
+
+#endif
         public bool SelectPrev()
         {
             if (_listBox.Items.Count == 0) return false;
@@ -352,12 +392,14 @@ namespace LibraryStudio.Forms
         void EnsureVisible(int index)
         {
             if (index >= 0 && index < _listBox.Items.Count)
+            {
                 _listBox.TopIndex = Math.Max(0, index - Math.Max(0, _listBox.Height / _listBox.ItemHeight / 2));
+            }
         }
 
         public string GetSelectedItem()
         {
-            return _listBox.SelectedItem?.ToString();
+            return (_listBox.SelectedItem as dynamic)?.Value;
         }
 
         public void AcceptSelected()
@@ -367,11 +409,7 @@ namespace LibraryStudio.Forms
             {
                 ItemChosen?.Invoke(this, item);
             }
-            else
-            {
-                // 关闭窗体但不要尝试激活其它窗口（调用 Close 会触发 Closed；MarcControl 会处理 IME）
-                try { this.Hide(); } catch { }
-            }
+            try { this.Hide(); } catch { }
         }
 
         public void Cancel()

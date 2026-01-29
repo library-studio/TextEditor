@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Vanara.PInvoke;
 
@@ -185,8 +186,29 @@ namespace LibraryStudio.Forms
                 OnCaretMoved(EventArgs.Empty);
             }
 
-            HideSuggestion();
-            // TryOpenValueListWindow(_caretInfo);
+            if (_valueListFloating == false)
+            {
+                HideSuggestion();
+            }
+            else
+            {
+                OpenValueListWindow(this.CaretInfo, false);
+            }
+            /*
+            Task.Run(async () => {
+                await Task.Delay(500);
+                this.Invoke(new Action(() => {
+                    if (_valueListFloating == false)
+                    {
+                        HideSuggestion();
+                    }
+                    else
+                    {
+                        OpenValueListWindow(this.CaretInfo, auto_close_prev: true);
+                    }
+                }));
+            });
+            */
         }
 
         public virtual void OnCaretMoved(EventArgs e)
@@ -273,11 +295,16 @@ namespace LibraryStudio.Forms
             _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
         }
 
-        bool OpenValueListWindow(HitInfo info)
+        bool OpenValueListWindow(HitInfo info, bool has_focus)
         {
-            var template_item = FindTemplateItem(_caretInfo, out HitInfo hit_info);
+            bool auto_close_prev = _valueListFloating;
+
+            var template_item = FindTemplateItem(_caretInfo,
+                out HitInfo hit_info);
             if (template_item == null)
             {
+                if (auto_close_prev)
+                    HideSuggestion();
                 return false;
             }
 
@@ -285,9 +312,11 @@ namespace LibraryStudio.Forms
             {
                 return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
             }
-            
 
-            var ret = OpenValueListWindow(template_item, out int item_text_length);
+            int item_text_length = 0;
+
+            var ret = OpenValueListWindow();
+            /*
             if (ret == true && item_text_length > 0)
             {
                 var offs = info.Offs - hit_info.Offs + ((hit_info.Offs / item_text_length) * item_text_length);
@@ -299,27 +328,91 @@ namespace LibraryStudio.Forms
                 // return false;
                 return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
             }
+            */
+            if (ret == false && auto_close_prev)
+            {
+                HideSuggestion();
+            }
+            else
+            {
+                if (ValueListWindowOpened())
+                    _suggestionPopup.HasFocus = has_focus;
+            }
             // return ret;
             return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
-        }
 
-        bool OpenValueListWindow(TemplateItem template_item,
-            out int item_text_length)
-        {
-            item_text_length = 0;
-            var list = template_item.GetValueList(template_item);
-            if (list == null)
+            bool OpenValueListWindow()
             {
-                return false;
-            }
+                item_text_length = 0;
+                var list = template_item.GetValueList(template_item);
+                if (list == null)
+                {
+                    return false;
+                }
 
-            item_text_length = list.FirstOrDefault()?.Value.Length ?? 0;
-            // int item_width = template_item.GetPixelWidth();
-            ShowSuggestion(list.Select(o => o.Value),
-                0,  // -hit_info.X + item_width,
-                0 /*-hit_info.Y*/);
-            return true;
+                var value_font = FixedFontGroup.FirstOrDefault();
+                var comment_font = CaptionFontGroup.FirstOrDefault();
+
+                item_text_length = list.FirstOrDefault()?.Value.Length ?? 0;
+
+                var offs = info.Offs;
+                if (item_text_length > 0)
+                    offs = info.Offs - hit_info.Offs + ((hit_info.Offs / item_text_length) * item_text_length);
+                _suggestion_caret_offs = offs;
+                var selected_item_text = this._record.MergeText(offs, offs + item_text_length);
+                _suggestion_start_text = selected_item_text;
+                // 将编辑器对应的文本选中
+                if (has_focus)
+                {
+                    this.Select(offs,
+                        offs + item_text_length,
+                        _caret_offs);
+                }
+
+                int delta_x = 0;
+                int delta_y = 0;
+                if (has_focus == false)
+                {
+                    int item_width = template_item.GetPixelWidth();
+                    delta_x = -hit_info.X + item_width + FontContext.DefaultReturnWidth;
+                    delta_y = -hit_info.Y - template_item.GetPixelHeight();
+                }
+
+                ShowSuggestion(
+                    value_font,
+                    comment_font,
+                    list,
+                    selected_item_text,
+                    delta_x,  // -hit_info.X + item_width,
+                    delta_y /*-hit_info.Y*/);
+                return true;
+            }
         }
+
+
+        bool _valueListFloating = false;
+
+        public bool ValueListFloating
+        {
+            get
+            {
+                return _valueListFloating;
+            }
+            set
+            {
+                _valueListFloating = value;
+                if (value == true)
+                {
+                    // 尝试打开
+                    OpenValueListWindow(_caretInfo, false);
+                }
+                else
+                {
+                    HideSuggestion(true);
+                }
+            }
+        }
+
 
         TemplateItem FindTemplateItem(HitInfo info,
             out HitInfo hit_info)

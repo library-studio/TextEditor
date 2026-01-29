@@ -966,3 +966,32 @@ MergeText() 和 MergeTextMask() 中一进入函数的位置应该判断 start en
 
 ~~~
 现在看来，插入符表示出插入还是替换状态非常必要！
+
+~~~
+ValueList 浮动小窗口用自绘方式同时显示出 value 和 comment。
+字体颜色和背景颜色要和 TemplateItem 显示和谐一致。
+目前使用的触发键 Ctrl+向下方向键 还值得继续考虑考虑。
+
+~~~
+ValueList Popup 弹出时，所对应的即将被替换的一段文字要自动选择为文字块。
+
+
+~~~
+窗口整体移动时，改变尺寸时，ValueList 窗口要跟随移动，或者自动关闭。
+
+~~~
+Ctrl++ 和 Ctrl+- 用于展开和收缩。
+
+
+~~~
+若干 TemplateItem 的内容都是空的情况下，移动到靠后的一个，在弹出的 ValueList
+窗口中选择，实际上新内容会跑到前面的 TemplateItem 中。
+为了避免这种情况，一个办法是在适当的时机预先自动填充好足够的空格。
+另外一个办法是，ValueList 不能仅仅凭借 TemplateItem 决定列表内容，而是要看它之前
+的所有 TemplateItem 内容是否足够字符，如果不够，可以拒绝弹出。
+也有一种做法，当前一个 TemplateItem 没有输入足够字符的时候，不允许移动到
+后面的 TemplateItem 进行输入。
+
+还有一个问题，(当 TemplateItem 位于 MARC 记录的最后一个字段中时)
+当 TemplateItem 大部分为空的时候，要想移动到后面一个进行输入，有可能
+就自动跳到最后一个空字段里面了。

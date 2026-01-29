@@ -971,6 +971,8 @@ out long left_width);
 
         protected override void OnResize(EventArgs e)
         {
+            HideSuggestion(true);
+
             if (_clientBoundsWidth == 0
                 && _disableResize == 0)
             {
@@ -984,6 +986,15 @@ out long left_width);
 
             base.OnResize(e);
         }
+
+        /*
+        protected override void OnMove(EventArgs e)
+        {
+            HideSuggestion();
+
+            base.OnMove(e);
+        }
+        */
 
         /*
         public void Relayout()
@@ -1271,7 +1282,9 @@ out long left_width);
             //Debug.WriteLine($"OnKeyDown() e.KeyCode={e.KeyCode}");
 
             // 如果候选弹窗存在并需要按键处理，优先交给弹窗
-            if (_suggestionPopup?.Visible == true && HandlePopupKeyDown(e))
+            if (_suggestionPopup?.Visible == true
+                && _suggestionPopup.HasFocus
+                && HandlePopupKeyDown(e))
             {
                 //Debug.WriteLine($"key {e.KeyCode.ToString()} OnKeyDown");
                 e.Handled = true;
@@ -1457,7 +1470,7 @@ out long left_width);
                     // 整块选择字段
                     if (controlPressed)
                     {
-                        if (OpenValueListWindow(_caretInfo) == true)
+                        if (OpenValueListWindow(_caretInfo, true) == true)
                         {
                             e.Handled = true;
                             break;
@@ -1766,7 +1779,9 @@ out long left_width);
         {
             //Debug.WriteLine($"OnKeyPress() e.KeyChar={e.KeyChar}");
             // 弹窗可能需要处理 Escape 等字符，优先处理
-            if (_suggestionPopup?.Visible == true && HandlePopupKeyPress(e))
+            if (_suggestionPopup?.Visible == true
+                && _suggestionPopup.HasFocus
+                && HandlePopupKeyPress(e))
             {
                 //Debug.WriteLine($"key {e.KeyChar.ToString()} OnKeyPress");
                 e.Handled = true;

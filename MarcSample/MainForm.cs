@@ -143,7 +143,7 @@ namespace MarcSample
                         },
                         new ValueItem {
                             Value = "22",
-                            Comment = "comment 22"
+                            Comment = "comment 22 测试 非常长的文字 test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test "
                         },
 
                     };

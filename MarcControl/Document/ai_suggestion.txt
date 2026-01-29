@@ -817,3 +817,352 @@ namespace LibraryStudio.Forms
 - 把 ListBox 改为自定义样式（OwnerDraw）或支持键盘重复按键加速等。
 
 需要我把这些改动提交为 patch 吗？
+
+
+====================
+
+GitHub Copilot
+
+深吸一口气。
+
+下面给出把 `_listBox` 改为 OwnerDraw（双列）显示 `ValueItem` 两成员的实现。方案要点：
+
+- 用 OwnerDrawFixed 模式自绘每一项，左列显示主文本（例如 `Value`），右列显示次要文本（例如 `Caption`/`Description` 等）。
+- 为兼容不同 `ValueItem` 定义，绘制时通过反射先尝试读取常用属性名（`Value` / `Key` / `Code` 作为左列；`Caption` / `Text` / `Label` / `Description` / `SubValue` 作为右列）；找不到则退回 `ToString()`。
+- 选中时使用系统高亮色，右列用灰色、靠右对齐并做省略号截断。
+- 设置合适 `ItemHeight` 并在 ResizeToFit 中以两列宽度计算窗体大小。
+
+把下面代码粘贴覆盖你当前的 `MarcControl\Control\SuggestionPopup.cs`（我只修改/替换了该文件内容以实现 OwnerDraw）：
+
+```csharp
+csharp MarcControl\Control\SuggestionPopup.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Reflection;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    /// <summary>
+    /// 无激活的候选弹出框（使用 WS_EX_NOACTIVATE）。
+    /// ListBox 使用 OwnerDraw，实现左右两列显示 ValueItem 的两个成员。
+    /// </summary>
+    internal class SuggestionPopup : Form
+    {
+        readonly ListBox _listBox;
+
+        public event EventHandler<string> ItemChosen;
+        public event EventHandler Cancelled;
+
+        public bool AutoResize { get; set; } = true;
+        public int MaxVisibleItems { get; set; } = 8;
+
+        public SuggestionPopup()
+        {
+            FormBorderStyle = FormBorderStyle.None;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.Manual;
+            TopMost = true;
+            DoubleBuffered = true;
+
+            _listBox = new ListBox
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                IntegralHeight = false,
+                SelectionMode = SelectionMode.One,
+                TabStop = false,
+                DrawMode = DrawMode.OwnerDrawFixed
+            };
+
+            // 固定项高度，留出一点内边距
+            _listBox.ItemHeight = Math.Max(18, this.Font.Height + 6);
+
+            // 自绘事件
+            _listBox.DrawItem += ListBox_DrawItem;
+            _listBox.MeasureItem += ListBox_MeasureItem;
+
+            _listBox.MouseClick += (s, e) =>
+            {
+                AcceptSelected();
+            };
+            _listBox.DoubleClick += (s, e) =>
+            {
+                AcceptSelected();
+            };
+
+            this.Controls.Add(_listBox);
+        }
+
+        // 确保窗体窗口样式包含 WS_EX_NOACTIVATE & WS_EX_TOOLWINDOW
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                const int WS_EX_NOACTIVATE = 0x08000000;
+                const int WS_EX_TOOLWINDOW = 0x00000080;
+                var cp = base.CreateParams;
+                cp.ExStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+                return cp;
+            }
+        }
+
+        public void SetItems(IEnumerable<object> items)
+        {
+            var arr = items?.ToArray() ?? new object[0];
+            _listBox.BeginUpdate();
+            _listBox.Items.Clear();
+            foreach (var s in arr) _listBox.Items.Add(s);
+            _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+            _listBox.EndUpdate();
+
+            if (AutoResize)
+                ResizeToFit();
+        }
+
+        void ResizeToFit()
+        {
+            int leftColMin = 120;
+            int rightColMin = 60;
+            int leftWidth = leftColMin;
+            int rightWidth = rightColMin;
+
+            using (var g = _listBox.CreateGraphics())
+            {
+                foreach (var obj in _listBox.Items.OfType<object>())
+                {
+                    var left = GetLeftText(obj);
+                    var right = GetRightText(obj);
+
+                    var leftSize = TextRenderer.MeasureText(g, left, _listBox.Font);
+                    var rightSize = TextRenderer.MeasureText(g, right, _listBox.Font);
+
+                    leftWidth = Math.Max(leftWidth, leftSize.Width);
+                    rightWidth = Math.Max(rightWidth, rightSize.Width);
+                }
+            }
+
+            // 增加一些间距与滚动条宽度
+            int padding = 12;
+            int totalW = leftWidth + rightWidth + padding + SystemInformation.VerticalScrollBarWidth;
+            int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, _listBox.Items.Count));
+            int h = visibleCount * _listBox.ItemHeight + 4;
+
+            _listBox.Location = new Point(2, 2);
+            _listBox.Size = new Size(totalW - 4, h);
+            this.ClientSize = new Size(totalW + 2, h + 4);
+        }
+
+        /// <summary>
+        /// 在屏幕坐标显示（不会激活）。
+        /// </summary>
+        public void ShowAt(Point screenLocation)
+        {
+            this.Location = screenLocation;
+            if (!this.Visible)
+                this.Show();   // Show 不会激活（CreateParams 指定了 NOACTIVATE）
+            else
+                this.Refresh();
+        }
+
+        // 绘制每一项（左右两列）
+        void ListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= _listBox.Items.Count)
+                return;
+
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            bool selected = (e.State & DrawItemState.Selected) != 0;
+            Color back = selected ? SystemColors.Highlight : SystemColors.Window;
+            Color fore = selected ? SystemColors.HighlightText : SystemColors.WindowText;
+
+            using (var b = new SolidBrush(back))
+                e.Graphics.FillRectangle(b, e.Bounds);
+
+            var item = _listBox.Items[e.Index];
+            var left = GetLeftText(item);
+            var right = GetRightText(item);
+
+            // 左列从左边缘的偏移
+            int padding = 6;
+            int leftX = e.Bounds.Left + padding;
+            int rightPadding = 6;
+
+            // 右列宽度预估：以文本测量为准，右对齐
+            Size rightSize = TextRenderer.MeasureText(right, _listBox.Font);
+            int rightX = e.Bounds.Right - rightSize.Width - rightPadding;
+
+            // 左列可用宽度，避免与右列重叠
+            int leftWidth = Math.Max(10, rightX - leftX - 6);
+
+            var leftRect = new Rectangle(leftX, e.Bounds.Top, leftWidth, e.Bounds.Height);
+            var rightRect = new Rectangle(rightX, e.Bounds.Top, rightSize.Width, e.Bounds.Height);
+
+            TextFormatFlags leftFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+            TextFormatFlags rightFlags = TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+
+            TextRenderer.DrawText(e.Graphics, left, _listBox.Font, leftRect, fore, leftFlags);
+
+            // 右列使用灰色文字以示次要信息
+            var rightColor = selected ? SystemColors.HighlightText : SystemColors.GrayText;
+            TextRenderer.DrawText(e.Graphics, right, _listBox.Font, rightRect, rightColor, rightFlags);
+
+            // 焦点矩形（如果需要）
+            if ((e.State & DrawItemState.Focus) != 0)
+                e.DrawFocusRectangle();
+        }
+
+        // 保持固定高度即可，但保留 MeasureItem 以防以后扩展
+        void ListBox_MeasureItem(object sender, MeasureItemEventArgs e)
+        {
+            e.ItemHeight = _listBox.ItemHeight;
+        }
+
+        // 辅助：尽量从对象读取左列文本（优先 Value / Key / Code），否则 ToString()
+        static string GetLeftText(object obj)
+        {
+            if (obj == null) return "";
+            var t = obj.GetType();
+
+            var candidates = new[] { "Value", "Key", "Code", "Name" };
+            foreach (var n in candidates)
+            {
+                var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p != null)
+                {
+                    var v = p.GetValue(obj);
+                    if (v != null) return v.ToString();
+                }
+            }
+
+            // fallback
+            return obj.ToString();
+        }
+
+        // 辅助：尽量从对象读取右列文本（优先 Caption / Text / Label / Description / SubValue）
+        static string GetRightText(object obj)
+        {
+            if (obj == null) return "";
+            var t = obj.GetType();
+
+            var candidates = new[] { "Caption", "Text", "Label", "Description", "SubValue", "Detail" };
+            foreach (var n in candidates)
+            {
+                var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p != null)
+                {
+                    var v = p.GetValue(obj);
+                    if (v != null) return v.ToString();
+                }
+            }
+
+            // fallback: if there's a Value property and ToString() returns that, try other properties
+            // 最后退回空字符串（避免重复显示主文本）
+            return "";
+        }
+
+        public bool SelectPrev()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Max(0, _listBox.SelectedIndex - 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool SelectNext()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + 1);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageUp()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Max(0, _listBox.SelectedIndex - page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        public bool PageDown()
+        {
+            if (_listBox.Items.Count == 0) return false;
+            int page = Math.Max(1, _listBox.Height / Math.Max(1, _listBox.ItemHeight));
+            int i = Math.Min(_listBox.Items.Count - 1, _listBox.SelectedIndex + page);
+            if (i != _listBox.SelectedIndex)
+            {
+                _listBox.SelectedIndex = i;
+                EnsureVisible(i);
+                return true;
+            }
+            return false;
+        }
+
+        void EnsureVisible(int index)
+        {
+            if (index >= 0 && index < _listBox.Items.Count)
+            {
+                _listBox.TopIndex = Math.Max(0, index - Math.Max(0, _listBox.Height / _listBox.ItemHeight / 2));
+            }
+        }
+
+        public string GetSelectedItem()
+        {
+            return (_listBox.SelectedItem as dynamic)?.Value;
+        }
+
+        public void AcceptSelected()
+        {
+            var item = GetSelectedItem();
+            if (item != null)
+            {
+                ItemChosen?.Invoke(this, item);
+            }
+            try { this.Hide(); } catch { }
+        }
+
+        public void Cancel()
+        {
+            Cancelled?.Invoke(this, EventArgs.Empty);
+            try { this.Hide(); } catch { }
+        }
+
+        // Visible 包装
+        public new bool Visible => base.Visible;
+    }
+}
+```
+
+我做了哪些具体改动与理由（简短）
+- 将 `ListBox.DrawMode` 改为 `OwnerDrawFixed`，并实现 `DrawItem` 用来绘制左右两列，视觉更可定制。
+- `SetItems` 改为接受 `IEnumerable<object>`（兼容不同 ValueItem 定义），并保留之前通过 `GetSelectedItem()` 提取 `Value` 的方式（使用 dynamic 以兼容）。
+- 使用反射读取对象常见属性名以保证兼容性；若你的 `ValueItem` 类确切属性名是固定的（例如 `Value` 和 `Caption`），可以把 `GetLeftText`/`GetRightText` 中使用反射替换为直接访问，性能更好。
+- 右列默认不重复显示左列；如果右列为空则仅显示左列。
+
+后续改进建议
+- 若 `ValueItem` 类是项目内明确类型（例如 `class ValueItem { public string Value; public string Caption; }`），把 `GetLeftText`/`GetRightText` 改为直接强类型访问以减少反射开销。
+- 根据内容需要调整列宽策略：目前 ResizeToFit 根据测量自动确定左右列宽；如需固定左列宽或对齐，可暴露属性配置。
+- 可实现 `OwnerDrawVariable` 并在 `MeasureItem` 里根据内容动态计算高度（当前简单方案一般足够）。
+
+如果你要，我可以：
+- 根据你项目中真实的 `ValueItem` 类型，把反射替换为强类型访问并提交 patch；
+- 增加高 DPI 支持（使用 Graphics.DpiX 时的缩放校正）或左右列分隔线/图标支持。
