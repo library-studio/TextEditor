@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 
 using Vanara.PInvoke;
+using static LibraryStudio.Forms.TemplateItem;
 using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
@@ -510,6 +511,7 @@ namespace LibraryStudio.Forms
                 return b[b.Length - 1];
             }
 
+            /*
             // 获得 StringBuilder 的第一个字符
             char First(StringBuilder b)
             {
@@ -520,6 +522,7 @@ namespace LibraryStudio.Forms
 
                 return b[0];
             }
+            */
         }
 
         public string MergeText(int start = 0, int end = int.MaxValue)
@@ -541,10 +544,12 @@ namespace LibraryStudio.Forms
 
             return builder.ToString();
 
+            /*
             bool InRange(int offs0, int start0, int end0)
             {
                 return offs0 >= start0 && offs0 < end0;
             }
+            */
         }
 
 
@@ -2475,6 +2480,7 @@ out int max_pixel_width)
                         var header = _fields[0];
                         var header_length = header.FullTextLength;
 
+                        Debug.Assert(padding_char != 0);
                         var content = header.MergeFullText() + new string(padding_char, 24 - header_length) + ch + new string(padding_char, 4);
 
                         return new InputInfo
@@ -2485,6 +2491,9 @@ out int max_pixel_width)
                             Caret = 24,
                         };
                     }
+
+                    Debug.Assert(padding_char != 0);
+
                     return new InputInfo
                     {
                         Text = (new string(ch, 1)) + (new string(padding_char, 4)),
@@ -2564,6 +2573,8 @@ out int max_pixel_width)
 
             InputInfo Build24()
             {
+                Debug.Assert(padding_char != 0);
+
                 var content = field.MergeFullText() + new string(padding_char, 24 - end);
                 // 输入一个字符以后的全部文字
                 content = content.Substring(0, caret_offs_in_field) + ch + content.Substring(caret_offs_in_field + 1);
@@ -2582,6 +2593,8 @@ out int max_pixel_width)
             //      length  试图要达到的字段全部文字长度。不包括结束符
             InputInfo Build(int length)
             {
+                Debug.Assert(padding_char != 0);
+
                 // 字段结束符左边的位置
                 var pure_end = end - 1;
                 // 填充后要达到的全部文字，注意排除了结束符。因为结束符本来就具备，替换和插入均不影响到它
@@ -2618,6 +2631,30 @@ out int max_pixel_width)
             // 在字段结束符以右，或者以左，都只能是插入
             if (end - 1 <= start + caret_offs_in_field)
             {
+                // 处理在 TemplateItem 末尾插入，自动根据模板内容字数定义填充字符
+                if (padding_char != 0)
+                {
+                    var template_item = MarcControl.FindTemplateItem(info,
+out HitInfo hit_info);
+                    if (template_item != null && template_item.Overflow == false)
+                    {
+                        int padding_length = template_item.GetPaddingText(PaddingStyle.TemplateWhole,
+        out int myself_offs);
+                        if (padding_length > 0)
+                        {
+                            Debug.Assert(padding_char != 0);
+                            return new InputInfo
+                            {
+                                Text = ch + new string(padding_char, padding_length - 1),
+                                Start = info.Offs,
+                                End = info.Offs,
+                                Caret = info.Offs + myself_offs,
+                            };
+                        }
+
+                    }
+                }
+
                 return new InputInfo
                 {
                     Text = new string(ch, 1),

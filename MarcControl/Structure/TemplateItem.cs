@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Dynamic;
 using System.Xml.Linq;
 using Vanara.PInvoke;
 
@@ -470,11 +471,18 @@ caption?.GetPixelHeight() ?? 0);
                 var caption_text = "";
 
                 if (this.Overflow)
+                {
                     caption_text = "(溢出)";
+                }
                 else if (this.ItemName == null)
+                {
                     caption_text = "";
+                }
                 else
+                {
                     caption_text = GetCaptionText(this.ItemName, UnitType.Chars);
+                }
+
                 var ret = _caption.ReplaceText(context,
                     dc,
                     0,
@@ -535,6 +543,86 @@ caption?.GetPixelHeight() ?? 0);
         public ReplaceTextResult ToggleExpand(HitInfo info, IContext context, Gdi32.SafeHDC dc, int pixel_width)
         {
             return new ReplaceTextResult();
+        }
+
+        public enum PaddingStyle
+        {
+            // 填充到当前对象之前为止
+            CurrentLeft = 0,
+            // 填充之前和到整个当前对象
+            CurrentWhole = 1,
+            // 填充完整个 Template，包括当前对象和后继兄弟
+            TemplateWhole = 2,
+        }
+
+        // 对于空内容的情况，检查本对象之前的兄弟 TemplateItem，得到输入字符之前需要填充的字符串
+        // parameters:
+        //      myshelf_offs    [out] 返回当前对象开头在填充长度之内的偏移位置
+        // return:
+        //      需要 padding 的字符数
+        public int GetPaddingText(PaddingStyle style,
+            out int myself_offs)
+        {
+            if (this.Overflow == true)
+            {
+                myself_offs = 0;
+                return 0;
+            }
+
+            // 如果本对象内容字符数不为 0，表示有了一些内容，那就不需要再在其前方插入填充了。
+            // 但需要注意，这种情况可能后面会有不足的字符
+            if (this.TextLength != 0)
+            {
+                myself_offs = 0;
+                return 0;
+            }
+
+            myself_offs = -1;
+
+            int padding_length = 0;
+            var parent = (this.Parent as Template);
+            foreach (var sibling in parent.Children)
+            {
+                if (sibling == this)
+                    myself_offs = padding_length;
+
+                // 只填充到当前对象之前
+                if (style == PaddingStyle.CurrentLeft
+                    && sibling == this)
+                {
+                   break;
+                }
+
+                if (sibling.Overflow)
+                {
+                    break;
+                }
+
+                var info = sibling.GetStructureInfoByBox(sibling, 1);
+                if (info.Length == 0)
+                {
+                    // 遇到自由长度的。理论上自由长度的事项以后不再有任何固定长事项
+                    break;
+                }
+
+                int text_length = sibling.TextLength;
+                if (text_length < info.Length)
+                {
+                    padding_length += info.Length - text_length;
+                }
+
+
+                // 只填充到当前对象为止(不包括后继对象)
+                if (style == PaddingStyle.CurrentWhole
+                    && sibling == this)
+                {
+                    break;
+                }
+            }
+
+            if (myself_offs == -1)
+                myself_offs = padding_length;
+            return padding_length;
         }
     }
 }

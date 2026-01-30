@@ -16,6 +16,7 @@ namespace LibraryStudio.Forms
     public partial class MarcControl
     {
         // 顶级分割条位置
+        // 为了兼容性保留。建议改用 GetCaptionPixelWidth() SetCaptionPixelWidth()
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         [EditorBrowsable(EditorBrowsableState.Never)]

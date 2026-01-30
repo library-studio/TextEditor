@@ -212,13 +212,13 @@ namespace LibraryStudio.Forms
                     if (o is IBox)
                     {
                         var box = o as IBox;
-                        if (Metrics.IsAncestorFixed(o, true)/*line.Name == "name" || line.Name == "indicator"*/)
-                        {
-                            return FixedFontGroup;
-                        }
-                        else if (box.Name == "!caption")
+                        if (box.Name == "!caption")
                         {
                             return CaptionFontGroup;
+                        }
+                        else if (Metrics.IsAncestorFixed(o, true)/*line.Name == "name" || line.Name == "indicator"*/)
+                        {
+                            return FixedFontGroup;
                         }
                         else if (box.Name == "!content")
                         {
@@ -333,7 +333,8 @@ namespace LibraryStudio.Forms
         class UiState
         {
             // 提示区域像素宽度
-            public int CaptionPixelWidth { get; set; }
+            // public int CaptionPixelWidth { get; set; }
+            public int[] CaptionPixelList { get; set; }
 
             public char HighlightBlankChar { get; set; } = ' ';
 
@@ -347,6 +348,8 @@ namespace LibraryStudio.Forms
             public string FixedSizeFont { get; set; }
 
             public string CaptionFont { get; set; }
+
+            public bool ValueListFloating { get; set; }
         }
 
         // 用于存储和恢复编辑器 UI 状态的 JSON 字符串
@@ -359,13 +362,15 @@ namespace LibraryStudio.Forms
             {
                 var state = new UiState
                 {
-                    CaptionPixelWidth = this.CaptionPixelWidth,
+                    // CaptionPixelWidth = this.CaptionPixelWidth,
+                    CaptionPixelList = this.Metrics?.CaptionPixelWidthList,
                     HighlightBlankChar = this.HighlightBlankChar,
                     ColorThemeName = this.ColorThemeName,
                     CustomColorTheme = this.IsCustomColorTheme() ? (this.GetCustomColorTheme() ?? null) : null,
                     Font = GetFontString(this.Font),
                     FixedSizeFont = GetFontString(this.FixedSizeFont),
                     CaptionFont = GetFontString(this.CaptionFont),
+                    ValueListFloating = this.ValueListFloating,
                 };
                 return JsonConvert.SerializeObject(state);
             }
@@ -377,7 +382,8 @@ namespace LibraryStudio.Forms
                     this.BeginUpdate();
                     try
                     {
-                        this.CaptionPixelWidth = state.CaptionPixelWidth;
+                        // this.CaptionPixelWidth = state.CaptionPixelWidth;
+                        this.Metrics.CaptionPixelWidthList = state.CaptionPixelList;
                         this.HighlightBlankChar = state.HighlightBlankChar == 0 ? ' ' : state.HighlightBlankChar;
                         if (state.ColorThemeName == MarcControl.CUSTOM_THEME_CAPTION)
                         {
@@ -411,6 +417,8 @@ namespace LibraryStudio.Forms
                                 this.CaptionFont = font;
                             }
                         }
+
+                        this.ValueListFloating = state.ValueListFloating;
                     }
                     finally
                     {

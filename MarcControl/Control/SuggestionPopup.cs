@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace LibraryStudio.Forms
@@ -41,17 +42,25 @@ namespace LibraryStudio.Forms
         }
 
         Metrics _metrics = null;
+        // 值内容字体
         Font _value_font = null;
+        // 注释文字字体
         Font _comment_font = null;
+        // 用于替代空格、突出显示的代替字符
+        char _hilight_blank_char = ' ';
+
+        // 希望一直拥有输入焦点
+        internal MarcControl _focus_owner = null;
 
         public SuggestionPopup(Metrics metrics,
             Font value_font,
-            Font comment_font)
+            Font comment_font,
+            char hilight_blank_char)
         {
             _metrics = metrics;
             _value_font = value_font;
             _comment_font = comment_font;
-
+            _hilight_blank_char = hilight_blank_char;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -89,9 +98,44 @@ namespace LibraryStudio.Forms
             {
                 AcceptSelected();
             };
-
+            // 设法让本 Form 获得输入焦点后重新把焦点切换回 MarcControl
+            this.GotFocus += (s, e) =>
+            {
+                // 为了解决在 _listBox 出现卷滚条时点了一下卷滚条之后无法 Esc 关闭小窗口的问题
+                this.BeginInvoke(new Action(() =>
+                {
+                    _focus_owner?.Focus();
+                }));
+            };
+            /*
+            _listBox.KeyDown += (s, e) =>
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.Enter:
+                    case Keys.Tab:
+                        // 确认当前选中项
+                        AcceptSelected();
+                        e.Handled = true;
+                        return;
+                    case Keys.Escape:
+                        this.Cancel();
+                        e.Handled = true;
+                        return;
+                }
+            };
+            _listBox.KeyPress += (s, e) =>
+            {
+                if (e.KeyChar == (char)Keys.Escape)
+                {
+                    this.Cancel();
+                    e.Handled = true;
+                }
+            };
+            */
             this.Controls.Add(_listBox);
         }
+
 
         // 确保窗体窗口样式包含 WS_EX_NOACTIVATE & WS_EX_TOOLWINDOW
         protected override CreateParams CreateParams
@@ -224,7 +268,7 @@ namespace LibraryStudio.Forms
             }
 
             var item = _listBox.Items[e.Index] as ValueItem;
-            var left = item.Value;  // GetLeftText(item);
+            var left = item.Value.Replace(' ', _hilight_blank_char);  // GetLeftText(item);
             var right = item.Comment;   // GetRightText(item);
 
             // 左列从左边缘的偏移

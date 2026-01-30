@@ -73,8 +73,8 @@ namespace MarcSample
 
             this.marcControl1.HighlightBlankChar = '·';  // '◌'; // '▪';// '▫'; // '□'; // '⸗';
 
-            LoadState();
-            LoadMarc();
+            AppUtility.LoadState(this.marcControl1);
+            AppUtility.LoadMarc(this.marcControl1);
         }
 
         static UnitInfo FindPath(UnitInfo root,
@@ -143,9 +143,35 @@ namespace MarcSample
                         },
                         new ValueItem {
                             Value = "22",
-                            Comment = "comment 22 测试 非常长的文字 test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test "
+                            Comment = "22", //"comment 22 测试 非常长的文字 test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test test "
                         },
-
+                        new ValueItem {
+                            Value = "  ",
+                            Comment = "两个空格"
+                        },
+                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },
+                                                new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },                        new ValueItem {
+                            Value = "33",
+                            Comment = "注释"
+                        },
                     };
                 case "100|a|(0/2)":
                     return new List<ValueItem>
@@ -252,15 +278,12 @@ namespace MarcSample
 
         private void MenuItem_dumpHistory_Click(object sender, EventArgs e)
         {
-            string strFileName = Path.Combine(GetBinDirectory(), "history.txt");
+            string strFileName = Path.Combine(AppUtility.GetBinDirectory(), "history.txt");
             File.WriteAllText(strFileName, this.marcControl1.DumpHistory());
             Process.Start("notepad.exe", strFileName);
         }
 
-        string GetBinDirectory()
-        {
-            return Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-        }
+
 
         public void SetFont()
         {
@@ -300,72 +323,14 @@ namespace MarcSample
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
             Stop();
-            SaveMarc();
-            SaveState();
+            AppUtility.SaveMarc(this.marcControl1);
+            AppUtility.SaveState(this.marcControl1);
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
 
         }
-
-        void LoadState()
-        {
-            try
-            {
-                var path = GetStateFileName();
-                if (File.Exists(path))
-                {
-                    var content = File.ReadAllText(path);
-                    this.marcControl1.UiStateJson = content;
-                }
-            }
-            catch (FileNotFoundException)
-            {
-            }
-        }
-
-        void SaveState()
-        {
-            var path = GetStateFileName();
-            File.WriteAllText(path, this.marcControl1.UiStateJson);
-        }
-
-        string GetMarcFileName()
-        {
-            return Path.Combine(GetBinDirectory(), "marc.txt");
-        }
-
-        string GetStateFileName()
-        {
-            return Path.Combine(GetBinDirectory(), "state.txt");
-        }
-
-        void LoadMarc()
-        {
-            //return;
-            try
-            {
-                var path = GetMarcFileName();
-                if (File.Exists(path))
-                {
-                    var content = File.ReadAllText(path);
-                    if (string.IsNullOrEmpty(content) == false)
-                        this.marcControl1.Content = content;
-                }
-            }
-            catch (FileNotFoundException)
-            {
-            }
-        }
-
-        void SaveMarc()
-        {
-            //return;
-            var path = GetMarcFileName();
-            File.WriteAllText(path, this.marcControl1.Content);
-        }
-
 
         private void MenuItem_startStressTest_Click(object sender, EventArgs e)
         {

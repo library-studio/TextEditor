@@ -11,15 +11,23 @@ namespace LibraryStudio.Forms
     {
         SuggestionPopup _suggestionPopup;
 
-        void EnsureSuggestionPopup(Font value_font, Font comment_font)
+        void EnsureSuggestionPopup(Font value_font,
+            Font comment_font,
+            delegate_itemChosen func_itemChosen,
+            delegate_cancel func_cancel)
         {
             if (_suggestionPopup != null)
                 return;
-            _suggestionPopup = new SuggestionPopup(_marcMetrics, value_font, comment_font);
-            _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
-            _suggestionPopup.Cancelled += (s, e) => { /* nothing by default */ };
+            _suggestionPopup = new SuggestionPopup(_marcMetrics,
+                value_font,
+                comment_font,
+                this.HighlightBlankChar);
+            // _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
+            _suggestionPopup.ItemChosen += (s, e) => { func_itemChosen?.Invoke(e); };
+            _suggestionPopup.Cancelled += (s, e) => { func_cancel?.Invoke(); };
         }
 
+#if REMOVED
         void SuggestionPopup_ItemChosen(object sender, string chosen)
         {
             if (string.IsNullOrEmpty(chosen))
@@ -55,12 +63,17 @@ namespace LibraryStudio.Forms
             try { _suggestionPopup.Hide(); } catch { }
             try { SetCompositionWindowPos(); } catch { }
         }
+#endif
 
+        /*
         // ValueList 窗口弹出前对应的插入符偏移
         int _suggestion_caret_offs = -1;
         // ValueList 窗口弹出前对应的拟替换的原有文字片段。注意可能比 Value 内容短
         string _suggestion_start_text = "";
+        */
 
+        public delegate void delegate_itemChosen(string text);
+        public delegate void delegate_cancel();
         /// <summary>
         /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
         /// 弹窗不会激活窗口（WS_EX_NOACTIVATE），因此输入焦点、IME 保持在 MarcControl。
@@ -71,7 +84,9 @@ namespace LibraryStudio.Forms
             IEnumerable<ValueItem> arr,
             string selected_item_text,
             int delta_x,
-            int delta_y)
+            int delta_y,
+            delegate_itemChosen func_itemChosen,
+            delegate_cancel func_cancel)
         {
             if (arr.Any() == false)
             {
@@ -79,8 +94,13 @@ namespace LibraryStudio.Forms
                 return;
             }
 
-            EnsureSuggestionPopup(value_font, comment_font);
+            EnsureSuggestionPopup(value_font,
+                comment_font,
+                func_itemChosen,
+                func_cancel);
             _suggestionPopup.SetItems(arr, selected_item_text);
+
+            _suggestionPopup._focus_owner = this;
 
             // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示，否则上方
             var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value + delta_x,
@@ -90,7 +110,6 @@ namespace LibraryStudio.Forms
 
             // 使用屏幕坐标显示无激活窗体
             _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
-
 
             /*
             // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置

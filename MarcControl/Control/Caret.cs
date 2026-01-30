@@ -7,6 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Vanara.PInvoke;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ToolTip;
+using static LibraryStudio.Forms.TemplateItem;
+using static Vanara.PInvoke.LANGID;
 
 namespace LibraryStudio.Forms
 {
@@ -257,14 +260,16 @@ namespace LibraryStudio.Forms
             var start_offs = _caret_offs; // 记录开始偏移量
 
             HitInfo info = null;
-            if (/*delta >= 0*/false)
+            if (delta > 0 && CaretAtHeaderOrTemplateItem())
             {
                 // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                 // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
                 info = HitByCaretOffs(_caret_offs + delta + 1, -1);
             }
             else
+            {
                 info = HitByCaretOffs(_caret_offs, delta);
+            }
             //SetCaretOffs(info.Offs); // 更新 _global_offs
             MoveCaret(info);
 
@@ -281,6 +286,16 @@ namespace LibraryStudio.Forms
             return true;
         }
 
+        bool CaretAtHeaderOrTemplateItem()
+        {
+            if (_caretInfo.ChildIndex == 0)
+                return true;
+            var template_item = FindTemplateItem(_caretInfo, out HitInfo temp);
+            if (template_item != null && template_item.Overflow == false)
+                return true;
+            return false;
+        }
+
         HitInfo HitByCaretOffs(int offs, int delta = 0)
         {
             _record.MoveByOffs(offs, delta, out HitInfo info);
@@ -294,6 +309,15 @@ namespace LibraryStudio.Forms
         {
             _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
         }
+
+        #region 被 OpenValueListWindow() 用到的变量
+
+        int suggestion_caret_offs = 0;
+        string replaced_text = "";
+        int before_length = 0;
+        int after_length = 0;
+
+        #endregion
 
         bool OpenValueListWindow(HitInfo info, bool has_focus)
         {
@@ -310,10 +334,19 @@ namespace LibraryStudio.Forms
 
             if (template_item.Overflow)
             {
+                if (auto_close_prev)
+                    HideSuggestion();
                 return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
             }
 
-            int item_text_length = 0;
+            var struct_info = template_item.GetStructureInfoByBox(template_item, 1);
+            // 如果插入符在 TemplateItem 中定额的最后一个字符右边，则不能弹出 ValueList。因为这样弹出会让用户误以为时这里的 List 但实际上选择后修改了下一个 TemplateItem 的内容
+            if (hit_info.Offs >= struct_info.Length)
+            {
+                if (auto_close_prev)
+                    HideSuggestion();
+                return true;
+            }
 
             var ret = OpenValueListWindow();
             /*
@@ -341,31 +374,36 @@ namespace LibraryStudio.Forms
             // return ret;
             return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
 
+
             bool OpenValueListWindow()
             {
-                item_text_length = 0;
+                int list_item_text_length = 0;
+                // 获得值列表。注意值的字符数可能比 TemplateItem 文本长度短(一般是整倍关系)
                 var list = template_item.GetValueList(template_item);
                 if (list == null)
                 {
                     return false;
                 }
 
+                int template_item_text_length = template_item.TextLength;
+
                 var value_font = FixedFontGroup.FirstOrDefault();
                 var comment_font = CaptionFontGroup.FirstOrDefault();
 
-                item_text_length = list.FirstOrDefault()?.Value.Length ?? 0;
+                // 列表中第一个事项的字符数
+                list_item_text_length = list.FirstOrDefault()?.Value.Length ?? 0;
 
+                // 编辑部分处在 TemplateItem 文本中的偏移。全局偏移
                 var offs = info.Offs;
-                if (item_text_length > 0)
-                    offs = info.Offs - hit_info.Offs + ((hit_info.Offs / item_text_length) * item_text_length);
-                _suggestion_caret_offs = offs;
-                var selected_item_text = this._record.MergeText(offs, offs + item_text_length);
-                _suggestion_start_text = selected_item_text;
+                if (list_item_text_length > 0)
+                    offs = info.Offs - hit_info.Offs + ((hit_info.Offs / list_item_text_length) * list_item_text_length);
+                suggestion_caret_offs = offs;
+                replaced_text = this._record.MergeText(offs, offs + Math.Min(list_item_text_length, template_item_text_length));
                 // 将编辑器对应的文本选中
                 if (has_focus)
                 {
                     this.Select(offs,
-                        offs + item_text_length,
+                        offs + replaced_text.Length,
                         _caret_offs);
                 }
 
@@ -373,18 +411,66 @@ namespace LibraryStudio.Forms
                 int delta_y = 0;
                 if (has_focus == false)
                 {
-                    int item_width = template_item.GetPixelWidth();
+                    // int item_width = template_item.GetPixelWidth();
+                    // 兄弟中最宽的宽度
+                    int item_width = (template_item.Parent as Template).Children
+                        .Where(o => o.Overflow == false)
+                        .Max(o => o.GetPixelWidth());
                     delta_x = -hit_info.X + item_width + FontContext.DefaultReturnWidth;
                     delta_y = -hit_info.Y - template_item.GetPixelHeight();
                 }
+
+                // 检查当前 TemplateItem 是否因法定字符数不足，需要进行空白字符填充
+                int padding_length = template_item.GetPaddingText(PaddingStyle.TemplateWhole,
+                    out before_length);
+                after_length = padding_length == 0 ? 0 :
+                    padding_length - before_length - list_item_text_length;
+                Debug.Assert(before_length >= 0);
+                Debug.Assert(after_length >= 0);
 
                 ShowSuggestion(
                     value_font,
                     comment_font,
                     list,
-                    selected_item_text,
-                    delta_x,  // -hit_info.X + item_width,
-                    delta_y /*-hit_info.Y*/);
+                    replaced_text,
+                    delta_x,
+                    delta_y,
+                    (chosen) =>
+                    {
+                        if (string.IsNullOrEmpty(chosen))
+                            return;
+
+                        Debug.Assert(suggestion_caret_offs != -1);
+                        var start = suggestion_caret_offs;
+                        var end = suggestion_caret_offs + replaced_text.Length;
+
+                        string new_text = chosen;
+                        int new_caret_offs = end;
+                        if (before_length > 0)
+                        {
+                            new_text = new string(this.PaddingChar, before_length) + new_text;
+                            new_caret_offs += before_length;
+                        }
+                        if (after_length > 0)
+                        {
+                            new_text = new_text + new string(this.PaddingChar, after_length);
+                        }
+
+                        ReplaceText(start,
+                            end,
+                            new_text,
+                            delay_update: false,
+                            auto_adjust_caret_and_selection: true,
+                            add_history: true);
+                        Select(new_caret_offs, new_caret_offs, new_caret_offs + 1, -1);
+
+                        HideSuggestion();
+                    },
+                    () =>
+                    {
+                        // if (reset_caret)
+                        Select(_caret_offs, _caret_offs, _caret_offs);
+                    });
                 return true;
             }
         }
@@ -413,8 +499,8 @@ namespace LibraryStudio.Forms
             }
         }
 
-
-        TemplateItem FindTemplateItem(HitInfo info,
+        // 查找 HitInfo 中 InnerHitInfo (.Box)链条中书否存在类型为 TemplateItem 的对象
+        public static TemplateItem FindTemplateItem(HitInfo info,
             out HitInfo hit_info)
         {
             hit_info = null;

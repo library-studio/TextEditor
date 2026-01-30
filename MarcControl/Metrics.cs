@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 
 namespace LibraryStudio.Forms
 {
@@ -18,6 +19,22 @@ namespace LibraryStudio.Forms
         public GetStructureFunc GetStructure { get; set; }
 
         List<int> _caption_widths = new List<int>();
+
+        public int[] CaptionPixelWidthList
+        {
+            get
+            {
+                return _caption_widths.ToArray();
+            }
+            set
+            {
+                if (value == null)
+                    _caption_widths = new List<int>();
+                else
+                    _caption_widths = new List<int>(value);
+            }
+        }
+
         public int GetCaptionPixelWidth(int level)
         {
             if (level < 0)
@@ -352,11 +369,11 @@ namespace LibraryStudio.Forms
 
     public delegate bool GetReadOnlyFunc(IBox box);
 
-    public delegate IEnumerable<ValueItem> GetValueListFunc(UnitNode [] path);
+    public delegate IEnumerable<ValueItem> GetValueListFunc(UnitNode[] path);
 
     // 获得 box 下的结构信息
     // 头标区的 Name 为 "###"
-    public delegate UnitInfo GetStructureFunc(UnitNode [] path, int level);
+    public delegate UnitInfo GetStructureFunc(UnitNode[] path, int level);
 
     public class ValueItem
     {
@@ -391,7 +408,7 @@ namespace LibraryStudio.Forms
                 {
                     var field = (MarcField)current;
                     type = UnitType.Field;
-                    name = field.IsHeader? "###" : field.FieldName;
+                    name = field.IsHeader ? "###" : field.FieldName;
                 }
                 else if (current is MarcSubfield)
                 {

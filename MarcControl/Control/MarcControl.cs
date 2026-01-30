@@ -1358,9 +1358,21 @@ out long left_width);
                             }
                             else
                             {
-                                // 向右移动，且在头标区内，需要特殊处理
+                                /*
+                                bool isHeaderOrTemplateItem()
+                                {
+                                    if (_caretInfo.ChildIndex == 0)
+                                        return true;
+                                    var template_item = FindTemplateItem(_caretInfo, out HitInfo temp);
+                                    if (template_item != null && template_item.Overflow == false)
+                                        return true;
+                                    return false;
+                                }
+                                */
+
+                                // 向右移动，且在头标区 或 TemplateItem 内，需要特殊处理
                                 if (shiftPressed == false && e.KeyCode == Keys.Right
-                                    && _caretInfo.ChildIndex == 0)
+                                    && CaretAtHeaderOrTemplateItem())
                                 {
                                     // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                                     // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等
@@ -1780,7 +1792,7 @@ out long left_width);
             //Debug.WriteLine($"OnKeyPress() e.KeyChar={e.KeyChar}");
             // 弹窗可能需要处理 Escape 等字符，优先处理
             if (_suggestionPopup?.Visible == true
-                && _suggestionPopup.HasFocus
+                && (_suggestionPopup.HasFocus || e.KeyChar == (char)Keys.Escape)
                 && HandlePopupKeyPress(e))
             {
                 //Debug.WriteLine($"key {e.KeyChar.ToString()} OnKeyPress");

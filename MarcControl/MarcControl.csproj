@@ -134,6 +134,7 @@
     <Compile Include="UnitTest\TestMarcField2.cs" />
     <Compile Include="UnitTest\TestMarcRecord.cs" />
     <Compile Include="UnitTest\UiTestHelpers.cs" />
+    <Compile Include="Utility\AppUtility.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>
   <ItemGroup>
