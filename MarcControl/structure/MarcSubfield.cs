@@ -87,7 +87,7 @@ namespace LibraryStudio.Forms
             int button_width = Metrics?.ButtonWidth ?? 0;
             int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
             int gap_width = Metrics?.GapThickness ?? 0;
-            return x0 + caption_width + button_width + gap_width;
+            return x0 + caption_width + button_width + gap_width * 3;
         }
 
         int GetContentY(int y0 = 0)
@@ -104,7 +104,7 @@ namespace LibraryStudio.Forms
         {
             int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
 
-            IBox box;
+            //IBox box;
             if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 // box = _content;
@@ -115,7 +115,7 @@ FontContext.DefaultFontHeight);
             }
             else
             {
-                box = _name;
+                //box = _name;
             }
 
             {
@@ -393,35 +393,46 @@ FontContext.DefaultFontHeight);
             return null;
         }
 
+        // | caption width (splitter) | button | gap | content
         public HitInfo HitTest(int x, int y)
         {
             Debug.Assert(_viewMode != ViewMode.None);
 
             var x0 = GetContentX();
             var y0 = GetContentY();
+
+            var caption_pixel = Metrics?.GetCaptionPixelWidth(this) ?? 0;
+            int caption_area_hitted = 0;
+            // 点击到了左边 Caption 区域
+            if (x < caption_pixel - Metrics?.SplitterPixelWidth)
+            {
+                caption_area_hitted = (int)FieldRegion.Caption;
+            }
+
+            // 点击到了 Caption 区域和 Name 区域的缝隙位置
+            else if (x < caption_pixel)
+            {
+                caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
+            }
+
+            // 点击到了字段名左边的按钮
+            else // if (x < caption_pixel + Metrics?.ButtonWidth)
+            {
+                var button_rect = GetButtonRect();
+                if (Utility.PtInRect(new Point(x, y), button_rect))
+                {
+                    caption_area_hitted = (int)FieldRegion.Button;
+                }
+                /*
+                else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
+                {
+                    caption_area_hitted = (int)FieldRegion.Splitter;
+                }
+                */
+            }
+            
             if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
-                if (x < x0)
-                {
-                    var button_rect = GetButtonRect();
-                    if (Utility.PtInRect(new Point(x, y), button_rect))
-                    {
-                        return new HitInfo
-                        {
-                            ChildIndex = (int)FieldRegion.Button,
-                            Box = this
-                        };
-                    }
-                    else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
-                    {
-                        return new HitInfo
-                        {
-                            ChildIndex = (int)FieldRegion.Splitter,
-                            Box = this
-                        };
-                    }
-                }
-
                 if (_content == null)
                     return new HitInfo { Box = this };
                 var sub_info = _content?.HitTest(x - x0,
@@ -429,40 +440,13 @@ FontContext.DefaultFontHeight);
                 var info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
-                info.ChildIndex = (int)FieldRegion.Content;
+                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content;
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return info;
             }
             else if (_viewMode == ViewMode.Expand)
             {
-                var caption_pixel = Metrics?.GetCaptionPixelWidth(this) ?? 0;
-                int caption_area_hitted = 0;
-                // 点击到了左边 Caption 区域
-                if (x < caption_pixel - Metrics?.SplitterPixelWidth)
-                {
-                    caption_area_hitted = (int)FieldRegion.Caption;
-                }
-
-                // 点击到了 Caption 区域和 Name 区域的缝隙位置
-                else if (x < caption_pixel)
-                {
-                    caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
-                }
-
-                // 点击到了字段名左边的按钮
-                else if (x < caption_pixel + Metrics?.ButtonWidth)
-                {
-                    var button_rect = GetButtonRect();
-                    if (Utility.PtInRect(new Point(x, y), button_rect))
-                    {
-                        caption_area_hitted = (int)FieldRegion.Button;
-                    }
-                    else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
-                    {
-                        caption_area_hitted = (int)FieldRegion.Splitter;
-                    }
-                }
 
                 if (_name != null && _template != null)
                 {

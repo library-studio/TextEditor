@@ -201,8 +201,10 @@ namespace LibraryStudio.Forms
                 }
                 else if (struct_info.IsField())
                 {
-                    //SetMode(struct_info);
-                    throw new NotImplementedException();
+                    // throw new NotImplementedException();
+
+                    // 暂时当作下级为子字段
+                    return NewSubfields(struct_info);
                 }
             }
 

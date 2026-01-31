@@ -93,11 +93,11 @@ namespace LibraryStudio.Forms
         int GetContentX(int x0 = 0)
         {
             Debug.Assert(Metrics != null);
-            int button_width = Metrics?.ButtonWidth ?? 0;
             int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
+            int button_width = Metrics?.ButtonWidth ?? 0;
             int gap_width = Metrics?.GapThickness ?? 0;
 
-            return x0 + caption_width + button_width + gap_width;
+            return x0 + caption_width + button_width + gap_width * 3;
         }
 
         int GetContentY(int y0 = 0)
@@ -190,31 +190,54 @@ namespace LibraryStudio.Forms
             return null;
         }
 
+        // | caption width (splitter) | button | gap | content
         public HitInfo HitTest(int x, int y)
         {
             var x0 = GetContentX();
             var y0 = GetContentY();
-            if (x < x0)
+            int caption_area_hitted = 0;
+            int button_width = Metrics?.ButtonWidth ?? 0;
+
+            var button_rect = GetButtonRect();
+            if (Utility.PtInRect(new Point(x, y), button_rect))
             {
-                var button_rect = GetButtonRect();
-                if (Utility.PtInRect(new Point(x, y), button_rect))
+                // 暂时不处理 button，这样就被当作点击编辑区域了
+                // 将来可以考虑把点击这里的 button 当作展开 ValueList 处理
+
+                // caption_area_hitted = (int)FieldRegion.Button;
+            }
+            else if (x < x0)
+            {
+                int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
+                // 点击到了左边 Caption 区域
+                if (x < caption_width - Metrics?.SplitterPixelWidth)
                 {
-                    return new HitInfo
-                    {
-                        ChildIndex = (int)FieldRegion.Button,
-                        Box = this
-                    };
+                    caption_area_hitted = (int)FieldRegion.Caption;
                 }
-                else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
+                // 点击到了 Caption 区域和 Name 区域的缝隙位置
+                else if (x < caption_width)
                 {
-                    return new HitInfo
+                    caption_area_hitted = (int)FieldRegion.Splitter;    // -1 表示 caption 和 name 之间的缝隙
+                }
+                else
+                {
+
+#if REMOVED
+                    else if (x > button_rect.Left - Metrics?.SplitterPixelWidth)
                     {
-                        ChildIndex = (int)FieldRegion.Splitter,
-                        Box = this
-                    };
+                        caption_area_hitted = (int)FieldRegion.Splitter;
+                        /*
+                        return new HitInfo
+                        {
+                            ChildIndex = (int)FieldRegion.Splitter,
+                            Box = this
+                        };
+                        */
+                    }
+#endif
                 }
             }
-            if (_content == null)
+            if (_content == null && caption_area_hitted == 0)
             {
                 return new HitInfo { Box = this };
             }
@@ -223,7 +246,7 @@ namespace LibraryStudio.Forms
             var info = sub_info.Clone();
             info.X += x0;
             info.Y += y0;
-            info.ChildIndex = (int)FieldRegion.Content;
+            info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content;
             info.Box = this;
             info.InnerHitInfo = sub_info;
             return info;

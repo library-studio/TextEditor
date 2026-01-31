@@ -1,10 +1,6 @@
-// csharp MarcControl\Control\SuggestionPopup.cs
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace LibraryStudio.Forms
@@ -182,6 +178,11 @@ namespace LibraryStudio.Forms
         int _left_width = 0;
         int _right_width = 0;
 
+        int _left_padding = 6;
+        int _right_padding = 6;
+        int _focus_width = 4;
+        int _seperator_width = 8;
+
         void ResizeToFit(IEnumerable<ValueItem> items)
         {
             int leftColMin = 120;
@@ -212,9 +213,11 @@ namespace LibraryStudio.Forms
             _left_width = leftWidth;
             _right_width = rightWidth;
 
+            _focus_width = _metrics?.GapThickness ?? 4;
+
             // 增加一些间距与滚动条宽度
-            int padding = 12;
-            int totalW = leftWidth + rightWidth + padding + SystemInformation.VerticalScrollBarWidth;
+            int padding = _left_padding + _right_padding;
+            int totalW = _focus_width + leftWidth + _seperator_width + rightWidth + padding + SystemInformation.VerticalScrollBarWidth;
             int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, count/*_listBox.Items.Count*/));
             int h = visibleCount * _listBox.ItemHeight + 4;
 
@@ -261,7 +264,7 @@ namespace LibraryStudio.Forms
                 {
                     var rect = new Rectangle(e.Bounds.X,
                         e.Bounds.Y,
-                        _metrics.GapThickness,
+                        _focus_width,   // _metrics.GapThickness,
                         e.Bounds.Height);
                     e.Graphics.FillRectangle(b, rect);
                 }
@@ -272,35 +275,12 @@ namespace LibraryStudio.Forms
             var right = item.Comment;   // GetRightText(item);
 
             // 左列从左边缘的偏移
-            int padding = 6;
-            int leftX = e.Bounds.Left + padding;
-            int rightPadding = 6;
-
-            /*
-            // 右列宽度预估：以文本测量为准，右对齐
-            Size rightSize = TextRenderer.MeasureText(right, _listBox.Font);
-            int rightX = e.Bounds.Right - rightSize.Width - rightPadding;
-
-            // 左列可用宽度，避免与右列重叠
-            int leftWidth = Math.Max(10, rightX - leftX - 6);
-
-            var leftRect = new Rectangle(leftX, e.Bounds.Top, leftWidth, e.Bounds.Height);
-            var rightRect = new Rectangle(rightX, e.Bounds.Top, rightSize.Width, e.Bounds.Height);
-
-            TextFormatFlags leftFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-            TextFormatFlags rightFlags = TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
-
-            TextRenderer.DrawText(e.Graphics, left, _listBox.Font, leftRect, fore, leftFlags);
-
-            // 右列使用灰色文字以示次要信息
-            var rightColor = selected ? SystemColors.HighlightText : SystemColors.GrayText;
-            TextRenderer.DrawText(e.Graphics, right, _listBox.Font, rightRect, rightColor, rightFlags);
-            */
+            int leftX = e.Bounds.Left + _left_padding + _focus_width;
 
             TextFormatFlags leftFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
             TextFormatFlags rightFlags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
 
-            int rightX = leftX + _left_width + 8;   // 左右列之间的最小间隔 8
+            int rightX = leftX + _left_width + _seperator_width;   // 左右列之间的最小间隔 8
 
             var leftRect = new Rectangle(leftX, e.Bounds.Top, _left_width, e.Bounds.Height);
             var rightRect = new Rectangle(rightX, e.Bounds.Top, _right_width, e.Bounds.Height);
@@ -325,7 +305,6 @@ namespace LibraryStudio.Forms
             if ((e.State & DrawItemState.Focus) != 0)
                 e.DrawFocusRectangle();
             */
-
         }
 
         // 保持固定高度即可，但保留 MeasureItem 以防以后扩展

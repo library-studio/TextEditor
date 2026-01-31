@@ -305,6 +305,11 @@ namespace LibraryStudio.Forms
             {
                 MoveCaret(HitByCaretOffs(input_info.Caret));
             }
+            else
+            {
+                // 重新定位插入符。比如 Overflow 风格的 TemplateItem 的仅剩的最后一个字符删除后，这个区域可能就不在了，需要重新定位到上一个 TemplateItem 末尾
+                SetCaret(HitByCaretOffs(info.Offs));
+            }
 
             // 2026/1/11
             // 把 selection start end 设置为 _caretInfo.CaretOffs
