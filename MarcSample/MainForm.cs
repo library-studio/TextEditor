@@ -125,6 +125,20 @@ namespace MarcSample
                             new int[] { 2, 3, 5, 10 }),
                     info_100,
                     UnitInfo.FromSubfields("200"),
+                    new UnitInfo
+                    {
+                        Type = UnitType.Field,
+                        Name = "410",
+                        Caption = "里面会嵌套字段",
+                        SubUnits = new List<UnitInfo>
+                        {
+                            UnitInfo.FromChars(UnitType.Field,
+                                "001",
+                                new int[] { 2, 3, 5, 10 }),
+                            info_100,
+                            UnitInfo.FromSubfields("200"),
+                        },
+                    }
                 },
             };
         }

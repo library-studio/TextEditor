@@ -68,7 +68,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public bool IsHeader { get; set; }
+        public virtual bool IsHeader { get; set; }
 
         void EnsureCaption()
         {
@@ -154,6 +154,22 @@ namespace LibraryStudio.Forms
                 return false;
             }
 
+            bool NewInnerFields(UnitInfo info)
+            {
+                if (_content == null || !(_content is MarcFieldCollection))
+                {
+                    _content?.Dispose();
+                    _content = new MarcFieldCollection(this, _metrics)
+                    {
+                        Name = "!fields",
+                        //StructureInfo = info,
+                    };
+                    return true;
+                }
+                return false;
+            }
+
+
             // 应要求，不支持展开。或者暂时为收缩状态
             if (name_changed == false &&
                 (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
@@ -204,12 +220,16 @@ namespace LibraryStudio.Forms
                     // throw new NotImplementedException();
 
                     // 暂时当作下级为子字段
-                    return NewSubfields(struct_info);
+                    // return NewSubfields(struct_info);
+                    return NewInnerFields(struct_info);
                 }
             }
 
             if (_viewMode == ViewMode.None)
+            {
                 _viewMode = ViewMode.Collapse;
+            }
+
             return NewParagraph();
 
 #if REMOVED
@@ -246,7 +266,12 @@ namespace LibraryStudio.Forms
 #endif
         }
 
-        public MarcField(MarcRecord record,
+        public MarcField()
+        {
+
+        }
+
+        public MarcField(IBox record,
             Metrics property)
         {
             Parent = record;
@@ -254,7 +279,7 @@ namespace LibraryStudio.Forms
             // ProcessBaseline();  // testing
         }
 
-        public int TextLength => (NameTextLength)
+        public virtual int TextLength => (NameTextLength)
             + (IndicatorTextLength)
             + (ContentTextLength)
             + (this.IsHeader ? 0 : 1);
@@ -276,7 +301,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public bool CaretMoveDown(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveDown(int x, int y, out HitInfo info)
         {
             if (y < 0)
             {
@@ -339,7 +364,7 @@ namespace LibraryStudio.Forms
             return false;
         }
 
-        public bool CaretMoveUp(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveUp(int x, int y, out HitInfo info)
         {
             x -= GetNameX();
             if (x < _metrics.NamePixelWidth
@@ -398,7 +423,7 @@ namespace LibraryStudio.Forms
             return false;
         }
 
-        public void Clear()
+        public virtual void Clear()
         {
             _caption?.Clear();
             _name?.Clear();
@@ -415,7 +440,7 @@ namespace LibraryStudio.Forms
             _cachePixelHeight = -1;
         }
 
-        public int GetPixelHeight()
+        public virtual int GetPixelHeight()
         {
             if (_cachePixelHeight == -1)
             {
@@ -437,7 +462,7 @@ namespace LibraryStudio.Forms
         }
 
         // 注意对于 _name _indicator _content 为 null 的时候，相应区域不应该允许点击，而要转移到最近相邻的一个区域返回点击信息
-        public HitInfo HitTest(int x, int y)
+        public virtual HitInfo HitTest(int x, int y)
         {
             Debug.Assert(FieldRegion.Caption != 0);
             Debug.Assert(FieldRegion.Splitter != 0);
@@ -480,8 +505,7 @@ namespace LibraryStudio.Forms
                 }
             }
 
-
-            var start = _metrics.NameBorderX; // 这里包括了左侧边沿空间
+            var start = _metrics.GetNameBorderX(caption_pixel); // 这里包括了左侧边沿空间
             // must 表示“其它 box 为空，必须用当前这个来 hittest”
             var must = _indicator == null && _content == null;
             if (IsHeader == false && _name != null
@@ -501,7 +525,7 @@ namespace LibraryStudio.Forms
                 return info;
             }
             start += _metrics.NamePixelWidth;
-            Debug.Assert(start == _metrics.IndicatorBorderX);
+            Debug.Assert(start == _metrics.GetIndicatorBorderX(caption_pixel));
             must = _content == null;
             if (IsHeader == false && _indicator != null && this.IsControlField == false
                 && (x < start + _metrics.IndicatorPixelWidth || must))
@@ -520,7 +544,7 @@ namespace LibraryStudio.Forms
                 return info;
             }
             start += _metrics.IndicatorPixelWidth;
-            Debug.Assert(start == _metrics.ContentBorderX);
+            Debug.Assert(start == _metrics.GetContentBorderX(caption_pixel));
             if (_content != null)
             {
                 var x0 = GetContentX();
@@ -627,7 +651,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public string MergeText(int start = 0, int end = int.MaxValue)
+        public virtual string MergeText(int start = 0, int end = int.MaxValue)
         {
             return MergeFullText(start, end);
         }
@@ -746,7 +770,7 @@ namespace LibraryStudio.Forms
 #endif
         }
 
-        public string MergeTextMask(int start = 0, int end = int.MaxValue)
+        public virtual string MergeTextMask(int start = 0, int end = int.MaxValue)
         {
             if (Utility.Cross(start, end, 0, this.FullTextLength) == false)
                 return "";
@@ -857,7 +881,7 @@ namespace LibraryStudio.Forms
         //      -1  越过左边
         //      0   成功
         //      1   越过右边
-        public int MoveByOffs(int offs,
+        public virtual int MoveByOffs(int offs,
             int direction,
             out HitInfo info)
         {
@@ -976,7 +1000,7 @@ namespace LibraryStudio.Forms
         // 获得一段文本显示范围的 Region
         // parameters:
         //      virtual_tail_length 如果为 1，表示需要关注末尾结束符是否在选择范围内，如果在，要加入一个表示结束符的矩形
-        public Region GetRegion(int start_offs = 0,
+        public virtual Region GetRegion(int start_offs = 0,
             int end_offs = int.MaxValue,
             int virtual_tail_length = 0)
         {
@@ -1250,7 +1274,7 @@ bool focused = false)
             var name_rect = GetNameBorderRect(x, y);
             name_rect.Width -= sep;
 
-            var solid_x = _metrics.SolidX + _metrics.BorderThickness;
+            var solid_x = _metrics.GetSolidX(_metrics.GetCaptionPixelWidth(this)) + _metrics.BorderThickness;
 
             var indicator_rect = GetIndicatorBorderRect(x, y);
             indicator_rect.Width -= sep;
@@ -1339,7 +1363,7 @@ _metrics?.BorderColor ?? SystemColors.ControlDark);
         public Rectangle GetFocusedRect(int x, int y)
         {
             // var x0 = x + _fieldProperty.ContentBorderX - _fieldProperty.BorderThickness * 2 - 1;
-            var x0 = x + _metrics.SolidX + _metrics.ButtonWidth;
+            var x0 = x + _metrics.GetSolidX(_metrics.GetCaptionPixelWidth(this)) + _metrics.ButtonWidth;
             return new Rectangle(x0, y, _metrics.GapThickness, this.GetPixelHeight());
         }
 
@@ -1653,7 +1677,7 @@ clipRect);
         // 获得 Name 外围边框区域的 Rectangle
         Rectangle GetNameBorderRect(int x = 0, int y = 0)
         {
-            return new Rectangle(x + _metrics.NameBorderX,
+            return new Rectangle(x + _metrics.GetNameBorderX(_metrics.GetCaptionPixelWidth(this)),
                 (int)(y + _baseLine - (_name?.BaseLine ?? 0)) - VerticalUnit() / 2,
                 _metrics.NamePixelWidth,
                 VerticalUnit() + (_name?.GetPixelHeight() ?? 0));
@@ -1663,7 +1687,7 @@ clipRect);
         // 获得 Name 可编辑区域的 Rectangle
         Rectangle GetNameRect(int x = 0, int y = 0)
         {
-            return new Rectangle(x + _metrics.NameX,
+            return new Rectangle(x + _metrics.GetNameX(_metrics.GetCaptionPixelWidth(this)),
                 (int)(y + _baseLine - (_name?.BaseLine ?? 0)) + 0,
                 _metrics.NamePixelWidth,
                 _name?.GetPixelHeight() ?? 0);
@@ -1697,7 +1721,7 @@ clipRect);
 
         int GetNameX()
         {
-            return _metrics.NameX;
+            return _metrics.GetNameX(_metrics.GetCaptionPixelWidth(this));
         }
 
         Rectangle GetIndicatorRect(int x = 0, int y = 0)
@@ -1706,13 +1730,13 @@ clipRect);
             if (_indicator == null || _indicator.BaseLine == 0)
             {
                 // 借用 _name 的一些参数。
-                return new Rectangle(x + _metrics.IndicatorX,
+                return new Rectangle(x + _metrics.GetIndicatorX(_metrics.GetCaptionPixelWidth(this)),
     (int)(y + _baseLine - (_name?.BaseLine ?? 0)) + 0,
     _metrics.IndicatorPixelWidth,
     _name?.GetPixelHeight() ?? 0);
 
             }
-            return new Rectangle(x + _metrics.IndicatorX,
+            return new Rectangle(x + _metrics.GetIndicatorX(_metrics.GetCaptionPixelWidth(this)),
                 (int)(y + _baseLine - (_indicator?.BaseLine ?? 0)) + 0,
                 _metrics.IndicatorPixelWidth,
                 _indicator?.GetPixelHeight() ?? 0);
@@ -1720,16 +1744,17 @@ clipRect);
 
         Rectangle GetIndicatorBorderRect(int x = 0, int y = 0)
         {
+            int caption_pixel_width = _metrics.GetCaptionPixelWidth(this);
             // _indicator 中暂无内容
             if (_indicator == null || _indicator.BaseLine == 0)
             {
                 // 借用 _name 的一些参数。
-                return new Rectangle(x + _metrics.IndicatorBorderX,
+                return new Rectangle(x + _metrics.GetIndicatorBorderX(caption_pixel_width),
                     (int)(y + _baseLine - (_name?.BaseLine ?? 0)) - VerticalUnit() / 2,
                     _metrics.IndicatorPixelWidth,
                     VerticalUnit() + _name?.GetPixelHeight() ?? 0);
             }
-            return new Rectangle(x + _metrics.IndicatorBorderX,
+            return new Rectangle(x + _metrics.GetIndicatorBorderX(caption_pixel_width),
                 (int)(y + _baseLine - (_indicator?.BaseLine ?? 0)) - VerticalUnit() / 2,
                 _metrics.IndicatorPixelWidth,
                 VerticalUnit() + _indicator?.GetPixelHeight() ?? 0);
@@ -1737,12 +1762,12 @@ clipRect);
 
         int GetIndicatorX()
         {
-            return _metrics.IndicatorX;
+            return _metrics.GetIndicatorX(_metrics.GetCaptionPixelWidth(this));
         }
 
         int GetContentX(int x0 = 0)
         {
-            return x0 + _metrics.ContentX;
+            return x0 + _metrics.GetContentX(_metrics.GetCaptionPixelWidth(this));
         }
 
         int GetContentY(int y0 = 0)
@@ -1758,7 +1783,7 @@ clipRect);
             return y0 + (int)(_baseLine - this._content.BaseLine);
         }
 
-        public void Paint(
+        public virtual void Paint(
             IContext context,
             SafeHDC dc,
             int x,
@@ -1771,10 +1796,12 @@ clipRect);
             // 在 _name _indicator _content 中最后一个使用 virtual_tail_length
             IBox right_most = GetRightMost();
 
+            int caption_pixel_width = _metrics.GetCaptionPixelWidth(this);
+
             // 绘制定制背景
             if (context.PaintBack != null)
             {
-                var width = _metrics.ContentX + _content?.GetPixelWidth() ?? 0;
+                var width = _metrics.GetContentX(caption_pixel_width) + _content?.GetPixelWidth() ?? 0;
                 var height = Math.Max(
                     _name?.GetPixelHeight() ?? 0,
                     _content?.GetPixelHeight() ?? 0
@@ -1844,7 +1871,7 @@ clipRect);
                 }
             }
 
-            x = x0 + _metrics.NameX;
+            x = x0 + _metrics.GetNameX(_metrics.GetCaptionPixelWidth(this));
             // rect = new Rectangle(x, y, _fieldProperty.NamePixelWidth, Line.GetLineHeight());
             rect = GetNameRect(x0, y);
 
@@ -1879,7 +1906,7 @@ clipRect);
             }
 
             x += _metrics.NamePixelWidth;
-            Debug.Assert(x - x0 == _metrics.IndicatorX);
+            Debug.Assert(x - x0 == _metrics.GetIndicatorX(_metrics.GetCaptionPixelWidth(this)));
             // rect = new Rectangle(x, y, _fieldProperty.IndicatorPixelWidth, Line.GetLineHeight());
             rect = GetIndicatorRect(x0, y);
 
@@ -1911,7 +1938,7 @@ clipRect);
             }
 
             x += _metrics.IndicatorPixelWidth;
-            Debug.Assert(x - x0 == _metrics.ContentX);
+            Debug.Assert(x - x0 == _metrics.GetContentX(caption_pixel_width));
             //rect = new Rectangle(x, y, _content.GetPixelWidth(), _content.GetPixelHeight());
 
             if (_content != null/*
@@ -1971,7 +1998,7 @@ clipRect);
         // return:
         //      0   未给出本次修改的像素宽度。需要调主另行计算
         //      其它  本次修改后的像素宽度
-        public ReplaceTextResult ReplaceText(
+        public virtual ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
             IContext context,
             SafeHDC dc,
@@ -2040,6 +2067,8 @@ clipRect);
 
             var old_name_value = this.FieldName;
 
+            int caption_pixel_width = _metrics.GetCaptionPixelWidth(this);
+
             if (true
                 //string.IsNullOrEmpty(name_value) == false
                 )
@@ -2058,7 +2087,7 @@ clipRect);
 
                 update_rect = Utility.Union(update_rect, update_rect_name);
                 max_pixel_width = Math.Max(max_pixel_width,
-                    _metrics.NameX + ret.MaxPixel);
+                    _metrics.GetNameX(caption_pixel_width) + ret.MaxPixel);
             }
             else
             {
@@ -2084,7 +2113,7 @@ clipRect);
 
                 update_rect = Utility.Union(update_rect, update_rect_caption);
                 max_pixel_width = Math.Max(max_pixel_width,
-                    _metrics.NameBorderX);
+                    _metrics.GetNameBorderX(caption_pixel_width));
             }
 
             if (true
@@ -2109,7 +2138,7 @@ clipRect);
                 update_rect = Utility.Union(update_rect, update_rect_indicator);
 
                 max_pixel_width = Math.Max(max_pixel_width,
-                    _metrics.IndicatorX + ret.MaxPixel);
+                    _metrics.GetIndicatorX(caption_pixel_width) + ret.MaxPixel);
             }
             else
             {
@@ -2158,7 +2187,7 @@ clipRect);
     0,
     -1,
     content_value,
-    pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
+    pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pixel_width)), _metrics.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
     );
                     }
                     else
@@ -2169,7 +2198,7 @@ dc,
 0,
 -1,
 content_value,
-pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
+pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pixel_width)), _metrics.MinFieldContentWidth/* 最小不小于 5 char 宽度*/)
 );
                     }
 
@@ -2205,14 +2234,14 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.Mi
                     update_rect = Utility.Union(update_rect, update_rect_content);
 
                     max_pixel_width = Math.Max(max_pixel_width,
-                        _metrics.ContentX + ret.MaxPixel);
+                        _metrics.GetContentX(caption_pixel_width) + ret.MaxPixel);
                 }
                 else
                 {
                     // 搜集清除前的 update_rect
                     var update_rect_content = GetRect(_content);
                     Utility.Offset(ref update_rect_content,
-                        _metrics.ContentX,
+                        _metrics.GetContentX(caption_pixel_width),
                         0);
 
                     update_rect = Utility.Union(update_rect, update_rect_content);
@@ -2231,7 +2260,7 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.Mi
                     }
 
                     result.UpdateRect = update_rect;
-                    result.MaxPixel = _metrics.ContentX + (_content?.GetPixelWidth() ?? 0);
+                    result.MaxPixel = _metrics.GetContentX(caption_pixel_width) + (_content?.GetPixelWidth() ?? 0);
                     return result;
                 }
             }
@@ -2367,26 +2396,6 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.Mi
 
             return errors;
         }
-
-#if REMOVED
-        // 补足字符
-        // 一个问题是如何通知窗口更新
-        public bool TryRightPad(
-            IContext context,
-            SafeHDC hdc,
-            out Rectangle update_rect)
-        {
-            if (this.IsHeader)
-            {
-                if (this._content.TextLength < 24)
-                {
-                    this._content.ReplaceText(context,
-                        hdc,)
-                }
-
-            }
-        }
-#endif
 
         float _baseLine;
         float _below;
@@ -2544,9 +2553,9 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.Mi
         }
 
 
-        public int GetPixelWidth()
+        public virtual int GetPixelWidth()
         {
-            return _metrics.ContentX + (_content?.GetPixelWidth() ?? 0);
+            return _metrics.GetContentX(_metrics.GetCaptionPixelWidth(this)) + (_content?.GetPixelWidth() ?? 0);
         }
 
         public string FieldName
@@ -3284,9 +3293,11 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.ContentX), _metrics.Mi
             // 继续展开下级
             if (info.InnerHitInfo != null
                 && _viewMode == ViewMode.Expand
-                && _content != null && _content is MarcSubfieldCollection)
+                && _content != null
+                && _content is IViewBox
+                )
             {
-                var collection = _content as MarcSubfieldCollection;
+                var collection = _content as IViewBox;
 
                 if (collection.ViewMode == ViewMode.Plane)
                     return new ReplaceTextResult();

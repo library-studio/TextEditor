@@ -118,6 +118,8 @@
     <Compile Include="Structure\FixedLine.cs" />
     <Compile Include="Structure\MarcContext.cs" />
     <Compile Include="Structure\MarcField.cs" />
+    <Compile Include="Structure\MarcFieldCollection.cs" />
+    <Compile Include="Structure\MarcInnerField.cs" />
     <Compile Include="Structure\MarcRecord.cs" />
     <Compile Include="Metrics.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

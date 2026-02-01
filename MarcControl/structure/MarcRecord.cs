@@ -739,6 +739,7 @@ namespace LibraryStudio.Forms
 
             if (offs == offs_param + direction)
             {
+                var caption_pixel_width = _fieldProperty.GetCaptionPixelWidth(field);
                 if (_fields.Count > 0)
                 {
                     // 最后一个字段的结束符右侧
@@ -751,7 +752,7 @@ namespace LibraryStudio.Forms
                     {
                         // 头标区得到的 x 在 content 区，要调整到 name 区
                         if (this._fields.Count == 1)
-                            hit_info.X = _fieldProperty.NameX;
+                            hit_info.X = _fieldProperty.GetNameX(caption_pixel_width);
 
                         var temp_info = new HitInfo
                         {
@@ -774,7 +775,7 @@ namespace LibraryStudio.Forms
                     // 连头标区都没有
                     info = new HitInfo
                     {
-                        X = _fieldProperty.NameX,
+                        X = _fieldProperty.GetNameX(caption_pixel_width),
                         Y = 0 + start_y,
                         Area = Area.BottomBlank,
                         ChildIndex = _fields.Count,
@@ -1866,7 +1867,7 @@ namespace LibraryStudio.Forms
                         var left_rect = new Rectangle(
                             x + caption_pixel,
                             y,
-                            _fieldProperty.ContentBorderX - caption_pixel,
+                            _fieldProperty.GetContentBorderX(caption_pixel) - caption_pixel,
                             height);
                         MarcField.PaintBack(hdc, left_rect, clipRect, color);
                     }
@@ -1894,7 +1895,7 @@ namespace LibraryStudio.Forms
                     var backColor = _fieldProperty.BorderColor;
                     if (backColor != Color.Transparent)
                     {
-                        var x0 = x + _fieldProperty.SolidX + _fieldProperty.SolidPixelWidth;
+                        var x0 = x + _fieldProperty.GetSolidX(_fieldProperty.GetCaptionPixelWidth(1)) + _fieldProperty.SolidPixelWidth;
                         var line_rect = new Rectangle(x0, y, _fieldProperty.BorderThickness, height);
                         if (line_rect.IntersectsWith(clipRect))
                         {

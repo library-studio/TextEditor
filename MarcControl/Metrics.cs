@@ -177,6 +177,7 @@ namespace LibraryStudio.Forms
             // CaptionPixelWidth = averageCharWidth * 12;
         }
 
+        // 即将废止
         // 检测分割条和 Caption 区域
         // return:
         //      -3  Button 区域
@@ -217,72 +218,59 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public int NameX
+        public int GetNameX(int caption_pixel_width)
         {
-            get
-            {
-                // return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness + this.BorderThickness + this.BlankUnit; // 两侧都准备了空白
-                return NameBorderX + this.BorderThickness + this.BlankUnit;
-            }
+            // return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness + this.BorderThickness + this.BlankUnit; // 两侧都准备了空白
+            return GetNameBorderX(caption_pixel_width) + this.BorderThickness + this.BlankUnit;
         }
 
-        public int NameBorderX
+        public int GetNameBorderX(int caption_pixel_width)
         {
-            get
-            {
-                return this.CaptionPixelWidth + this.BorderThickness + this.GapThickness
-                    + this.ButtonWidth;
-                // Name 边框左边还有空白，用于绘制 Solid 区的左边线
-            }
+            return caption_pixel_width + this.BorderThickness + this.GapThickness
+                + this.ButtonWidth;
+            // Name 边框左边还有空白，用于绘制 Solid 区的左边线
         }
 
 
-        public int IndicatorX
+        public int GetIndicatorX(int caption_pixel_width)
         {
-            get
-            {
-                return this.NameX + this.NamePixelWidth;
-            }
+            return this.GetNameX(caption_pixel_width) + this.NamePixelWidth;
         }
 
-        public int IndicatorBorderX
+        public int GetIndicatorBorderX(int caption_pixel_width)
         {
-            get
-            {
-                return this.NameBorderX + this.NamePixelWidth;
-            }
+            return this.GetNameBorderX(caption_pixel_width) + this.NamePixelWidth;
         }
 
-        public int ContentX
+        public int GetContentX(int caption_pixel_width)
         {
-            get
-            {
-                return this.IndicatorX + this.IndicatorPixelWidth;
-            }
+            return this.GetIndicatorX(caption_pixel_width) + this.IndicatorPixelWidth;
         }
 
-        public int ContentBorderX
+        public int GetContentBorderX(int caption_pixel_width)
         {
-            get
-            {
-                return this.IndicatorBorderX + this.IndicatorPixelWidth;
-            }
+            return this.GetIndicatorBorderX(caption_pixel_width) + this.IndicatorPixelWidth;
         }
 
-        public int SolidX
+        public int GetSolidX(int caption_pixel_width)
         {
-            get
-            {
-                return this.CaptionPixelWidth;
-            }
+            return caption_pixel_width;
         }
 
         public int SolidPixelWidth
         {
             get
             {
+                return (this.BorderThickness + this.GapThickness
+                + this.ButtonWidth)
+                    + this.NamePixelWidth + this.IndicatorPixelWidth;
+            }
+            /*
+            get
+            {
                 return this.ContentBorderX - this.CaptionPixelWidth;
             }
+            */
         }
 
 #if OLD

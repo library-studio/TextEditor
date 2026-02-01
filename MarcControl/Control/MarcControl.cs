@@ -488,6 +488,7 @@ namespace LibraryStudio.Forms
             // base.OnPaintBackground(e);
         }
 
+#if REMOVED
         Rectangle GetFocusRect()
         {
             if (_caretInfo.ChildIndex >= this._record.FieldCount)
@@ -504,6 +505,7 @@ namespace LibraryStudio.Forms
                 AutoScrollMinSize.Width - _marcMetrics.NameBorderX,
                 field.GetPixelHeight());
         }
+#endif
 
 
         // private int _content_length = 0;
@@ -1637,7 +1639,7 @@ out long left_width);
                                     int x0 = this.HorizontalScroll.Value;
                                     info = _record.HitTest(
                                         e.KeyCode == Keys.Home ?
-                                        x0 + _marcMetrics.ContentX
+                                        x0 + _marcMetrics.GetContentX(_marcMetrics.GetCaptionPixelWidth(1))
                                         : this.ClientSize.Width,
                                         _caretInfo.Y);
                                 }
@@ -1710,7 +1712,7 @@ out long left_width);
     value);
 
                             var caret_y = _caretInfo.Y + delta;
-                            var caret_x = Math.Max(_marcMetrics.ContentX + 1, _lastX);
+                            var caret_x = Math.Max(_marcMetrics.GetContentX(_marcMetrics.GetCaptionPixelWidth(1)) + 1, _lastX);
 
                             var hit_info = this._record.HitTest(caret_x, caret_y);
                             //SetCaretOffs(hit_info.Offs);

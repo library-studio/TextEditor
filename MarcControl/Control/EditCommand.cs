@@ -919,7 +919,7 @@ namespace LibraryStudio.Forms
                         var handle = e.Graphics.GetHdc();
                         using (var hdc = new SafeHDC(handle))
                         {
-                            int x = -_marcMetrics.SolidX;
+                            int x = -_marcMetrics.GetSolidX(_marcMetrics.GetCaptionPixelWidth(1));
                             int y = 0;
                             foreach (var field in fields)
                             {
