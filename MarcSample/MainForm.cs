@@ -188,6 +188,7 @@ namespace MarcSample
                         },
                     };
                 case "100|a|(0/2)":
+                case "410|100|a|(0/2)":
                     return new List<ValueItem>
                     {
                         new ValueItem {

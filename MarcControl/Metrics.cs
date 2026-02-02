@@ -315,6 +315,7 @@ namespace LibraryStudio.Forms
             return count;
         }
 
+        // 计算祖先中具有 ICaption 接口的对象的个数。也就是 Splitter 的层数
         public static int CountSplitterLevel(IBox box)
         {
             int count = 0;
@@ -328,6 +329,7 @@ namespace LibraryStudio.Forms
             return count;
         }
 
+        // 检查祖先中是否有 IFixed 接口的对象
         public static bool IsAncestorFixed(IBox box, bool include_myself)
         {
             var current = include_myself ? box : box.Parent;
@@ -340,6 +342,7 @@ namespace LibraryStudio.Forms
             return false;
         }
 
+        // 获得祖先中的 MarcField 对象
         public static MarcField GetAncestorField(IBox box, bool include_myself)
         {
             var current = include_myself ? box : box.Parent;

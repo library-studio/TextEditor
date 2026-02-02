@@ -507,6 +507,8 @@ e.Y + this.VerticalScroll.Value);
                 max_pixel_width = this._record.GetPixelWidth();
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
             SetCaret(HitByCaretOffs(_caret_offs), reset_selection: false, ensure_caret_visible: false);
+
+            // TODO: 改变 _lastX ?
         }
     }
 }

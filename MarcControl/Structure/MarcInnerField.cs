@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 
 using static Vanara.PInvoke.Gdi32;
@@ -37,7 +38,6 @@ namespace LibraryStudio.Forms
                     return base.PureTextLength;
                 return 2 + base.PureTextLength;
             }
-
         }
 
         public override string MergeTextMask(int start = 0, int end = int.MaxValue)
@@ -110,7 +110,7 @@ namespace LibraryStudio.Forms
 
         // direction 参数值，direction
         // 小于 0 表示这是从后向前移动，如果遇到后方可用的位置优先使用后方的；direction
-        // 大于 0 表表示这是从前向后的移动，如果遇到靠前的可用位置优先使用靠前的。
+        // 大于等于 0 表示这是从前向后的移动，如果遇到靠前的可用位置优先使用靠前的。
         // 而如果 direction 为零，则无法表达取舍倾向性。比如 offs:1 direction:0。如果确有倾向性要求，
         // 以倾向靠后的可用位置为例，上例可以改为以 offs:2 direction:-1 调用。
         // parameters:
@@ -134,10 +134,14 @@ namespace LibraryStudio.Forms
                 if (offs + direction >= 0
                     && offs + direction < 2)
                 {
-                    int current_offs = 0 - direction;
-                    if (direction <= 0)
-                        current_offs = 2 - direction;
-                    var ret = base.MoveByOffs(current_offs,
+                    if (direction < 0)
+                    {
+                        info = new HitInfo();
+                        return -1;  // -1 表示 caret 落入当前对象的左侧
+                    }
+                    //var new_direction = direction < 0 ? -1 : 0;
+                    //var new_offs = -direction;
+                    var ret = base.MoveByOffs(0 - direction,
                         direction,
                         out info);
                     info.Offs += 2;
@@ -168,7 +172,7 @@ namespace LibraryStudio.Forms
                 // TODO: 如果将来前导 2 字符在选中的时候也要显示块背景色，则需要在这里 Union 它的 Region
                 start_offs -= 2;
                 end_offs -= 2;
-                return base.GetRegion(start_offs, start_offs, 0);
+                return base.GetRegion(start_offs, end_offs, 0);
             }
         }
 
@@ -215,6 +219,8 @@ namespace LibraryStudio.Forms
                     end = -1;
                 }
 
+                if (start < 0)
+                    start = 0;
                 this.PlainText = false;
 
                 return base.ReplaceText(

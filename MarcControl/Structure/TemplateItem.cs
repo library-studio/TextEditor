@@ -43,7 +43,7 @@ namespace LibraryStudio.Forms
         public string ItemName { get; set; }
 
         public string Name { get; set; }
-        public IBox Parent { get; set; }
+        // public IBox Parent { get; set; }
 
         public int TextLength => _content?.TextLength ?? 0;
 

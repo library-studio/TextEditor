@@ -559,12 +559,42 @@ namespace LibraryStudio.Forms
             right = text.Substring(info.StartLength);
         }
 
+        static MarcInnerField HitInnerField(HitInfo info)
+        {
+            var current = info;
+            while (current != null)
+            {
+                if (current.Box is MarcInnerField)
+                {
+                    return current.Box as MarcInnerField;
+                }
+
+                current = current.InnerHitInfo;
+            }
+            return null;
+        }
+
         // 处理输入回车字符
         public virtual bool ProcessInputReturnChar(char ch,
             HitInfo info,
             bool delay)
         {
             Debug.Assert(this._caret_offs == info.Offs);
+
+            var inner_field = HitInnerField(info);
+            if (inner_field != null)
+            {
+                // 在内嵌字段的内容里插入 $1
+                var offs = _caret_offs;
+                ReplaceText(_caret_offs,
+    _caret_offs,
+    "\u001f1",
+    delay_update: delay,
+    auto_adjust_caret_and_selection: false);
+                offs += 2;
+                SetCaret(HitByCaretOffs(offs));
+                return true;
+            }
 
             if (ch == '\r')
             {
@@ -728,7 +758,13 @@ namespace LibraryStudio.Forms
             }
             else
             {
+                save_offs = this._caret_offs;
                 SetCaret(HitByCaretOffs(this._caret_offs));
+                if (this._caret_offs > save_offs)
+                {
+                    // 尝试恢复原先 caret 位置的举动，导致跨过这个位置向后了一部分距离。这通常是由于在内嵌字段的 $1 位置操作引起的
+                    return true;    // 这样就不必再专门向前移动一次了
+                }
             }
 
             // 向前移动一次 Caret

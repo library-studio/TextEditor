@@ -301,59 +301,71 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public virtual bool CaretMoveDown(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveDown(int x_param, int y_param, out HitInfo info)
         {
+            int x = x_param;
+            int y = y_param;
+
             if (y < 0)
             {
                 y = 0;
             }
+
+            int offs = 0;
 
             var rect = GetNameRect();
             if (x < rect.Right
                 && _name != null)
             {
                 // ChildIndex 中要填入表示所在位置的数字
-                var ret = _name.CaretMoveDown(x - rect.X,
-                    y - rect.Y,
+                var ret = _name.CaretMoveDown(x_param - rect.X,
+                    y_param - rect.Y,
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Name;
+                info.Offs += offs;
                 info.LineHeight = FirstLineCaretHeight(_name);
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
+            offs += _name?.TextLength ?? 0;
+
             rect = GetIndicatorRect();
             if (x < rect.Right
                 && _indicator != null)
             {
-                var ret = _indicator.CaretMoveDown(x - rect.X,
-                    y - rect.Y,
+                var ret = _indicator.CaretMoveDown(x_param - rect.X,
+                    y_param - rect.Y,
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Indicator;
+                info.Offs += offs;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
+            offs += _indicator?.TextLength ?? 0;
+
             if (_content != null)
             {
                 var x0 = GetContentX();
                 var y0 = GetContentY();
-                var ret = _content.CaretMoveDown(x - x0,
-                    y - y0, // Math.Max(0, y - y0),    // 避免在上沿以上
+                var ret = _content.CaretMoveDown(x_param - x0,
+                    y_param - y0, // Math.Max(0, y - y0),    // 避免在上沿以上
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
+                info.Offs += offs;
                 // 保持 info.LineHeight
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
@@ -364,55 +376,68 @@ namespace LibraryStudio.Forms
             return false;
         }
 
-        public virtual bool CaretMoveUp(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveUp(int x_param, int y_param, out HitInfo info)
         {
+            int x = x_param;
+            int y = y_param;
+
+            int offs = 0;
+
             x -= GetNameX();
             if (x < _metrics.NamePixelWidth
                 && _name != null)
             {
                 var rect = GetNameRect();
-                var ret = _name.CaretMoveUp(x - rect.X,
-                    y - rect.Y,
+                var ret = _name.CaretMoveUp(x_param - rect.X,
+                    y_param - rect.Y,
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Name;
+                info.Offs += offs;
                 info.LineHeight = FirstLineCaretHeight(_name);
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
+
+            offs += _name?.TextLength ?? 0;
+
             x -= _metrics.NamePixelWidth;
             if (x < _metrics.IndicatorPixelWidth
                 && _indicator != null)
             {
                 var rect = GetIndicatorRect();
-                var ret = _indicator.CaretMoveUp(x - rect.X,
-                    y - rect.Y,
+                var ret = _indicator.CaretMoveUp(x_param - rect.X,
+                    y_param - rect.Y,
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += rect.X;
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Indicator;
+                info.Offs += offs;
                 info.LineHeight = FirstLineCaretHeight(_indicator);
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
             }
 
+            offs += _indicator?.TextLength ?? 0;
+
             if (_content != null)
             {
                 var x0 = GetContentX();
                 var y0 = GetContentY();
-                x -= _metrics.IndicatorPixelWidth;
-                var ret = _content.CaretMoveUp(x - x0,
-                    Math.Max(0, y - y0),
+                // x -= _metrics.IndicatorPixelWidth;
+                var ret = _content.CaretMoveUp(x_param - x0,
+                    Math.Max(0, y_param - y0),
                     out HitInfo sub_info);
                 info = sub_info.Clone();
                 info.X += x0;
                 info.Y += y0;
                 info.ChildIndex = (int)FieldRegion.Content;
+                info.Offs += offs;
                 // 保持 info.LineHeight()
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
@@ -1016,10 +1041,10 @@ namespace LibraryStudio.Forms
             if (end_offs <= 0)
                 return null;
             // TODO: 改为使用 .FullTextLength
-            if (start_offs >= this.PureTextLength + virtual_tail_length)
+            if (start_offs >= this.TextLength/*this.PureTextLength + virtual_tail_length*/)
                 return null;
 
-            var array = new List<Point>();
+            // var array = new List<Point>();
             var boxes = new List<IBox>();
             GetBoxes();
             var tail_box = GetRightMost(); // boxes.LastOrDefault();
@@ -1037,8 +1062,10 @@ namespace LibraryStudio.Forms
                     );
                 if (result != null)
                 {
-                    var p = array[i];
-                    result.Offset(p.X, p.Y);
+                    // var p = array[i];
+                    // result.Offset(p.X, p.Y);
+                    var rect = GetRect(box);
+                    result.Offset(rect.X, rect.Y);
                     if (region == null)
                         region = result;
                     else
@@ -1058,19 +1085,42 @@ namespace LibraryStudio.Forms
                 if (_name != null)
                 {
                     boxes.Add(_name);
-                    var rect = GetNameRect();
-                    array.Add(new Point(rect.X, rect.Y));
+                    //var rect = GetNameRect();
+                    //array.Add(new Point(rect.X, rect.Y));
                 }
                 if (_indicator != null)
                 {
                     boxes.Add(_indicator);
-                    var rect = GetIndicatorRect();
-                    array.Add(new Point(rect.X, rect.Y));
+                    //var rect = GetIndicatorRect();
+                    //array.Add(new Point(rect.X, rect.Y));
                 }
                 if (_content != null)
                 {
                     boxes.Add(_content);
-                    array.Add(new Point(GetContentX(), GetContentY()));
+                    //array.Add(new Point(GetContentX(), GetContentY()));
+                }
+            }
+
+            Rectangle GetRect(IBox b)
+            {
+                if (_name == b)
+                {
+                    return GetNameRect();
+                }
+                else if (_indicator == b)
+                {
+                    return GetIndicatorRect();
+                }
+                else if (_content == b)
+                {
+                    return (new Rectangle(GetContentX(),
+                        GetContentY(),
+                        0,
+                        0));
+                }
+                else
+                {
+                    throw new ArgumentException("命中的 box 不属于三个区域中的任何一个");
                 }
             }
         }
@@ -2012,9 +2062,16 @@ clipRect);
                 throw new ArgumentException($"start ({start}) 必须小于 end ({end})");
             }
 
-            if (this.IsHeader == false && content != null && content.Contains(Metrics.FieldEndCharDefault))
+            if (this.IsHeader == false && content != null)
             {
-                throw new ArgumentException($"content 参数值中不允许包含字段结束符");
+                if (content.EndsWith(new string(Metrics.FieldEndCharDefault, 1)))
+                {
+                    content = content.Substring(0, content.Length - 1);
+                }
+                else if (content.Contains(Metrics.FieldEndCharDefault))
+                {
+                    throw new ArgumentException($"content 参数值中(除了最后一个字符以外)不允许包含字段结束符");
+                }
             }
 
             var update_rect = System.Drawing.Rectangle.Empty;
@@ -3277,7 +3334,7 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
                 if (this._viewMode == ViewMode.Plane)
                     return new ReplaceTextResult();
 
-                var text = this.MergePureText();
+                var text = this.MergeText();    // this.MergePureText();
                 this._viewMode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
                 ret1 = ReplaceText(
                     null,

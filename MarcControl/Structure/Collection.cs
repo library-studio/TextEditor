@@ -105,6 +105,7 @@ namespace LibraryStudio.Forms
                 out info);
             if (ret == true)
             {
+                /*
                 // 能成功 Move
                 y = info.Y + start_y;
                 if (y >= this.GetPixelHeight())
@@ -113,6 +114,13 @@ namespace LibraryStudio.Forms
                     return false;
                 }
                 info = this.HitTest(x, y);
+                return true;
+                */
+                var sub_info = info.Clone();
+                info.Y += start_y;
+                info.Offs += _lines.GetRange(0, index).Sum(o => o.TextLength);
+                info.ChildIndex = index;
+                info.InnerHitInfo = sub_info;
                 return true;
             }
 
@@ -188,6 +196,7 @@ namespace LibraryStudio.Forms
                 out info);
             if (ret == true)
             {
+                /*
                 // 能成功 Move
                 info = new HitInfo { Box = this };
                 y -= 1; // Line.GetLineHeight();
@@ -197,6 +206,13 @@ namespace LibraryStudio.Forms
                     return false;
                 }
                 info = this.HitTest(x, y);
+                return true;
+                */
+                var sub_info = info.Clone();
+                info.Y += start_y;
+                info.Offs += _lines.GetRange(0, index).Sum(o => o.TextLength);
+                info.ChildIndex = index;
+                info.InnerHitInfo = sub_info;
                 return true;
             }
 
@@ -510,6 +526,39 @@ namespace LibraryStudio.Forms
                     var ret = line.MoveByOffs(offs_param - offs,
                         direction,
                         out HitInfo hit_info);
+                    if (ret == -1)
+                    {
+                        // 2026/2/2
+                        // 改用前一个对象的最后字符以右
+                        if (i > 0)
+                        {
+                            var prev_line = _lines[i - 1];
+                            ret = prev_line.MoveByOffs(offs,
+        0,
+        out hit_info);
+                            if (ret == 0)
+                            {
+                                offs -= prev_line.TextLength;
+                                start_y -= prev_line.GetPixelHeight();
+
+                                var temp_info = new HitInfo
+                                {
+                                    X = hit_info.X,
+                                    Y = hit_info.Y + start_y,
+                                    Area = hit_info.Area,
+                                    ChildIndex = i,
+                                    TextIndex = hit_info.Offs,
+                                    Offs = offs + hit_info.Offs,
+                                    LineHeight = hit_info.LineHeight,
+                                    Box = this,
+                                    InnerHitInfo = hit_info,
+                                };
+                                info = temp_info;
+                                return 0;
+                            }
+                        }
+                    }
+
                     if (ret == 0)
                     {
                         Debug.Assert(ret == 0);

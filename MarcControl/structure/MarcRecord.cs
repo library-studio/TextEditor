@@ -120,6 +120,7 @@ namespace LibraryStudio.Forms
                 out info);
             if (ret == true)
             {
+                /*
                 // 能成功 Move
                 y = info.Y + start_y;
                 if (y >= this.GetPixelHeight())
@@ -128,6 +129,13 @@ namespace LibraryStudio.Forms
                     return false;
                 }
                 info = this.HitTest(x, y);
+                return true;
+                */
+                var sub_info = info.Clone();
+                info.Y += start_y;
+                info.Offs += _fields.GetRange(0, index).Sum(o => o.TextLength);
+                info.ChildIndex = index;
+                info.InnerHitInfo = sub_info;
                 return true;
             }
 
@@ -220,6 +228,7 @@ namespace LibraryStudio.Forms
                 out info);
             if (ret == true)
             {
+                /*
                 // 能成功 Move
                 info = new HitInfo { Box = this };
                 y -= 1; // Line.GetLineHeight();
@@ -229,6 +238,13 @@ namespace LibraryStudio.Forms
                     return false;
                 }
                 info = this.HitTest(x, y);
+                return true;
+                */
+                var sub_info = info.Clone();
+                info.Y += start_y;
+                info.Offs += _fields.GetRange(0, index).Sum(o=>o.TextLength);
+                info.ChildIndex = index;
+                info.InnerHitInfo = sub_info;
                 return true;
             }
 
@@ -340,7 +356,7 @@ namespace LibraryStudio.Forms
                 current_y += height;
 
                 // TODO: 改为使用 .FullTextLength
-                offs += field.PureTextLength + return_length;
+                offs += field.TextLength;   // field.PureTextLength + return_length;
             }
 
             this.MoveByOffs(offs,
@@ -688,9 +704,9 @@ namespace LibraryStudio.Forms
                 // info.RangeIndex = 0;
                 field = _fields[i] as MarcField;
                 // TODO: 改为使用 .FullTextLength
-                var line_text_length = field.PureTextLength;
-                var return_length = i == 0 ? 0 : 1;
-                var text_length = line_text_length + return_length;
+                //var line_text_length = field.PureTextLength;
+                //var return_length = i == 0 ? 0 : 1;
+                var text_length = field.TextLength; // line_text_length + return_length;
                 if (offs_param + direction >= offs && offs_param + direction <= offs + text_length) // 2026/1/15 从 < 改为 <=
                 {
                     var ret = field.MoveByOffs(offs_param - offs,
@@ -859,7 +875,8 @@ namespace LibraryStudio.Forms
                 }
 
                 // TODO: 改为使用 .FullTextLength
-                current_offs += field.PureTextLength + (i == 0 ? 0 : 1);
+                // current_offs += field.PureTextLength + (i == 0 ? 0 : 1);
+                current_offs += field.TextLength;
 
                 y += field.GetPixelHeight();
                 i++;
@@ -905,7 +922,7 @@ namespace LibraryStudio.Forms
                 }
                 y += paragraph_height;
                 // TODO: 改为使用 .FullTextLength
-                current_start_offs += field.PureTextLength + (i == 0 ? 0 : 1);
+                current_start_offs += field.TextLength; // field.PureTextLength + (i == 0 ? 0 : 1);
                 i++;
             }
         }
@@ -2958,7 +2975,7 @@ out HitInfo hit_info);
             foreach (MarcField field in _fields)
             {
                 // TODO: 改为使用 .FullTextLength
-                var raw_text_length = field.PureTextLength;
+                // var raw_text_length = field.PureTextLength;
                 if (i == field_index)
                 {
                     start = offs;
@@ -2969,7 +2986,7 @@ out HitInfo hit_info);
                     end = offs;
                     return true;
                 }
-                offs += raw_text_length + (i == 0 ? 0 : 1);
+                offs += field.TextLength;   // raw_text_length + (i == 0 ? 0 : 1);
 
                 // start_y += field.GetPixelHeight();
                 i++;
@@ -3019,7 +3036,7 @@ out HitInfo hit_info);
             foreach (MarcField field in _fields)
             {
                 // TODO: 改为使用 .FullTextLength
-                var raw_text_length = field.PureTextLength;
+                // var raw_text_length = field.PureTextLength;
                 if (i >= field_index)
                 {
                     results.Add(offs);
@@ -3029,7 +3046,7 @@ out HitInfo hit_info);
                 {
                     return results;
                 }
-                offs += raw_text_length + (i == 0 ? 0 : 1);
+                offs += field.TextLength;   // raw_text_length + (i == 0 ? 0 : 1);
                 i++;
             }
 
@@ -3062,9 +3079,10 @@ out HitInfo hit_info);
             foreach (MarcField field in _fields)
             {
                 // TODO: 改为使用 .FullTextLength
-                var raw_text_length = field.PureTextLength;
-                var length = raw_text_length + (i == 0 ? 0 : 1);
-                // if (offs >= start && offs + length < end)
+                //var raw_text_length = field.PureTextLength;
+                //var length = raw_text_length + (i == 0 ? 0 : 1);
+                var length = field.TextLength;
+
                 if (Utility.Cross(start, end == -1 ? Int32.MaxValue : end,
                     offs, offs + length))
                 {
