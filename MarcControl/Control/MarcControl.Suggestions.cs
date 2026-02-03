@@ -78,13 +78,14 @@ namespace LibraryStudio.Forms
         /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
         /// 弹窗不会激活窗口（WS_EX_NOACTIVATE），因此输入焦点、IME 保持在 MarcControl。
         /// </summary>
+        // parameters:
+        //      ref_rect    参考用的矩形。这个矩形是显示小窗口时需要避开的一个区域
         public void ShowSuggestion(
             Font value_font,
             Font comment_font,
             IEnumerable<ValueItem> arr,
             string selected_item_text,
-            int delta_x,
-            int delta_y,
+            Rectangle ref_rect,
             delegate_itemChosen func_itemChosen,
             delegate_cancel func_cancel)
         {
@@ -98,15 +99,33 @@ namespace LibraryStudio.Forms
                 comment_font,
                 func_itemChosen,
                 func_cancel);
+            // 设置事项，并且初始化小窗口尺寸
             _suggestionPopup.SetItems(arr, selected_item_text);
 
             _suggestionPopup._focus_owner = this;
 
             // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示，否则上方
-            var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value + delta_x,
-                                        _caretInfo.Y - this.VerticalScroll.Value + delta_y);
+
+            //var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value + delta_x,
+            //                            _caretInfo.Y - this.VerticalScroll.Value + delta_y);
+            var caretClient = new Point(ref_rect.Right, ref_rect.Top);
             var screenCaret = this.PointToScreen(caretClient);
-            int belowY = screenCaret.Y + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+
+            int belowY = screenCaret.Y;
+            if (ref_rect.Width == 0)
+                belowY += ref_rect.Height;
+
+            // + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+
+            Rectangle screenBounds = Screen.FromControl(this).WorkingArea;
+            if (belowY + _suggestionPopup.Height > screenBounds.Height)
+            {
+                belowY = screenCaret.Y - _suggestionPopup.Height;
+            }
+            if (screenCaret.X + _suggestionPopup.Width > screenBounds.Width)
+            {
+                screenCaret.X -= ref_rect.Width + _suggestionPopup.Width;
+            }
 
             // 使用屏幕坐标显示无激活窗体
             _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));

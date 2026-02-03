@@ -348,7 +348,7 @@ namespace LibraryStudio.Forms
                 return true;
             }
 
-            var ret = OpenValueListWindow();
+            var ret = _openValueListWindow();
             /*
             if (ret == true && item_text_length > 0)
             {
@@ -375,7 +375,7 @@ namespace LibraryStudio.Forms
             return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
 
 
-            bool OpenValueListWindow()
+            bool _openValueListWindow()
             {
                 int list_item_text_length = 0;
                 // 获得值列表。注意值的字符数可能比 TemplateItem 文本长度短(一般是整倍关系)
@@ -407,18 +407,36 @@ namespace LibraryStudio.Forms
                         _caret_offs);
                 }
 
+                // 兄弟中最宽的宽度
+                int item_width = (template_item.Parent as Template).Children
+                    .Where(o => o.Overflow == false)
+                    .Max(o => o.GetPixelWidth());
+                Rectangle ref_rect = new Rectangle(_caretInfo.X,
+                    _caretInfo.Y,
+                    0,
+                    template_item.GetPixelHeight());
+                if (has_focus == false)
+                {
+                    //var caption_pixel_width = _marcMetrics.GetCaptionPixelWidth(template_item);
+                    ref_rect = new Rectangle(_caretInfo.X - hit_info.X/* + caption_pixel_width*/,
+                    _caretInfo.Y,
+                    item_width + FontContext.DefaultReturnWidth/* - caption_pixel_width*/,
+                    template_item.GetPixelHeight());
+                }
+#if REMOVED
                 int delta_x = 0;
                 int delta_y = 0;
                 if (has_focus == false)
                 {
                     // int item_width = template_item.GetPixelWidth();
-                    // 兄弟中最宽的宽度
-                    int item_width = (template_item.Parent as Template).Children
-                        .Where(o => o.Overflow == false)
-                        .Max(o => o.GetPixelWidth());
+
+                    ref_rect.Width = item_width + FontContext.DefaultReturnWidth;
+                    /*
                     delta_x = -hit_info.X + item_width + FontContext.DefaultReturnWidth;
                     delta_y = -hit_info.Y - template_item.GetPixelHeight();
+                    */
                 }
+#endif
 
                 // 检查当前 TemplateItem 是否因法定字符数不足，需要进行空白字符填充
                 int padding_length = template_item.GetPaddingText(PaddingStyle.TemplateWhole,
@@ -433,8 +451,9 @@ namespace LibraryStudio.Forms
                     comment_font,
                     list,
                     replaced_text,
-                    delta_x,
-                    delta_y,
+                    //delta_x,
+                    //delta_y,
+                    ref_rect,
                     (chosen) =>
                     {
                         if (string.IsNullOrEmpty(chosen))
@@ -463,8 +482,16 @@ namespace LibraryStudio.Forms
                             auto_adjust_caret_and_selection: true,
                             add_history: true);
                         Select(new_caret_offs, new_caret_offs, new_caret_offs + 1, -1);
-
                         HideSuggestion();
+
+                        // 重新打开
+                        if (_valueListFloating)
+                        {
+                            this.BeginInvoke(new Action(() =>
+                            {
+                                OpenValueListWindow(this.CaretInfo, true);
+                            }));
+                        }
                     },
                     () =>
                     {
