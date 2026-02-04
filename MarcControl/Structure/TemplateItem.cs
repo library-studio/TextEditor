@@ -621,7 +621,7 @@ caption?.GetPixelHeight() ?? 0);
                     break;
                 }
 
-                var info = sibling.GetStructureInfoByBox(sibling, 1);
+                var info = sibling.GetStructureInfoByBox(sibling, 1, null/* 从缓存中取得 */);
                 if (info.Length == 0)
                 {
                     // 遇到自由长度的。理论上自由长度的事项以后不再有任何固定长事项

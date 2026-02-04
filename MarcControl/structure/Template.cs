@@ -17,14 +17,20 @@ namespace LibraryStudio.Forms
         {
         }
 
+        UnitInfo _struct = null;
+
         public override IEnumerable<string> SplitChildren(string text)
         {
-            var container_info = this.GetStructureInfoByBox(this.Parent, 2);
+            _struct = null;
+            var container_info = this.GetStructureInfoByBox(this.Parent,
+                2,
+                text);
             if (container_info == null)
             {
                 return base.SplitChildren(text);
             }
 
+            _struct = container_info;
             return SplitChars(text, container_info);
         }
 
@@ -55,7 +61,7 @@ namespace LibraryStudio.Forms
         public override TemplateItem CreateChild(IContext context, int index, string text)
         {
             var result = base.CreateChild(context, index, text);
-            var container_info = this.GetStructureInfoByBox(this.Parent, 2);
+            var container_info = _struct;   // this.GetStructureInfoByBox(this.Parent, 2);
             int count = container_info?.SubUnits?.Count ?? -1;
             if (count > 0 && index > count - 1)
             {
@@ -66,7 +72,7 @@ namespace LibraryStudio.Forms
             {
                 var info = container_info?.SubUnits?.ElementAtOrDefault(index);
                 result.ItemName = info?.Name;
-                result.SetStructureInfo(info, 1);
+                result.SetStructureInfo(info, 1, null); // null 是为了便于后面再次容易从缓存中取得
                 // result._initialCaptionText = this.StructureInfo?.SubUnits?.ElementAtOrDefault(index)?.Caption;
                 result.Overflow = false;
             }

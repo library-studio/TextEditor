@@ -71,17 +71,21 @@ namespace LibraryStudio.Forms
         public override MarcInnerField CreateChild(IContext context, int index, string text)
         {
             var result = base.CreateChild(context, index, text);
-            var container_info = this.GetStructureInfoByBox(this.Parent, 2);
+            var container_info = _struct;   // this.GetStructureInfoByBox(this.Parent, 2);
             // int count = container_info?.SubUnits?.Count ?? -1;
             var name = MarcSubfield.NormalizeName(text.Substring(0, Math.Min(2, text.Length)));
             var info = container_info?.SubUnits?.Where(o => o.Name == name).FirstOrDefault();
-            result.SetStructureInfo(info, 1);
+            result.SetStructureInfo(info, 1, null);
             return result;
         }
+
+        UnitInfo _struct = null;
 
         // 把文字内容按需切割为子结构所需的部分
         public override IEnumerable<string> SplitChildren(string text)
         {
+            _struct = this.GetStructureInfoByBox(this.Parent, 2, text);
+
             return SplitFields(text);
         }
 

@@ -1166,3 +1166,361 @@ namespace LibraryStudio.Forms
 如果你要，我可以：
 - 根据你项目中真实的 `ValueItem` 类型，把反射替换为强类型访问并提交 patch；
 - 增加高 DPI 支持（使用 Graphics.DpiX 时的缩放校正）或左右列分隔线/图标支持。
+
+~~~
+
+GitHub Copilot
+
+深吸一口气。
+
+原因简述  
+点击滚动条会触发 WM_MOUSEACTIVATE，使控件尝试接收激活/焦点。要在不激活弹窗且仍能操作滚动条的情况下防止焦点转移，正确做法是在承载滚动条的控件上拦截 WM_MOUSEACTIVATE 并返回 MA_NOACTIVATE（而不是吃掉事件），这样鼠标事件继续被处理但窗口不被激活。
+
+实现方案（改变点）
+- 用自定义的 `NoActivateListBox : ListBox`，在 `WndProc` 中处理 `WM_MOUSEACTIVATE` 并返回 `MA_NOACTIVATE`。
+- 在 `SuggestionPopup` 中把 `_listBox` 换成 `NoActivateListBox`（其余 OwnerDraw 逻辑不变）。
+
+把下面代码替换到 `MarcControl\Control\SuggestionPopup.cs`（或只把 `NoActivateListBox` 类添加并把 `_listBox = new ListBox(...)` 改为 `_listBox = new NoActivateListBox(...)`）：
+
+```csharp
+csharp MarcControl\Control\SuggestionPopup.cs
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Windows.Forms;
+using static Vanara.PInvoke.User32;
+
+namespace LibraryStudio.Forms
+{
+    /// <summary>
+    /// 无激活的候选弹出框（使用 WS_EX_NOACTIVATE）。
+    /// ListBox 使用 OwnerDraw，实现左右两列显示 ValueItem 的两个成员。
+    /// </summary>
+    internal class SuggestionPopup : Form
+    {
+        readonly ListBox _listBox;
+        // ... 其他字段与构造器保持不变 ...
+
+        public SuggestionPopup(Metrics metrics,
+            Font value_font,
+            Font comment_font,
+            char hilight_blank_char)
+        {
+            // ... 之前的初始化代码 ...
+
+            // 使用自定义 ListBox，拦截 WM_MOUSEACTIVATE
+            _listBox = new NoActivateListBox
+            {
+                BorderStyle = BorderStyle.FixedSingle,
+                IntegralHeight = false,
+                SelectionMode = SelectionMode.One,
+                TabStop = false,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                BackColor = metrics.BackColor,
+            };
+
+            // ... 其余初始化、事件绑定等保持不变 ...
+            _listBox.DrawItem += ListBox_DrawItem;
+            _listBox.MeasureItem += ListBox_MeasureItem;
+            _listBox.MouseClick += (s, e) => { AcceptSelected(); };
+            _listBox.DoubleClick += (s, e) => { AcceptSelected(); };
+
+            this.Controls.Add(_listBox);
+        }
+
+        // ... 剩余 SuggestionPopup 实现保持不变 ...
+
+        // 自定义 ListBox：在点击/滚动条时不激活窗口，但仍处理鼠标事件
+        internal class NoActivateListBox : ListBox
+        {
+            const int WM_MOUSEACTIVATE = 0x0021;
+            const int MA_NOACTIVATE = 3; // 不激活窗口并且不吃掉鼠标消息
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WM_MOUSEACTIVATE)
+                {
+                    // 返回 MA_NOACTIVATE：不激活窗口，但鼠标消息会继续被处理（滚动条可用）
+                    m.Result = new IntPtr(MA_NOACTIVATE);
+                    return;
+                }
+                base.WndProc(ref m);
+            }
+        }
+    }
+}
+```
+
+注意与测试建议
+- 编译后检查行为：点击滚动条时 `MarcControl` 应保持焦点，滚动条仍可拖动/点击。
+- 若在某些系统/主题下仍出现焦点跳转（极少见），可以同时拦截弹窗或父窗体的 `WM_MOUSEACTIVATE`，或在 `SuggestionPopup` 的 `CreateParams` 中确保 `WS_EX_NOACTIVATE` 已正确设置（你已有该设置）。
+- 由于弹窗不激活，`ListBox` 不会获得键盘焦点；键盘选择（上下/回车）仍应通过 `MarcControl` 的 `HandlePopupKeyDown/KeyPress` 路由到 `_listBox` 的选择方法（你已有实现）。
+- 如果需要在鼠标按下滚动条时改变弹窗的“显示样式”（例如高亮），可在 `NoActivateListBox` 中处理 `WM_NCLBUTTONDOWN` 或 `WM_LBUTTONDOWN` 等消息，但不要改变激活行为。
+
+需要我把上述改动直接打成 patch 并提交到仓库吗？
+
+
+~~~~
+
+GitHub Copilot
+
+深吸一口气。
+
+思路简短：在显示 SuggestionPopup 时，让 MarcControl 开始“追踪”宿主窗体与自身的位置/大小变化；当这些事件发生时重新计算 caret 的屏幕坐标并调用 popup 的 `ShowAt(...)`（或 Hide/重新定位）。在隐藏 popup 时移除事件订阅。这样当包含 MarcControl 的窗口移动、缩放或控件在容器中移动时，弹窗会跟随。
+
+下面给出可直接替换 `MarcControl\Control\MarcControl.Suggestions.cs` 的实现，增加了追踪逻辑（Start/StopTracking、RepositionSuggestionPopup、事件处理）。把整个文件覆盖粘贴即可（改动点在 ShowSuggestion/HideSuggestion 内调用 Start/Stop，新增追踪相关私有成员与方法）。
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    public partial class MarcControl
+    {
+        SuggestionPopup _suggestionPopup;
+
+        // 记录用于追踪的宿主 Form（FindForm()）
+        Form _popupOwnerForm = null;
+
+        void EnsureSuggestionPopup()
+        {
+            if (_suggestionPopup != null)
+                return;
+            // 注意 SuggestionPopup 构造签名：保持你工程中已有构造器参数一致
+            _suggestionPopup = new SuggestionPopup(this._marcMetrics, this.FixedSizeFont, this.CaptionFont, this.HighlightBlankChar);
+            _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
+            _suggestionPopup.Cancelled += (s, e) => { /* nothing by default */ };
+        }
+
+        void SuggestionPopup_ItemChosen(object sender, string chosen)
+        {
+            if (string.IsNullOrEmpty(chosen))
+                return;
+
+            // 把选中的内容插入到当前 caret 位置
+            ReplaceText(_caret_offs, _caret_offs, chosen, delay_update: true, auto_adjust_caret_and_selection: true, add_history: true);
+
+            // 隐藏弹窗并停止追踪
+            HideSuggestion();
+            // 插入后确保 IME 合成窗口位置正确
+            try { SetCompositionWindowPos(); } catch { }
+        }
+
+        /// <summary>
+        /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
+        /// 弹窗不会激活窗口（WS_EX_NOACTIVATE），因此输入焦点、IME 保持在 MarcControl。
+        /// </summary>
+        public void ShowSuggestion(IEnumerable<ValueItem> items)
+        {
+            var arr = (items ?? Enumerable.Empty<ValueItem>()).ToArray();
+            if (arr.Length == 0)
+            {
+                HideSuggestion();
+                return;
+            }
+
+            EnsureSuggestionPopup();
+            _suggestionPopup.SetItems(arr, selected_item_text: null);
+
+            // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示否则上方
+            RepositionSuggestionPopup();
+
+            // 开始追踪宿主窗体与控件自身的移动/大小变化
+            StartPopupTracking();
+
+            // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置
+            try { SetCompositionWindowPos(); } catch { }
+
+            Debug.Assert(_suggestionPopup.Visible == true);
+        }
+
+        public void HideSuggestion()
+        {
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                try { _suggestionPopup.Hide(); } catch { }
+            }
+
+            // 关闭后停止追踪并更新 IME 合成窗口位置
+            StopPopupTracking();
+            try { SetCompositionWindowPos(); } catch { }
+        }
+
+        // 重新计算弹窗的位置并显示（仅在弹窗可见时调用也可用于刚显示时）
+        void RepositionSuggestionPopup()
+        {
+            if (_suggestionPopup == null)
+                return;
+            // 计算 caret 在控件 client 坐标
+            var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value,
+                                        _caretInfo.Y - this.VerticalScroll.Value);
+
+            // 转为屏幕坐标
+            var screenCaret = this.PointToScreen(caretClient);
+
+            // 优先在 caret 下方显示
+            int belowY = screenCaret.Y + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+
+            // 如果 popup 已可见，直接移动；否则显示
+            try
+            {
+                _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
+            }
+            catch
+            {
+                // 兜底：若 ShowAt 不可用，先尝试 Hide 再 Show
+                try { _suggestionPopup.Hide(); } catch { }
+                try { _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY)); } catch { }
+            }
+        }
+
+        // 开始订阅移动/大小等事件以便跟随
+        void StartPopupTracking()
+        {
+            StopPopupTracking(); // 防止重复订阅
+
+            // 订阅宿主 Form 的移动/位置/大小变化事件
+            var f = this.FindForm();
+            if (f != null)
+            {
+                _popupOwnerForm = f;
+                _popupOwnerForm.Move += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.LocationChanged += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.SizeChanged += PopupOwnerForm_MovedOrResized;
+            }
+
+            // 订阅本控件的变化事件（控件被父容器布局/移动时）
+            this.LocationChanged += MarcControl_LocationChanged;
+            this.VisibleChanged += MarcControl_VisibleChanged;
+
+            // 如果控件滚动（OnScroll 被覆盖），你也可以调用 RepositionSuggestionPopup()，
+            // 这里直接订阅一个可观察到的事件：当 MarcControl 的滚动发生时（如果有），在 OnScroll 中显式调用 RepositionSuggestionPopup。
+        }
+
+        void StopPopupTracking()
+        {
+            if (_popupOwnerForm != null)
+            {
+                try
+                {
+                    _popupOwnerForm.Move -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.LocationChanged -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.SizeChanged -= PopupOwnerForm_MovedOrResized;
+                }
+                catch { }
+                _popupOwnerForm = null;
+            }
+
+            try
+            {
+                this.LocationChanged -= MarcControl_LocationChanged;
+                this.VisibleChanged -= MarcControl_VisibleChanged;
+            }
+            catch { }
+        }
+
+        // 事件处理：宿主窗体移动或大小变化
+        void PopupOwnerForm_MovedOrResized(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            // 异步调用以避开可能的重入或时序问题
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        // 事件处理：MarcControl 自身位置/可见性变化
+        void MarcControl_LocationChanged(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        void MarcControl_VisibleChanged(object sender, EventArgs e)
+        {
+            // 若控件隐藏，隐藏 popup
+            if (!this.Visible)
+            {
+                HideSuggestion();
+                return;
+            }
+            // 若可见且 popup 显示中，重新定位
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    try { RepositionSuggestionPopup(); } catch { }
+                }));
+            }
+        }
+
+        // 保持已有的键盘路由接口
+        public bool HandlePopupKeyDown(KeyEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Up:
+                    if (_suggestionPopup.SelectPrev()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Down:
+                    if (_suggestionPopup.SelectNext()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageUp:
+                    if (_suggestionPopup.PageUp()) { e.Handled = true; return true; }
+                    break;
+                case Keys.PageDown:
+                    if (_suggestionPopup.PageDown()) { e.Handled = true; return true; }
+                    break;
+                case Keys.Enter:
+                case Keys.Tab:
+                    // 确认当前选中项
+                    _suggestionPopup.AcceptSelected();
+                    e.Handled = true;
+                    return true;
+                case Keys.Escape:
+                    HideSuggestion();
+                    e.Handled = true;
+                    return true;
+            }
+            return false;
+        }
+
+        public bool HandlePopupKeyPress(KeyPressEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            if (e.KeyChar == (char)Keys.Escape)
+            {
+                HideSuggestion();
+                e.Handled = true;
+                return true;
+            }
+            return false;
+        }
+    }
+}
+```
+
+实现要点与注意事项（简短）
+- 使用 `FindForm()` 订阅宿主窗体的 `Move` / `LocationChanged` / `SizeChanged`，并订阅控件自身的 `LocationChanged`/`VisibleChanged`，能覆盖大多数窗体移动、缩放和布局调整场景。
+- 在事件中使用 `BeginInvoke` 异步调用 `RepositionSuggestionPopup()`，避免在窗体移动的同步事件流中发生重入或时序问题。
+- 如果你的控件所在容器会滚动（例如放在滚动容器中），请在那种滚动事件（例如覆写的 `OnScroll` / 父控件的 Scroll 事件）中也调用 `RepositionSuggestionPopup()` 或在 StartPopupTracking 时订阅父容器的 Layout/Scroll。
+- 当宿主窗体被最小化或控件不可见时，建议立即隐藏 popup（已在 VisibleChanged 处理）。
+- 若弹窗仍然偶尔位置不准确，可在 RepositionSuggestionPopup 中增加对可用屏幕工作区的检查并调整为上方显示。
+
+需要我把这些改动直接打入仓库（生成 patch）并把 MarcControl.ShowSuggestion 中的调用点替换为新的实现吗？

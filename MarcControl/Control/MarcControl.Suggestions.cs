@@ -11,6 +11,9 @@ namespace LibraryStudio.Forms
     {
         SuggestionPopup _suggestionPopup;
 
+        // 记录用于追踪的宿主 Form（FindForm()）
+        Form _popupOwnerForm = null;
+
         void EnsureSuggestionPopup(Font value_font,
             Font comment_font,
             delegate_itemChosen func_itemChosen,
@@ -108,7 +111,8 @@ namespace LibraryStudio.Forms
 
             //var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value + delta_x,
             //                            _caretInfo.Y - this.VerticalScroll.Value + delta_y);
-            var caretClient = new Point(ref_rect.Right, ref_rect.Top);
+            var caretClient = new Point(ref_rect.Right - this.HorizontalScroll.Value,
+                ref_rect.Top - this.VerticalScroll.Value);
             var screenCaret = this.PointToScreen(caretClient);
 
             int belowY = screenCaret.Y;
@@ -130,15 +134,13 @@ namespace LibraryStudio.Forms
             // 使用屏幕坐标显示无激活窗体
             _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
 
-            /*
-            // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置
-            try { SetCompositionWindowPos(); } catch { }
+            // 开始追踪宿主窗体与控件自身的移动/大小变化
+            StartPopupTracking();
 
-            Debug.Assert(_suggestionPopup.Visible == true);
-            */
             BeginInvoke(new Action(() =>
             {
                 try { this.Focus(); } catch { }
+                // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置
                 try { SetCompositionWindowPos(); } catch { }
             }));
         }
@@ -150,11 +152,109 @@ namespace LibraryStudio.Forms
                 try { _suggestionPopup.Hide(); } catch { }
                 if (reset_caret)
                     Select(_caret_offs, _caret_offs, _caret_offs);
+
+                // 关闭后也更新 IME 合成窗口位置
+                try { SetCompositionWindowPos(); } catch { }
+
+                // 关闭后停止追踪并更新 IME 合成窗口位置
+                StopPopupTracking();
+            }
+        }
+
+        #region 追踪大小改变、移动
+
+        // 开始订阅移动/大小等事件以便跟随
+        void StartPopupTracking()
+        {
+            StopPopupTracking(); // 防止重复订阅
+
+            // 订阅宿主 Form 的移动/位置/大小变化事件
+            var f = this.FindForm();
+            if (f != null)
+            {
+                _popupOwnerForm = f;
+                _popupOwnerForm.Move += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.LocationChanged += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.SizeChanged += PopupOwnerForm_MovedOrResized;
             }
 
-            // 关闭后也更新 IME 合成窗口位置
-            try { SetCompositionWindowPos(); } catch { }
+            // 订阅本控件的变化事件（控件被父容器布局/移动时）
+            this.LocationChanged += MarcControl_LocationChanged;
+            this.VisibleChanged += MarcControl_VisibleChanged;
+
+            // 如果控件滚动（OnScroll 被覆盖），你也可以调用 RepositionSuggestionPopup()，
+            // 这里直接订阅一个可观察到的事件：当 MarcControl 的滚动发生时（如果有），在 OnScroll 中显式调用 RepositionSuggestionPopup。
         }
+
+        void StopPopupTracking()
+        {
+            if (_popupOwnerForm != null)
+            {
+                try
+                {
+                    _popupOwnerForm.Move -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.LocationChanged -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.SizeChanged -= PopupOwnerForm_MovedOrResized;
+                }
+                catch { }
+                _popupOwnerForm = null;
+            }
+
+            try
+            {
+                this.LocationChanged -= MarcControl_LocationChanged;
+                this.VisibleChanged -= MarcControl_VisibleChanged;
+            }
+            catch { }
+        }
+
+        // 事件处理：宿主窗体移动或大小变化
+        void PopupOwnerForm_MovedOrResized(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            // 异步调用以避开可能的重入或时序问题
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        // 事件处理：MarcControl 自身位置/可见性变化
+        void MarcControl_LocationChanged(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        void MarcControl_VisibleChanged(object sender, EventArgs e)
+        {
+            // 若控件隐藏，隐藏 popup
+            if (!this.Visible)
+            {
+                HideSuggestion();
+                return;
+            }
+            // 若可见且 popup 显示中，重新定位
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    try { RepositionSuggestionPopup(); } catch { }
+                }));
+            }
+        }
+
+        void RepositionSuggestionPopup()
+        {
+            HideSuggestion();
+        }
+
+#endregion
 
         public bool ValueListWindowOpened()
         {

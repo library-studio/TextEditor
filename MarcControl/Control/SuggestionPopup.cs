@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using static Vanara.PInvoke.User32;
 
 namespace LibraryStudio.Forms
 {
@@ -65,7 +66,7 @@ namespace LibraryStudio.Forms
             DoubleBuffered = true;
             BackColor = metrics.BackColor;
 
-            _listBox = new ListBox
+            _listBox = new NoActivateListBox
             {
                 BorderStyle = BorderStyle.FixedSingle, // .FixedSingle,
                 IntegralHeight = false,
@@ -100,7 +101,7 @@ namespace LibraryStudio.Forms
                 // 为了解决在 _listBox 出现卷滚条时点了一下卷滚条之后无法 Esc 关闭小窗口的问题
                 this.BeginInvoke(new Action(() =>
                 {
-                    _focus_owner?.Focus();
+                    // _focus_owner?.Focus();
                 }));
             };
             /*
@@ -443,5 +444,24 @@ namespace LibraryStudio.Forms
 
         // Visible 包装
         public new bool Visible => base.Visible;
+    }
+
+
+    // 自定义 ListBox：在点击/滚动条时不激活窗口，但仍处理鼠标事件
+    internal class NoActivateListBox : ListBox
+    {
+        const int WM_MOUSEACTIVATE = 0x0021;
+        const int MA_NOACTIVATE = 3; // 不激活窗口并且不吃掉鼠标消息
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_MOUSEACTIVATE)
+            {
+                // 返回 MA_NOACTIVATE：不激活窗口，但鼠标消息会继续被处理（滚动条可用）
+                m.Result = new IntPtr(MA_NOACTIVATE);
+                return;
+            }
+            base.WndProc(ref m);
+        }
     }
 }

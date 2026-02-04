@@ -108,7 +108,9 @@ namespace LibraryStudio.Forms
         // _content 中存储的对象，可以是 Paragraph Template MarcSubfieldCollection 之一。
         // 其中，Template 在没有模板定义的情况下，默认当作一个 Paragraph 处理，那么实际上
         // _content 中存储的对象，可以简化为两种类型: Template 和 MarcSubfieldCollection 之一。
-        bool EnsureContent(string name, bool name_changed)
+        bool EnsureContent(string name,
+            bool name_changed,
+            string content)
         {
             bool NewParagraph()
             {
@@ -187,7 +189,7 @@ namespace LibraryStudio.Forms
 
             // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
             // 查询结构定义
-            var struct_info = GetStructureInfo(this.IsHeader ? "###" : name, UnitType.Field, 2);
+            var struct_info = GetStructureInfo(this.IsHeader ? "###" : name, UnitType.Field, 2, content/*头标区和 001 等字段可能直接有下级 Chars 结构*/);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
@@ -2019,7 +2021,7 @@ clipRect);
             EnsureCaption();
 
             // var caption = _fieldProperty.GetFieldCaption?.Invoke(this);
-            var caption = GetStructureInfo(this.IsHeader ? "###" : this.FieldName, UnitType.Field, 1)?.Caption;
+            var caption = GetStructureInfo(this.IsHeader ? "###" : this.FieldName, UnitType.Field, 1, null/* 从缓存取得 */)?.Caption;
             var ret = _caption.ReplaceText(
                 context,
                 dc,
@@ -2222,7 +2224,7 @@ clipRect);
                 // 保留一下 _content 内容清空之前，旧内容的宽度
                 int old_width = _content?.GetPixelWidth() ?? 0;
 
-                if (EnsureContent(name_value, name_value != old_name_value))
+                if (EnsureContent(name_value, name_value != old_name_value, content_value))
                 {
                     view_mode_changed = true;
                 }
@@ -2231,7 +2233,9 @@ clipRect);
                 if (content_value.LastOrDefault() == Metrics.FieldEndCharDefault)
                     content_value = content_value.Substring(0, content_value.Length - 1);
 
-                if (content_value != _content.MergeText())
+                if (view_mode_changed
+                    || content_value != _content.MergeText()
+                    )
                 {
                     ReplaceTextResult ret;
                     if (_content is IViewBox)
@@ -2323,7 +2327,7 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             }
             else
             {
-                EnsureContent(name_value, name_value != old_name_value);
+                EnsureContent(name_value, name_value != old_name_value, content_value);
                 Debug.Assert(_viewMode != ViewMode.None);
                 _content.Clear();
             }

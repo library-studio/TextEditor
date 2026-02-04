@@ -364,7 +364,10 @@ namespace LibraryStudio.Forms
 
     // 获得 box 下的结构信息
     // 头标区的 Name 为 "###"
-    public delegate UnitInfo GetStructureFunc(UnitNode[] path, int level);
+    // parameters:
+    //      content 要获得结构的部分的内容。用于辅助判断结构，例如 USMARC 的 006 007 008 字段
+    public delegate UnitInfo GetStructureFunc(UnitNode[] path,
+        int level);
 
     public class ValueItem
     {
@@ -378,11 +381,14 @@ namespace LibraryStudio.Forms
         public string Name { get; set; }
         public UnitType Type { get; set; }
 
+        public string Content { get; set; }
+
         // parameters:
         //      name    在 box 对象下级附加的最后一级的 Name。如果为 null，表示 box 已经是最后一级
         public static UnitNode[] BuildPath(IBox box,
             string last_level_name,
-            UnitType last_level_type = UnitType.Unknown)
+            UnitType last_level_type = UnitType.Unknown,
+            string last_level_content = null)
         {
             var results = new List<UnitNode>();
             var current = box;
@@ -430,7 +436,8 @@ namespace LibraryStudio.Forms
                 results.Add(new UnitNode
                 {
                     Name = last_level_name,
-                    Type = last_level_type
+                    Type = last_level_type,
+                    Content = last_level_content,
                 });
             }
 

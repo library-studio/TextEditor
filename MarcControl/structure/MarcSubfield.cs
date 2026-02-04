@@ -709,7 +709,7 @@ virtual_tail_length);
             return "";
         }
 
-        bool EnsureContent(string name, bool name_changed)
+        bool EnsureContent(string name, bool name_changed, string content)
         {
             bool NewParagraph()
             {
@@ -777,7 +777,7 @@ virtual_tail_length);
             // 查询之前对 name 进行修整
             name = NormalizeName(name);
             // var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name, 2);
-            var struct_info = GetStructureInfo(name, UnitType.Subfield, 2);
+            var struct_info = GetStructureInfo(name, UnitType.Subfield, 2, content);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
@@ -858,7 +858,7 @@ virtual_tail_length);
 
             if (view_mode_tree != null)
                 this._viewMode = view_mode_tree.ViewMode;
-            EnsureContent(name, old_name != name);
+            EnsureContent(name, old_name != name, new_text.Substring(name.Length));
             Debug.Assert(_viewMode != ViewMode.None);
 
             var x0 = GetContentX();

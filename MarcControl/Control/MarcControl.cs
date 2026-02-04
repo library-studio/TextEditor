@@ -1219,6 +1219,7 @@ out long left_width);
                 _caretCreated = false;
             }
             OnFocusedIndexChanged();
+
             base.OnLostFocus(e);
         }
 
@@ -1901,6 +1902,8 @@ out long left_width);
 
         protected override void OnScroll(ScrollEventArgs se)
         {
+            HideSuggestion();
+
             base.OnScroll(se);
             // this.Invalidate();
         }

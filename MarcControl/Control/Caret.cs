@@ -339,7 +339,7 @@ namespace LibraryStudio.Forms
                 return true;    // 只要是属于 TemplateItem 的区域都返回 true，这样避免往后继续做定义块的处理，保持行为一致
             }
 
-            var struct_info = template_item.GetStructureInfoByBox(template_item, 1);
+            var struct_info = template_item.GetStructureInfoByBox(template_item, 1, null/* 从缓存中取得 */);
             // 如果插入符在 TemplateItem 中定额的最后一个字符右边，则不能弹出 ValueList。因为这样弹出会让用户误以为时这里的 List 但实际上选择后修改了下一个 TemplateItem 的内容
             if (hit_info.Offs >= struct_info.Length)
             {
@@ -398,7 +398,7 @@ namespace LibraryStudio.Forms
                 if (list_item_text_length > 0)
                     offs = info.Offs - hit_info.Offs + ((hit_info.Offs / list_item_text_length) * list_item_text_length);
                 suggestion_caret_offs = offs;
-                replaced_text = this._record.MergeText(offs, offs + Math.Min(list_item_text_length, template_item_text_length));
+                replaced_text = this._record.MergeText(offs, offs + Math.Min(list_item_text_length, template_item_text_length - hit_info.Offs));
                 // 将编辑器对应的文本选中
                 if (has_focus)
                 {
@@ -464,7 +464,7 @@ namespace LibraryStudio.Forms
                         var end = suggestion_caret_offs + replaced_text.Length;
 
                         string new_text = chosen;
-                        int new_caret_offs = end;
+                        int new_caret_offs = start + chosen.Length;
                         if (before_length > 0)
                         {
                             new_text = new string(this.PaddingChar, before_length) + new_text;
@@ -482,6 +482,8 @@ namespace LibraryStudio.Forms
                             auto_adjust_caret_and_selection: true,
                             add_history: true);
                         Select(new_caret_offs, new_caret_offs, new_caret_offs + 1, -1);
+                        EnsureCaretVisible();
+
                         HideSuggestion();
 
                         // 重新打开
