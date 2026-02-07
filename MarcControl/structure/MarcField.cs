@@ -189,7 +189,10 @@ namespace LibraryStudio.Forms
 
             // TODO: 结构定义可以考虑缓存。这样反复收缩/展开时就不用重新查询定义了
             // 查询结构定义
-            var struct_info = GetStructureInfo(this.IsHeader ? "###" : name, UnitType.Field, 2, content/*头标区和 001 等字段可能直接有下级 Chars 结构*/);
+            var struct_info = GetStructureInfo(this.IsHeader ? "###" : name,
+                UnitType.Field,
+                2,
+                (o) => content/*头标区和 001 等字段可能直接有下级 Chars 结构*/);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
@@ -2021,7 +2024,24 @@ clipRect);
             EnsureCaption();
 
             // var caption = _fieldProperty.GetFieldCaption?.Invoke(this);
-            var caption = GetStructureInfo(this.IsHeader ? "###" : this.FieldName, UnitType.Field, 1, null/* 从缓存取得 */)?.Caption;
+            var caption = GetStructureInfo(this.IsHeader ? "###" : this.FieldName,
+                UnitType.Field,
+                1,
+                (o) => {
+                    var text = this.MergePureText();
+                    if (this.IsHeader)
+                        return text;
+                    if (this.IsControlField)
+                    {
+                        if (text.Length <= 3)
+                            return "";
+                        return text.Substring(3);
+                    }
+                    if (text.Length <= 5)
+                        return "";
+                    return text.Substring(5);
+                }
+                )?.Caption;
             var ret = _caption.ReplaceText(
                 context,
                 dc,

@@ -1524,3 +1524,420 @@ namespace LibraryStudio.Forms
 - 若弹窗仍然偶尔位置不准确，可在 RepositionSuggestionPopup 中增加对可用屏幕工作区的检查并调整为上方显示。
 
 需要我把这些改动直接打入仓库（生成 patch）并把 MarcControl.ShowSuggestion 中的调用点替换为新的实现吗？
+
+~~~
+
+当 MarcControl 控件所在的窗口从前台被推到后台时，如何让 _suggestionPopup 小窗口自动隐藏？注意_suggestionPopup 小窗口正常打开的时候本身会夺走 MarcControl 的 focus，这里要小心
+
+
+MarcControl\Control\MarcControl.Suggestions.cs
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+
+namespace LibraryStudio.Forms
+{
+    public partial class MarcControl
+    {
+        SuggestionPopup _suggestionPopup;
+
+        // 记录用于追踪的宿主 Form（FindForm()）
+        Form _popupOwnerForm = null;
+
+        // 用于检测宿主窗口是否仍在前台（被推到后台时隐藏 popup）
+        Timer _popupForegroundTimer = null;
+
+        void EnsureSuggestionPopup(Font value_font,
+            Font comment_font,
+            delegate_itemChosen func_itemChosen,
+            delegate_cancel func_cancel)
+        {
+            if (_suggestionPopup != null)
+                return;
+            _suggestionPopup = new SuggestionPopup(_marcMetrics,
+                value_font,
+                comment_font,
+                this.HighlightBlankChar);
+            // _suggestionPopup.ItemChosen += SuggestionPopup_ItemChosen;
+            _suggestionPopup.ItemChosen += (s, e) => { func_itemChosen?.Invoke(e); };
+            _suggestionPopup.Cancelled += (s, e) => { func_cancel?.Invoke(); };
+        }
+
+#if REMOVED
+        void SuggestionPopup_ItemChosen(object sender, string chosen)
+        {
+            if (string.IsNullOrEmpty(chosen))
+                return;
+
+            // 把选中的内容插入到当前 caret 位置
+            // ReplaceText(_caret_offs, _caret_offs, chosen, delay_update: true, auto_adjust_caret_and_selection: true, add_history: true);
+
+            Debug.Assert(_suggestion_caret_offs != -1);
+            var start = _suggestion_caret_offs;
+            var end = _suggestion_caret_offs + _suggestion_start_text.Length;
+            ReplaceText(start,
+                end,
+                chosen,
+                delay_update: false,
+                auto_adjust_caret_and_selection: true,
+                add_history: true);
+            Select(end, end, end + 1, -1);
+
+            /*
+            Task.Run(async () => {
+                await Task.Delay(1000);
+                BeginInvoke(new Action(() =>
+                {
+                    try { _suggestionPopup.Focus(); } catch { }
+                    try { SetCompositionWindowPos(); } catch { }
+                })));
+
+            });
+            */
+
+            // 关闭弹窗后需要重新定位 IME 合成窗口
+            try { _suggestionPopup.Hide(); } catch { }
+            try { SetCompositionWindowPos(); } catch { }
+        }
+#endif
+
+        /*
+        // ValueList 窗口弹出前对应的插入符偏移
+        int _suggestion_caret_offs = -1;
+        // ValueList 窗口弹出前对应的拟替换的原有文字片段。注意可能比 Value 内容短
+        string _suggestion_start_text = "";
+        */
+
+        public delegate void delegate_itemChosen(string text);
+        public delegate void delegate_cancel();
+        /// <summary>
+        /// 显示候选弹窗。items 可以为空（会清空并隐藏）。
+        /// 弹窗不会激活窗口（WS_EX_NOACTIVATE），因此输入焦点、IME 保持在 MarcControl。
+        /// </summary>
+        // parameters:
+        //      ref_rect    参考用的矩形。这个矩形是显示小窗口时需要避开的一个区域
+        public void ShowSuggestion(
+            Font value_font,
+            Font comment_font,
+            IEnumerable<ValueItem> arr,
+            string selected_item_text,
+            Rectangle ref_rect,
+            delegate_itemChosen func_itemChosen,
+            delegate_cancel func_cancel)
+        {
+            if (arr.Any() == false)
+            {
+                HideSuggestion();
+                return;
+            }
+
+            EnsureSuggestionPopup(value_font,
+                comment_font,
+                func_itemChosen,
+                func_cancel);
+            // 设置事项，并且初始化小窗口尺寸
+            _suggestionPopup.SetItems(arr, selected_item_text);
+
+            _suggestionPopup._focus_owner = this;
+
+            // 计算弹窗显示位置（屏幕坐标）：在 caret 下方优先显示，否则上方
+
+            //var caretClient = new Point(_caretInfo.X - this.HorizontalScroll.Value + delta_x,
+            //                            _caretInfo.Y - this.VerticalScroll.Value + delta_y);
+            var caretClient = new Point(ref_rect.Right - this.HorizontalScroll.Value,
+                ref_rect.Top - this.VerticalScroll.Value);
+            var screenCaret = this.PointToScreen(caretClient);
+
+            int belowY = screenCaret.Y;
+            if (ref_rect.Width == 0)
+                belowY += ref_rect.Height;
+
+            // + (_caretInfo.LineHeight > 0 ? _caretInfo.LineHeight : this.Font.Height);
+
+            Rectangle screenBounds = Screen.FromControl(this).WorkingArea;
+            if (belowY + _suggestionPopup.Height > screenBounds.Height)
+            {
+                belowY = screenCaret.Y - _suggestionPopup.Height;
+            }
+            if (screenCaret.X + _suggestionPopup.Width > screenBounds.Width)
+            {
+                screenCaret.X -= ref_rect.Width + _suggestionPopup.Width;
+            }
+
+            // 使用屏幕坐标显示无激活窗体
+            _suggestionPopup.ShowAt(new Point(screenCaret.X, belowY));
+
+            // 开始追踪宿主窗体与控件自身的移动/大小变化（并开始前台检测）
+            StartPopupTracking();
+
+            BeginInvoke(new Action(() =>
+            {
+                try { this.Focus(); } catch { }
+                // 显示后更新 IME 合成窗口位置，确保输入法仍在正确位置
+                try { SetCompositionWindowPos(); } catch { }
+            }));
+        }
+
+        public void HideSuggestion(bool reset_caret = false)
+        {
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                try { _suggestionPopup.Hide(); } catch { }
+                if (reset_caret)
+                    Select(_caret_offs, _caret_offs, _caret_offs);
+
+                // 关闭后也更新 IME 合成窗口位置
+                try { SetCompositionWindowPos(); } catch { }
+
+                // 关闭后停止追踪并更新 IME 合成窗口位置
+                StopPopupTracking();
+            }
+        }
+
+        #region 追踪大小改变、移动
+
+        // 开始订阅移动/大小等事件以便跟随
+        void StartPopupTracking()
+        {
+            StopPopupTracking(); // 防止重复订阅
+
+            // 订阅宿主 Form 的移动/位置/大小变化事件
+            var f = this.FindForm();
+            if (f != null)
+            {
+                _popupOwnerForm = f;
+                _popupOwnerForm.Move += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.LocationChanged += PopupOwnerForm_MovedOrResized;
+                _popupOwnerForm.SizeChanged += PopupOwnerForm_MovedOrResized;
+
+                // 当宿主窗体失去激活（被推到后台）时，隐藏 popup
+                _popupOwnerForm.Deactivate += PopupOwnerForm_Deactivated;
+            }
+
+            // 订阅本控件的变化事件（控件被父容器布局/移动时）
+            this.LocationChanged += MarcControl_LocationChanged;
+            this.VisibleChanged += MarcControl_VisibleChanged;
+
+            // 启动一个短定时器用于检测当前前台窗口（更稳健地在各种 focus 行为下判断是否应隐藏）
+            try
+            {
+                _popupForegroundTimer = new Timer { Interval = 250 };
+                _popupForegroundTimer.Tick += PopupForegroundTimer_Tick;
+                _popupForegroundTimer.Start();
+            }
+            catch { }
+
+            // 如果控件滚动（OnScroll 被覆盖），你也可以调用 RepositionSuggestionPopup()，
+            // 这里直接订阅一个可观察到的事件：当 MarcControl 的滚动发生时（如果有），在 OnScroll 中显式调用 RepositionSuggestionPopup。
+        }
+
+        void StopPopupTracking()
+        {
+            if (_popupOwnerForm != null)
+            {
+                try
+                {
+                    _popupOwnerForm.Move -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.LocationChanged -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.SizeChanged -= PopupOwnerForm_MovedOrResized;
+                    _popupOwnerForm.Deactivate -= PopupOwnerForm_Deactivated;
+                }
+                catch { }
+                _popupOwnerForm = null;
+            }
+
+            try
+            {
+                this.LocationChanged -= MarcControl_LocationChanged;
+                this.VisibleChanged -= MarcControl_VisibleChanged;
+            }
+            catch { }
+
+            try
+            {
+                if (_popupForegroundTimer != null)
+                {
+                    _popupForegroundTimer.Stop();
+                    _popupForegroundTimer.Tick -= PopupForegroundTimer_Tick;
+                    _popupForegroundTimer.Dispose();
+                    _popupForegroundTimer = null;
+                }
+            }
+            catch { }
+        }
+
+        // 事件处理：宿主窗体移动或大小变化
+        void PopupOwnerForm_MovedOrResized(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            // 异步调用以避开可能的重入或时序问题
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        // 事件处理：宿主窗体失去激活（被推到后台）
+        void PopupOwnerForm_Deactivated(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            // 异步隐藏，避免在事件内直接操作 UI 导致重入
+            this.BeginInvoke(new Action(() =>
+            {
+                try { HideSuggestion(true); } catch { }
+            }));
+        }
+
+        // 定时器：检测前台窗口，当前窗口不再是宿主窗体或 suggestion popup 时隐藏
+        void PopupForegroundTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                    return;
+                if (_popupOwnerForm == null)
+                    return;
+
+                IntPtr fg = GetForegroundWindow();
+                if (fg == IntPtr.Zero)
+                    return;
+
+                // 如果前台窗口是宿主窗体或弹窗自身，则继续显示
+                Control fgControl = Control.FromHandle(fg);
+                Form fgForm = fgControl?.FindForm();
+
+                if (fgForm == _popupOwnerForm || fgForm == _suggestionPopup)
+                    return;
+
+                // 有时前台窗口是宿主窗体的子控件（通过 TopLevelControl 判定）
+                if (fgControl != null)
+                {
+                    var top = fgControl.TopLevelControl;
+                    if (top != null && top.FindForm() == _popupOwnerForm)
+                        return;
+                }
+
+                // 其他情况都隐藏弹窗
+                HideSuggestion(true);
+            }
+            catch { }
+        }
+
+        // 事件处理：MarcControl 自身位置/可见性变化
+        void MarcControl_LocationChanged(object sender, EventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return;
+            this.BeginInvoke(new Action(() =>
+            {
+                try { RepositionSuggestionPopup(); } catch { }
+            }));
+        }
+
+        void MarcControl_VisibleChanged(object sender, EventArgs e)
+        {
+            // 若控件隐藏，隐藏 popup
+            if (!this.Visible)
+            {
+                HideSuggestion();
+                return;
+            }
+            // 若可见且 popup 显示中，重新定位
+            if (_suggestionPopup != null && _suggestionPopup.Visible)
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    try { RepositionSuggestionPopup(); } catch { }
+                }));
+            }
+        }
+
+        void RepositionSuggestionPopup()
+        {
+            HideSuggestion();
+        }
+
+#endregion
+
+        public bool ValueListWindowOpened()
+        {
+            return (_suggestionPopup != null && _suggestionPopup.Visible);
+        }
+
+        public bool HandlePopupKeyDown(KeyEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                return false;
+
+            switch (e.KeyCode)
+            {
+                case Keys.Up:
+                    _suggestionPopup.SelectPrev();
+                    e.Handled = true;
+                    return true;
+                case Keys.Down:
+                    _suggestionPopup.SelectNext();
+                    e.Handled = true;
+                    return true;
+                case Keys.PageUp:
+                    _suggestionPopup.PageUp();
+                    e.Handled = true;
+                    return true;
+                case Keys.PageDown:
+                    _suggestionPopup.PageDown();
+                    e.Handled = true;
+                    return true;
+                case Keys.Enter:
+                case Keys.Tab:
+                    // 确认当前选中项
+                    _suggestionPopup.AcceptSelected();
+                    e.Handled = true;
+                    return true;
+                case Keys.Escape:
+                    HideSuggestion(true);
+                    e.Handled = true;
+                    return true;
+            }
+            return false;
+        }
+
+        public bool HandlePopupKeyPress(KeyPressEventArgs e)
+        {
+            if (_suggestionPopup == null || !_suggestionPopup.Visible)
+            {
+                return false;
+            }
+
+            if (e.KeyChar == (char)Keys.Escape)
+            {
+                HideSuggestion(true);
+                e.Handled = true;
+                return true;
+            }
+            if (e.KeyChar == '\r')
+            {
+                e.Handled = true;
+                return true;
+            }
+            return false;
+        }
+
+        // P/Invoke: 获取当前前台窗口句柄
+        [DllImport("user32.dll")]
+        static extern IntPtr GetForegroundWindow();
+    }
+}
+
+变更说明（简短）：
+•	在 StartPopupTracking 中添加对宿主窗体的 Deactivate 订阅，并新增一个短周期的 Timer（250ms）来检测前台窗口。
+•	在 StopPopupTracking 中取消订阅并停止/释放定时器。
+•	实现了 PopupOwnerForm_Deactivated 和 PopupForegroundTimer_Tick：当宿主窗体被推到后台，或者当前前台窗口既不是宿主窗体也不是 suggestion popup（包括宿主窗体的子控件情况）时，调用 HideSuggestion(true) 隐藏弹窗。
+•	使用 Control.FromHandle 判断前台句柄对应的 WinForms 控件/窗体，从而避免把判断建立在控件失去焦点上（满足你提到的 popup 可能抢焦点的情况）。
+这样做比仅依赖控件焦点或 LostFocus 更稳健：既能响应宿主窗体被推到后台的情况（Form.Deactivate），也能处理前台窗口被其他进程或同进程其他窗口占用的情况（定时检测 GetForegroundWindow）。如果你希望更低延迟，可以把定时器间隔调小；若希望更节省资源可以放宽间隔或只订阅 Deactivate（但会在 popup 自身抢焦点时触发，需要按实际行为调整）。
+

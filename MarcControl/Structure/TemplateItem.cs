@@ -503,7 +503,8 @@ caption?.GetPixelHeight() ?? 0);
                 }
                 else
                 {
-                    caption_text = GetCaptionText(this.ItemName, UnitType.Chars);
+                    caption_text = GetCaptionText(this.ItemName, UnitType.Chars, (o) => content);
+                    caption_text = $"({this.ItemName}) {caption_text}";
                 }
 
                 var ret = _caption.ReplaceText(context,

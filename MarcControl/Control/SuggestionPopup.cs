@@ -184,12 +184,16 @@ namespace LibraryStudio.Forms
         int _focus_width = 4;
         int _seperator_width = 8;
 
+
         void ResizeToFit(IEnumerable<ValueItem> items)
         {
             int leftColMin = 120;
-            int rightColMin = 60;
+            int rightColMin = 240;
             int leftWidth = leftColMin;
             int rightWidth = rightColMin;
+
+            Rectangle screenBounds = Screen.FromControl(this).WorkingArea;
+            int maxClientWidth = screenBounds.Width / 4;
 
             int count = 0;
             using (var g = _listBox.CreateGraphics())
@@ -222,6 +226,23 @@ namespace LibraryStudio.Forms
             int visibleCount = Math.Min(MaxVisibleItems, Math.Max(1, count/*_listBox.Items.Count*/));
             int h = visibleCount * _listBox.ItemHeight + 4;
 
+
+            if (totalW > maxClientWidth)
+            {
+                _listBox.HorizontalScrollbar = true;
+                // 加上滚动条宽度作为余量，避免文本被裁剪
+                _listBox.HorizontalExtent = totalW + SystemInformation.VerticalScrollBarWidth;
+
+                h += SystemInformation.HorizontalScrollBarHeight;
+            }
+            else
+            {
+                _listBox.HorizontalScrollbar = false;
+            }
+
+            // 限制总宽度
+            totalW = Math.Min(maxClientWidth, totalW);
+
             _listBox.Location = new Point(2, 2);
             _listBox.Size = new Size(totalW - 4, h);
             this.ClientSize = new Size(totalW + 2, h + 4);
@@ -243,7 +264,9 @@ namespace LibraryStudio.Forms
         void ListBox_DrawItem(object sender, DrawItemEventArgs e)
         {
             if (e.Index < 0 || e.Index >= _listBox.Items.Count)
+            {
                 return;
+            }
 
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 

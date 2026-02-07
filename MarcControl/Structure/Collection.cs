@@ -576,7 +576,9 @@ namespace LibraryStudio.Forms
                             InnerHitInfo = hit_info,
                         };
 
-                        if (direction >= 0)
+                        if (direction >= 0
+                            || line_text_length == 0/* 即便是尽量向后找模式，一旦出现第一个字符数为零的就要返回 */
+                            || LessThanDefLength(line)/* 内容长度不足定义字符数*/)
                         {
                             info = temp_info;
                             return 0;
@@ -623,6 +625,20 @@ namespace LibraryStudio.Forms
 
             info.Area = Area.BottomBlank;
             return 1;
+
+            bool LessThanDefLength(IBox box)
+            {
+                if (box is Base)
+                {
+                    var b = box as Base;
+                    var struct_info = b.GetStructureInfoByBox(box, 1, null/*box.MergeText()*/);
+                    var def_length = struct_info?.Length ?? 0;
+                    if (box.TextLength < def_length)
+                        return true;
+                    return false;
+                }
+                return false;
+            }
         }
 
         public virtual void PaintBack(

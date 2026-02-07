@@ -1932,12 +1932,12 @@ tag);
 
             // 没有任何 Line 的情况
             if (_lines.Count == 0
-                && offs + direction == 0)
+                && offs_param + direction == 0)
             {
                 info.X = 0;
                 info.Y = 0;
                 info.ChildIndex = 0;
-                info.Offs = offs + direction;
+                info.Offs = offs_param + direction;
                 info.TextIndex = 0;
                 info.Area = Area.Text;
                 info.LineHeight = FontContext.DefaultFontHeight;

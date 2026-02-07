@@ -84,7 +84,10 @@ namespace LibraryStudio.Forms
         // 把文字内容按需切割为子结构所需的部分
         public override IEnumerable<string> SplitChildren(string text)
         {
-            _struct = this.GetStructureInfoByBox(this.Parent, 2, text);
+            _struct = this.GetStructureInfoByBox(this.Parent,
+                2,
+                (o) => text
+                );
 
             return SplitFields(text);
         }

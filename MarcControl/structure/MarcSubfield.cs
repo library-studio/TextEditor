@@ -430,7 +430,7 @@ FontContext.DefaultFontHeight);
                 }
                 */
             }
-            
+
             if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
             {
                 if (_content == null)
@@ -480,6 +480,14 @@ FontContext.DefaultFontHeight);
             }
 
             return null;
+        }
+
+        // 疑问: 字段内容中第一个子字符符号前的一段文字，name 和 content 分别怎么算?
+        public string GetContent()
+        {
+            var text = this.MergeText();
+            var name = this.GetSubfieldName();
+            return text.Substring(name.Length);
         }
 
         // 注: _viewMode 和三个组件之间的对应关系可能扭曲。只能说确保 _content 和 _name+_tamplte 两组组件之间只有一组不为 null 即可
@@ -777,7 +785,10 @@ virtual_tail_length);
             // 查询之前对 name 进行修整
             name = NormalizeName(name);
             // var struct_info = Metrics.GetStructure?.Invoke(this.Parent?.Parent, name, 2);
-            var struct_info = GetStructureInfo(name, UnitType.Subfield, 2, content);
+            var struct_info = GetStructureInfo(name,
+                UnitType.Subfield,
+                2,
+                (o) => content);
             // 无法获得结构定义，就用 Paragraph
             if (struct_info == null
                 || struct_info.SubUnits.Count == 0
@@ -858,7 +869,8 @@ virtual_tail_length);
 
             if (view_mode_tree != null)
                 this._viewMode = view_mode_tree.ViewMode;
-            EnsureContent(name, old_name != name, new_text.Substring(name.Length));
+            var pure_content = new_text.Substring(name.Length);
+            EnsureContent(name, old_name != name, pure_content);
             Debug.Assert(_viewMode != ViewMode.None);
 
             var x0 = GetContentX();
@@ -873,7 +885,9 @@ virtual_tail_length);
                     dc,
                     0,
                     -1,
-                    GetCaptionText(NormalizeName(name), UnitType.Subfield),
+                    GetCaptionText(NormalizeName(name),
+                    UnitType.Subfield,
+                    (o) => pure_content),
                     int.MaxValue);
                 var caption_update_rect = ret.UpdateRect;
                 var rect = TemplateItem.GetCaptionRect(_caption, 0, 0, Metrics);

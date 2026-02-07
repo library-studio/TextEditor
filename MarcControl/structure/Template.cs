@@ -24,7 +24,7 @@ namespace LibraryStudio.Forms
             _struct = null;
             var container_info = this.GetStructureInfoByBox(this.Parent,
                 2,
-                text);
+                (o) => text);
             if (container_info == null)
             {
                 return base.SplitChildren(text);

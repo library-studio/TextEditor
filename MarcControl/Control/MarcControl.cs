@@ -1932,6 +1932,7 @@ out long left_width);
             #endregion
 
             DestroyMouseTimer();
+            DestorySuggestion();
 
             base.OnHandleDestroyed(e);
         }

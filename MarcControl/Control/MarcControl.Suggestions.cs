@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
 {
@@ -13,6 +16,18 @@ namespace LibraryStudio.Forms
 
         // 记录用于追踪的宿主 Form（FindForm()）
         Form _popupOwnerForm = null;
+
+        void DestorySuggestion()
+        {
+            try
+            {
+                _suggestionPopup?.Close();
+                _suggestionPopup?.Dispose();
+                _suggestionPopup = null;
+            }
+            catch { }
+        }
+
 
         void EnsureSuggestionPopup(Font value_font,
             Font comment_font,
@@ -163,6 +178,9 @@ namespace LibraryStudio.Forms
 
         #region 追踪大小改变、移动
 
+        // 用于检测宿主窗口是否仍在前台（被推到后台时隐藏 popup）
+        Timer _popupForegroundTimer = null;
+
         // 开始订阅移动/大小等事件以便跟随
         void StartPopupTracking()
         {
@@ -181,9 +199,15 @@ namespace LibraryStudio.Forms
             // 订阅本控件的变化事件（控件被父容器布局/移动时）
             this.LocationChanged += MarcControl_LocationChanged;
             this.VisibleChanged += MarcControl_VisibleChanged;
+            this.LostFocus += MarcControl_LostFocus;
 
             // 如果控件滚动（OnScroll 被覆盖），你也可以调用 RepositionSuggestionPopup()，
             // 这里直接订阅一个可观察到的事件：当 MarcControl 的滚动发生时（如果有），在 OnScroll 中显式调用 RepositionSuggestionPopup。
+        }
+
+        private void MarcControl_LostFocus(object sender, EventArgs e)
+        {
+            CheckAndHide();
         }
 
         void StopPopupTracking()
@@ -204,8 +228,69 @@ namespace LibraryStudio.Forms
             {
                 this.LocationChanged -= MarcControl_LocationChanged;
                 this.VisibleChanged -= MarcControl_VisibleChanged;
+                this.LostFocus -= MarcControl_LostFocus;
             }
             catch { }
+        }
+
+        public void CheckAndHide()
+        {
+            Task.Run(async () => {
+                // await Task.Delay(1000);
+                this.Invoke(new Action(() => {
+                    _checkHide();
+                }));
+            });
+        }
+
+        void _checkHide()
+        {
+            try
+            {
+                if (_suggestionPopup == null || !_suggestionPopup.Visible)
+                    return;
+                if (_popupOwnerForm == null)
+                    return;
+
+                var fg = User32.GetForegroundWindow();
+                if (fg == IntPtr.Zero)
+                    return;
+
+                // 如果前台窗口是宿主窗体或弹窗自身，则继续显示
+                Control fgControl = Control.FromHandle((IntPtr)fg);
+                Form fgForm = fgControl?.FindForm();
+
+                if (fgForm == _popupOwnerForm
+                    || BelongTo(_popupOwnerForm, fgForm)
+                    || fgForm == _suggestionPopup)
+                    return;
+
+                // 有时前台窗口是宿主窗体的子控件（通过 TopLevelControl 判定）
+                if (fgControl != null)
+                {
+                    var top = fgControl.TopLevelControl;
+                    if (top != null && top.FindForm() == _popupOwnerForm)
+                        return;
+                }
+
+                // 其他情况都隐藏弹窗
+                HideSuggestion(true);
+            }
+            catch { }
+        }
+
+        bool BelongTo(Form sub, Form parent)
+        {
+            if (sub == null || parent == null)
+                return false;
+            var current = sub;
+            while(current != null)
+            {
+                if (current == parent)
+                    return true;
+                current = current.ParentForm;
+            }
+            return false;
         }
 
         // 事件处理：宿主窗体移动或大小变化

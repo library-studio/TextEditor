@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -49,7 +50,7 @@ namespace MarcSample
             // this.marcControl1.ClientBoundsWidth = -1;
             this.marcControl1.GetStructure = (path, level) =>
             {
-                var root = BuildTree();
+                var root = BuildTree("usmarc");
                 var result = FindPath(root, path);
                 if (result == null)
                     return null;
@@ -86,12 +87,108 @@ namespace MarcSample
                 return null;
             foreach (var node in path.Skip(1))
             {
-                var sub = current.SubUnits.Where(o => o.Name == node.Name).FirstOrDefault();
-                if (sub == null)
+                var multi = current.SubUnits.Where(o => o.Name == node.Name);
+                if (multi.Count() == 0)
                     return null;
-                current = sub;
+                // 从多个中选出一个来
+                current = filter(multi, node);
             }
             return current;
+
+            UnitInfo filter(IEnumerable<UnitInfo> list, UnitNode path_node)
+            {
+                // TODO: 可以考虑根据 UnitInfo.Sensitive 判断是否需要经过内容过滤
+                if (path_node.Type == UnitType.Field
+                    && path_node.Name == "006")
+                {
+                    var type_name = get_006_type(path_node.GetContent(path_node.Box));
+                    return list.Where(o => o.Caption?.ToLower().Contains(type_name.ToLower()) ?? false).FirstOrDefault();
+                }
+
+                return list.FirstOrDefault();
+            }
+        }
+
+        static string get_006_type(string eValue)
+        {
+            string strType = "";
+
+            if (eValue == null || eValue.Length < 1)
+            {
+                // 权且当作 'a' 处理
+                strType = "Books";
+            }
+            else
+            {
+                // http://www.loc.gov/marc/bibliographic/bd006.html
+                // a - Language material
+                // Coded data elements relating to nonserial language material.
+                if (eValue[0] == 'a')
+                    strType = "Books";
+                // c - Notated music
+                // Coded data elements relating to notated music.
+                else if (eValue[0] == 'c')
+                    strType = "Music";
+                // d - Manuscript notated music
+                // Coded data elements relating to manuscript notated music.
+                else if (eValue[0] == 'd')
+                    strType = "Music";
+                // e - Cartographic material
+                // Coded data elements relating to nonmanuscript cartographic material.
+                else if (eValue[0] == 'e')
+                    strType = "Maps";
+                // f - Manuscript cartographic material
+                // Coded data elements relating to manuscript cartographic material.
+                else if (eValue[0] == 'f')
+                    strType = "Maps";
+                // g - Projected medium
+                // Coded data elements relating to a projected medium.
+                else if (eValue[0] == 'g')
+                    strType = "Visual Materials";
+                // i - Nonmusical sound recording
+                // Coded data elements relating to a nonmusical sound recording.
+                else if (eValue[0] == 'i')
+                    strType = "Music";
+                // j - Musical sound recording
+                // Coded data elements relating to a musical sound recording.
+                else if (eValue[0] == 'j')
+                    strType = "Music";
+                // k - Two-dimensional nonprojectable graphic
+                // Coded data elements relating to a two-dimensional nonprojectable graphic.
+                else if (eValue[0] == 'k')
+                    strType = "Visual Materials";
+                // m - Computer file/Electronic resource
+                // Coded data elements relating to either a computer file or an electronic resource in form.
+                else if (eValue[0] == 'm')
+                    strType = "Computer Files";
+                // o - Kit
+                // Coded data elements relating to a kit.
+                else if (eValue[0] == 'o')
+                    strType = "Visual Materials";
+                // p - Mixed material
+                // Coded data elements relating to mixed material.
+                else if (eValue[0] == 'p')
+                    strType = "Mixed Materials";
+                // r - Three-dimensional artifact or naturally occurring object
+                // Coded data elements relating to a three-dimensional artifact or naturally occurring object.
+                else if (eValue[0] == 'r')
+                    strType = "Visual Materials";
+                // s - Serial/Integrating resource
+                // Coded data elements relating to the control aspects of a non-printed continuing resource. For serially-controlled printed language material, field 008 is used.
+                else if (eValue[0] == 's')
+                    strType = "Continuing Resources";
+                // t - Manuscript language material
+                // Coded data elements relating to manuscript language material.
+                else if (eValue[0] == 't')
+                    strType = "Books";
+                else
+                {
+                    // "无法根据当前006字段第一字符内容 '" + eValue[0].ToString() + "' 判断模板类型";
+                    return "Books";
+                }
+            }
+
+            return strType;
         }
 
         static void CutLevel(UnitInfo info, int level)
@@ -107,7 +204,16 @@ namespace MarcSample
             }
         }
 
-        static UnitInfo BuildTree()
+        static UnitInfo BuildTree(string marc_syntax)
+        {
+            if (marc_syntax == "unimarc")
+                return BuildUnimarcTree();
+            if (marc_syntax == "usmarc")
+                return BuildUsmarcTree();
+            throw new ArgumentException($"无法识别的 marc_syntax '{marc_syntax}'");
+        }
+
+        static UnitInfo BuildUnimarcTree()
         {
             var info_100 = UnitInfo.FromSubfields("100");
             info_100.SubUnits.RemoveAt(0);
@@ -142,6 +248,810 @@ namespace MarcSample
                 },
             };
         }
+
+        /*
+  <Field name="006" type="Books" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Books</Label>
+      <Label xml:lang="zh">附件特征 - 图书</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/4">
+      <Property>
+        <Label xml:lang="en">Illustrations</Label>
+        <Label xml:lang="zh">图表</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_1/4" />
+      </Property>
+    </Char>
+    <Char name="5/1">
+      <Property>
+        <Label xml:lang="en">Target audience</Label>
+        <Label xml:lang="zh">读者对象</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#targetaudiencecodes" />
+      </Property>
+    </Char>
+    <Char name="6/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="7/4">
+      <Property>
+        <Label xml:lang="en">Nature of contents</Label>
+        <Label xml:lang="zh">内容特征</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_7/4" />
+      </Property>
+    </Char>
+    <Char name="11/1">
+      <Property>
+        <Label xml:lang="en">Government publication</Label>
+        <Label xml:lang="zh">政府出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#governmentpublicationcodes" />
+      </Property>
+    </Char>
+    <Char name="12/1">
+      <Property>
+        <Label xml:lang="en">Conference publication</Label>
+        <Label xml:lang="zh">会议出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_12/1" />
+      </Property>
+    </Char>
+    <Char name="13/1">
+      <Property>
+        <Label xml:lang="en">Festschrift</Label>
+        <Label xml:lang="zh">纪念文集</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_13/1" />
+      </Property>
+    </Char>
+    <Char name="14/1">
+      <Property>
+        <Label xml:lang="en">Index</Label>
+        <Label xml:lang="zh">索引</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#indexcodes" />
+      </Property>
+    </Char>
+    <Char name="15/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_15/1" />
+      </Property>
+    </Char>
+    <Char name="16/1">
+      <Property>
+        <Label xml:lang="en">Literary form</Label>
+        <Label xml:lang="zh">文学体裁</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_16/1" />
+      </Property>
+    </Char>
+    <Char name="17/1">
+      <Property>
+        <Label xml:lang="en">Biography</Label>
+        <Label xml:lang="zh">传记</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006book_17/1" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Computer Files" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Computer files/Electronic resources</Label>
+      <Label xml:lang="zh">附件特征 - 计算机文件/电子资源</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/4">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006computer_1/4" />
+      </Property>
+    </Char>
+    <Char name="5/1">
+      <Property>
+        <Label xml:lang="en">Target audience</Label>
+        <Label xml:lang="zh">读者对象</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#targetaudiencecodes" />
+      </Property>
+    </Char>
+    <Char name="6/3">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006computer_6/3" />
+      </Property>
+    </Char>
+    <Char name="9/1">
+      <Property>
+        <Label xml:lang="en">Type of computer file</Label>
+        <Label xml:lang="zh">计算机文件类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006computer_9/1" />
+      </Property>
+    </Char>
+    <Char name="10/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006computer_10/1" />
+      </Property>
+    </Char>
+    <Char name="11/1">
+      <Property>
+        <Label xml:lang="en">Government publication</Label>
+        <Label xml:lang="zh">政府出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#governmentpublicationcodes" />
+      </Property>
+    </Char>
+    <Char name="12/6">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006computer_12/1" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Maps" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Maps</Label>
+      <Label xml:lang="zh">附件特征 - 地图</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/4">
+      <Property>
+        <Label xml:lang="en">Relief</Label>
+        <Label xml:lang="zh">地形</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_1/4" />
+      </Property>
+    </Char>
+    <Char name="5/2">
+      <Property>
+        <Label xml:lang="en">Projection</Label>
+        <Label xml:lang="zh">投影</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_5/2" />
+      </Property>
+    </Char>
+    <Char name="7/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_7/1" />
+      </Property>
+    </Char>
+    <Char name="8/1">
+      <Property>
+        <Label xml:lang="en">Type of cartographic material</Label>
+        <Label xml:lang="zh">测绘制图资料出版形式</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_8/1" />
+      </Property>
+    </Char>
+    <Char name="9/2">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_9/2" />
+      </Property>
+    </Char>
+    <Char name="11/1">
+      <Property>
+        <Label xml:lang="en">Government publication</Label>
+        <Label xml:lang="zh">政府出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#governmentpublicationcodes" />
+      </Property>
+    </Char>
+    <Char name="12/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="13/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_13/1" />
+      </Property>
+    </Char>
+    <Char name="14/1">
+      <Property>
+        <Label xml:lang="en">Index</Label>
+        <Label xml:lang="zh">索引</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#indexcodes" />
+      </Property>
+    </Char>
+    <Char name="15/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_15/1" />
+      </Property>
+    </Char>
+    <Char name="16/2">
+      <Property>
+        <Label xml:lang="en">Special format characteristics</Label>
+        <Label xml:lang="zh">特殊形式特征</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006maps_16/2" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Music" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Music</Label>
+      <Label xml:lang="zh">附件特征 - 音乐</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/2">
+      <Property>
+        <Label xml:lang="en">Form of composition</Label>
+        <Label xml:lang="zh">乐曲形式</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_1/2" />
+      </Property>
+    </Char>
+    <Char name="3/1">
+      <Property>
+        <Label xml:lang="en">Format of music</Label>
+        <Label xml:lang="zh">乐谱类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_3/1" />
+      </Property>
+    </Char>
+    <Char name="4/1">
+      <Property>
+        <Label xml:lang="en">Music parts</Label>
+        <Label xml:lang="zh">分谱</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_4/1" />
+      </Property>
+    </Char>
+    <Char name="5/1">
+      <Property>
+        <Label xml:lang="en">Target audience</Label>
+        <Label xml:lang="zh">读者对象</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#targetaudiencecodes" />
+      </Property>
+    </Char>
+    <Char name="6/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="7/6">
+      <Property>
+        <Label xml:lang="en">Accompanying matter</Label>
+        <Label xml:lang="zh">附件</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_7/6" />
+      </Property>
+    </Char>
+    <Char name="13/2">
+      <Property>
+        <Label xml:lang="en">Literary text for sound recordings</Label>
+        <Label xml:lang="zh">录音资料的文体类别</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_13/2" />
+      </Property>
+    </Char>
+    <Char name="15/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_15/1" />
+      </Property>
+    </Char>
+    <Char name="16/1">
+      <Property>
+        <Label xml:lang="en">Transposition and arrangement</Label>
+        <Label xml:lang="zh">变调和改编</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_16/1" />
+      </Property>
+    </Char>
+    <Char name="17/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006music_17/1" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Continuing Resources" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Continuing resources</Label>
+      <Label xml:lang="zh">附件特征 - 连续性资源</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/1">
+      <Property>
+        <Label xml:lang="en">Frequency</Label>
+        <Label xml:lang="zh">出版频率</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_1/1" />
+      </Property>
+    </Char>
+    <Char name="2/1">
+      <Property>
+        <Label xml:lang="en">Regularity</Label>
+        <Label xml:lang="zh">发行规律</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_2/1" />
+      </Property>
+    </Char>
+    <Char name="3/1">
+      <Property>
+        <Label xml:lang="en">ISSN center</Label>
+        <Label xml:lang="zh">ISSN 中心</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_3/1" />
+      </Property>
+    </Char>
+    <Char name="4/1">
+      <Property>
+        <Label xml:lang="en">Type of continuing resource</Label>
+        <Label xml:lang="zh">连续性资源类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_4/1" />
+      </Property>
+    </Char>
+    <Char name="5/1">
+      <Property>
+        <Label xml:lang="en">Form of original item</Label>
+        <Label xml:lang="zh">原版文献形式</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="6/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="7/1">
+      <Property>
+        <Label xml:lang="en">Nature of entire work</Label>
+        <Label xml:lang="zh">整体特征</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_7/1" />
+      </Property>
+    </Char>
+    <Char name="8/3">
+      <Property>
+        <Label xml:lang="en">Nature of contents</Label>
+        <Label xml:lang="zh">内容特征</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#natureofcontentscodes" />
+      </Property>
+    </Char>
+    <Char name="11/1">
+      <Property>
+        <Label xml:lang="en">Government publication</Label>
+        <Label xml:lang="zh">政府出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#governmentpublicationcodes" />
+      </Property>
+    </Char>
+    <Char name="12/1">
+      <Property>
+        <Label xml:lang="en">Conference publication</Label>
+        <Label xml:lang="zh">会议出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_12/1" />
+      </Property>
+    </Char>
+    <Char name="13/3">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_13/3" />
+      </Property>
+    </Char>
+    <Char name="16/1">
+      <Property>
+        <Label xml:lang="en">Original alphabet or script of title</Label>
+        <Label xml:lang="zh">题名原文字母或文字</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_16/1" />
+      </Property>
+    </Char>
+    <Char name="17/1">
+      <Property>
+        <Label xml:lang="en">Entry convention</Label>
+        <Label xml:lang="zh">款目原则</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006continuing_17/1" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Mixed Materials" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Mixed materials</Label>
+      <Label xml:lang="zh">附件特征 - 混合型资料</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/5">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006mixed_1/5" />
+      </Property>
+    </Char>
+    <Char name="6/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="7/11">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006mixed_7/11" />
+      </Property>
+    </Char>
+  </Field>
+  <Field name="006" type="Visual Materials" mandatory="yes" repeatable="no">
+    <Property>
+      <Label xml:lang="en">Additional Material Characteristics -- Visual materials</Label>
+      <Label xml:lang="zh">附件特征 - 可视资料</Label>
+    </Property>
+    <Char name="0/1">
+      <Property>
+        <Label xml:lang="en">Form of material</Label>
+        <Label xml:lang="zh">资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006_0/1" />
+        <sensitive />
+      </Property>
+    </Char>
+    <Char name="1/3">
+      <Property>
+        <Label xml:lang="en">Running time</Label>
+        <Label xml:lang="zh">放映时间</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_1/3" />
+      </Property>
+    </Char>
+    <Char name="4/1">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_4/1" />
+      </Property>
+    </Char>
+    <Char name="5/1">
+      <Property>
+        <Label xml:lang="en">Target audience</Label>
+        <Label xml:lang="zh">读者对象</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_5/1" />
+      </Property>
+    </Char>
+    <Char name="6/5">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_6/5" />
+      </Property>
+    </Char>
+    <Char name="11/1">
+      <Property>
+        <Label xml:lang="en">Government publication</Label>
+        <Label xml:lang="zh">政府出版物</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#governmentpublicationcodes" />
+      </Property>
+    </Char>
+    <Char name="12/1">
+      <Property>
+        <Label xml:lang="en">Form of item</Label>
+        <Label xml:lang="zh">载体形态</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#formofitemcodes" />
+      </Property>
+    </Char>
+    <Char name="13/3">
+      <Property>
+        <Label xml:lang="en">Undefined</Label>
+        <Label xml:lang="zh">未定义</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_13/3" />
+      </Property>
+    </Char>
+    <Char name="16/1">
+      <Property>
+        <Label xml:lang="en">Type of visual material</Label>
+        <Label xml:lang="zh">可视资料类型</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_16/1" />
+      </Property>
+    </Char>
+    <Char name="17/1">
+      <Property>
+        <Label xml:lang="en">Technique</Label>
+        <Label xml:lang="zh">技术</Label>
+        <Help xml:lang="zh" />
+        <ValueList ref="marcvaluelist#006visual_17/1" />
+      </Property>
+    </Char>
+  </Field>
+         * */
+        static UnitInfo BuildUsmarcTree()
+        {
+            var ret = new UnitInfo
+            {
+                Type = UnitType.Record,
+                SubUnits = new List<UnitInfo>
+                {
+                    Build006_books(),   // 第一字符 a
+                    Build006_computerFiles(),   // 第一字符 m
+                },
+            };
+            return ret;
+        }
+
+        static UnitInfo Build006_books()
+        {
+            return new UnitInfo
+            {
+                Name = "006",
+                Caption = "Additional Material Characteristics -- Books",
+                Type = UnitType.Field,
+                Sensitive = true,
+                SubUnits = new List<UnitInfo>
+                {
+                    new UnitInfo
+                    {
+                        Name = "0/1",
+                        Caption = "Form of material",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                        Sensitive = true,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "1/4",
+                        Caption = "Illustrations",
+                        Length = 4,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "5/1",
+                        Caption = "Target audience",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "6/1",
+                        Caption = "Form of item",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "7/4",
+                        Caption = "Nature of contents",
+                        Length = 4,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "11/1",
+                        Caption = "Government publication",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "12/1",
+                        Caption = "Conference publication",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "13/1",
+                        Caption = "Festschrift",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "14/1",
+                        Caption = "Index",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "15/1",
+                        Caption = "Undefined",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "16/1",
+                        Caption = "Literary form",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "17/1",
+                        Caption = "Biography",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                },
+            };
+        }
+
+        static UnitInfo Build006_computerFiles()
+        {
+            return new UnitInfo
+            {
+                Name = "006",
+                Caption = "Additional Material Characteristics -- Computer files/Electronic resources",
+                Type = UnitType.Field,
+                Sensitive = true,
+                SubUnits = new List<UnitInfo>
+                {
+                    new UnitInfo
+                    {
+                        Name = "0/1",
+                        Caption = "Form of material",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                        Sensitive = true,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "1/4",
+                        Caption = "Undefined",
+                        Length = 4,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "5/1",
+                        Caption = "Target audience",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "6/3",
+                        Caption = "Undefined",
+                        Length = 3,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "9/1",
+                        Caption = "Type of computer file",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "10/1",
+                        Caption = "Undefined",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "11/1",
+                        Caption = "Government publication",
+                        Length = 1,
+                        Type = UnitType.Chars,
+                    },
+                    new UnitInfo
+                    {
+                        Name = "12/6",
+                        Caption = "Undefined",
+                        Length = 6,
+                        Type = UnitType.Chars,
+                    },
+                },
+            };
+        }
+
 
         IEnumerable<ValueItem> FindValueList(UnitNode[] path)
         {

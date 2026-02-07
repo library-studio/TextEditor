@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using Vanara.PInvoke;
 
 namespace LibraryStudio.Forms
 {
@@ -376,19 +377,26 @@ namespace LibraryStudio.Forms
 
     }
 
+    public delegate string GetContentFunc(IBox box);
+
     public class UnitNode
     {
         public string Name { get; set; }
         public UnitType Type { get; set; }
 
-        public string Content { get; set; }
+        // public string Content { get; set; }
+        public GetContentFunc GetContent { get; set; }
+
+        public IBox Box { get; set; }
 
         // parameters:
-        //      name    在 box 对象下级附加的最后一级的 Name。如果为 null，表示 box 已经是最后一级
+        //      last_level_name    在 box 对象下级附加的最后一级的 Name。如果为 null，表示 box 已经是最后一级
+        //      last_level_type     在 box 对象下级附加的最后一级的 type。如果 last_level_name 参数值为 null，表示不使用本参数
+        //      get_last_level_content  针对 box 对象下级附加的最后一级的，用于获取内容的函数。如果 last_level_name 参数值为 null，表示不使用本参数
         public static UnitNode[] BuildPath(IBox box,
             string last_level_name,
             UnitType last_level_type = UnitType.Unknown,
-            string last_level_content = null)
+            GetContentFunc get_last_level_content = null)
         {
             var results = new List<UnitNode>();
             var current = box;
@@ -425,7 +433,20 @@ namespace LibraryStudio.Forms
                 results.Insert(0, new UnitNode
                 {
                     Name = name,
-                    Type = type
+                    Type = type,
+                    Box = current,
+                    GetContent = (o) => {
+                        if (o is MarcField f)
+                        {
+                            return f.GetContent();
+                        }
+                        else if (o is MarcSubfield s)
+                        {
+                            return s.GetContent();
+                        }
+
+                        return o?.MergeText() ?? null;
+                    },
                 });
             CONTINUE:
                 current = current.Parent;
@@ -437,7 +458,8 @@ namespace LibraryStudio.Forms
                 {
                     Name = last_level_name,
                     Type = last_level_type,
-                    Content = last_level_content,
+                    Box = null,
+                    GetContent = get_last_level_content,
                 });
             }
 
@@ -455,6 +477,9 @@ namespace LibraryStudio.Forms
 
         // 0 表示不确定长度
         public int Length { get; set; } = 0;
+
+        // 是否具有结构敏感特性。所谓结构敏感就是本结构的文字内容，直接影响到如何构建本级结构
+        public bool Sensitive { get; set; } = false;
 
         // 下级单元
         public List<UnitInfo> SubUnits { get; set; } = new List<UnitInfo>();

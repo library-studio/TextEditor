@@ -340,6 +340,14 @@ namespace LibraryStudio.Forms
             }
 
             var struct_info = template_item.GetStructureInfoByBox(template_item, 1, null/* 从缓存中取得 */);
+            Debug.Assert(struct_info != null);
+            if (struct_info == null)
+            {
+                if (auto_close_prev)
+                    HideSuggestion();
+                return false;
+            }
+
             // 如果插入符在 TemplateItem 中定额的最后一个字符右边，则不能弹出 ValueList。因为这样弹出会让用户误以为时这里的 List 但实际上选择后修改了下一个 TemplateItem 的内容
             if (hit_info.Offs >= struct_info.Length)
             {
@@ -379,9 +387,19 @@ namespace LibraryStudio.Forms
             {
                 int list_item_text_length = 0;
                 // 获得值列表。注意值的字符数可能比 TemplateItem 文本长度短(一般是整倍关系)
-                var list = template_item.GetValueList(template_item);
-                if (list == null)
+                List<ValueItem> list = null;
+                try
                 {
+                    list = template_item.GetValueList(template_item)
+                        .ToList();  // 让异常尽早抛出
+                    if (list == null)
+                    {
+                        return false;
+                    }
+                }
+                catch(Exception ex)
+                {
+                    // TODO: 飘出 tips 显示出错原因
                     return false;
                 }
 
