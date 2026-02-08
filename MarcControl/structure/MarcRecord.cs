@@ -242,7 +242,7 @@ namespace LibraryStudio.Forms
                 */
                 var sub_info = info.Clone();
                 info.Y += start_y;
-                info.Offs += _fields.GetRange(0, index).Sum(o=>o.TextLength);
+                info.Offs += _fields.GetRange(0, index).Sum(o => o.TextLength);
                 info.ChildIndex = index;
                 info.InnerHitInfo = sub_info;
                 return true;
@@ -314,7 +314,7 @@ namespace LibraryStudio.Forms
                 y = 0;
             }
 
-            var result = new HitInfo{ Box = this };
+            var result = new HitInfo { Box = this };
             int current_y = 0;
             int offs = 0;
             for (int i = 0; i < _fields.Count; i++)
@@ -1140,6 +1140,11 @@ namespace LibraryStudio.Forms
 
             string content = left_text + text + right_text;
 
+            if (old_fields.Count > 0)
+            {
+                _fields.RemoveRange(first_paragraph_index, old_fields.Count);
+            }
+
             var new_fields = new List<MarcField>();
             if (string.IsNullOrEmpty(content) == false)
             {
@@ -1206,6 +1211,11 @@ namespace LibraryStudio.Forms
                     if (max_update_width < current_update_width)
                         max_update_width = current_update_width;
 
+
+                    // 为了让外部探测的过程感知到已经创建好的部分字段。
+                    // 因为创建中途，后面新创建的字段，需要动态探测已经创建的字段(比如 008 需要了解头标区)才能查询到结构，用于创建
+                    _fields.Insert(first_paragraph_index + new_fields.Count, new_field);
+
                     new_fields.Add(new_field);
                 }
             }
@@ -1215,16 +1225,13 @@ namespace LibraryStudio.Forms
             // 至少当输入发生在 MarcField 的 Name 和 Indicator 部分的时候，通常是替换，不会引起剧烈变化。
 
 
-
-            if (old_fields.Count > 0)
-            {
-                _fields.RemoveRange(first_paragraph_index, old_fields.Count);
-            }
+            /*
             if (new_fields.Count > 0)
             {
                 Debug.Assert(first_paragraph_index >= 0);
                 _fields.InsertRange(first_paragraph_index, new_fields);
             }
+            */
 
             if (first_paragraph_index == 0
                 && (end == -1 || _fields.Count == new_fields.Count))

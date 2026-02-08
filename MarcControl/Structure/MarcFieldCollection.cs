@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using Vanara.PInvoke;
+using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
 {
@@ -30,6 +31,11 @@ namespace LibraryStudio.Forms
                 x,
                 y,
                 clipRect);
+            this.PaintSolidArea(dc,
+    x,
+    y,
+    clipRect,
+    -1/*caret_field_index*/);
             base.Paint(context,
                 dc,
                 x,
@@ -39,6 +45,28 @@ namespace LibraryStudio.Forms
                 blockOffs2,
                 virtual_tail_length);
         }
+
+        public void PaintSolidArea(SafeHDC hdc,
+    int x,
+    int y,
+    Rectangle clipRect,
+    int caret_field_index = -1)
+        {
+            int i = 0;
+            foreach (var field in this.Children)
+            {
+                if (y >= clipRect.Bottom)
+                    break;
+                field.PaintBackAndBorder(hdc,
+x,
+y,
+clipRect,
+i == caret_field_index);
+                y += field.GetPixelHeight();
+                i++;
+            }
+        }
+
 
         public override ReplaceTextResult ReplaceText(IContext context, Gdi32.SafeHDC dc, int start, int end, string text, int pixel_width)
         {

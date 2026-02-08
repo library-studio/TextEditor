@@ -50,7 +50,7 @@ namespace MarcSample
             // this.marcControl1.ClientBoundsWidth = -1;
             this.marcControl1.GetStructure = (path, level) =>
             {
-                var root = BuildTree("usmarc");
+                var root = BuildTree("unimarc");
                 var result = FindPath(root, path);
                 if (result == null)
                     return null;

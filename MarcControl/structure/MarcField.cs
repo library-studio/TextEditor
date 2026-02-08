@@ -1751,17 +1751,20 @@ clipRect);
         Rectangle GetButtonRect(int x = 0, int y = 0)
         {
             IBox box;
+            int height = 0;
             if (this.IsHeader)
             {
                 box = _content;
+                // 获得 _content 的第一行的高度
+                height = (int)( _content?.BaseLine ?? FontContext.DefaultFontHeight);
             }
             else
             {
                 box = _name;
+                height = _name?.GetPixelHeight() ?? FontContext.DefaultFontHeight;
             }
 
             {
-                var height = FontContext.DefaultFontHeight;
                 return new Rectangle(x + _metrics.GetCaptionPixelWidth(this),
         (int)(y + _baseLine - (box?.BaseLine ?? 0)) + 0,
         _metrics.ButtonWidth,
@@ -2497,14 +2500,17 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             }
         }
 
+        // 注: 头标区只返回 _content，控制字段不返回 _indicator
         List<IBox> GetBoxes()
         {
             var boxes = new List<IBox>();
+            if (this.IsHeader && _content != null)
+                return new List<IBox>() { _content };
             if (_name != null)
             {
                 boxes.Add(_name);
             }
-            if (_indicator != null)
+            if (_indicator != null && this.IsControlField == false)
             {
                 boxes.Add(_indicator);
             }
@@ -2526,11 +2532,17 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             {
                 // TODO: 利用一个空格检测
                 // _baseLine = Line.GetLineHeight();
-                _baseLine = 0;
+                _baseLine = 0;  // FontContext.DefaultFontHeight;
                 _below = 0;
                 return (old_baseLine != this._baseLine || old_below != this._below);
             }
-            _baseLine = boxes.Max(x => x.BaseLine) + VerticalUnit() / 2;
+            _baseLine = boxes.Max(x => x.BaseLine);
+            /*
+            // 2026/2/8
+            if (_baseLine == 0)
+                _baseLine = FontContext.DefaultFontHeight;
+            */
+            _baseLine += VerticalUnit() / 2;
             _below = boxes.Max(y => y.Below) + VerticalUnit() / 2;
             return (old_baseLine != this._baseLine || old_below != this._below);
         }
