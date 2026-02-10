@@ -1078,22 +1078,53 @@ virtual_tail_length);
             // return new ViewModeTree { ViewMode = this._viewMode != ViewMode.Expand ? ViewMode.None : this._viewMode };
         }
 
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
         public ReplaceTextResult ToggleExpand(
             HitInfo info,
             IContext context,
             Gdi32.SafeHDC dc,
-            int pixel_width)
+            int pixel_width,
+            int action = 0)
         {
-            ReplaceTextResult ret1 = null;
-            ReplaceTextResult ret2 = null;
+            if (action != -1
+    && action != 0
+    && action != 1)
+            {
+                throw new ArgumentException($"{nameof(action)}参数值 {action} 不合法");
+            }
 
-            if (info.ChildIndex == (int)FieldRegion.Button)
+            var new_view_mode = ViewMode.None;
+            if (action == 0
+    && info.ChildIndex == (int)FieldRegion.Button)
             {
                 if (this._viewMode == ViewMode.Plane)
+                {
                     return new ReplaceTextResult();
+                }
+
+                new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+            }
+            else if (action != 0)
+            {
+                new_view_mode = action == -1 ? ViewMode.Collapse : ViewMode.Expand;
+            }
+            else
+            {
+                return new ReplaceTextResult();
+            }
+
+            Debug.Assert(new_view_mode != ViewMode.None);
+
+            {
+                if (this._viewMode == ViewMode.Plane
+                    || this._viewMode == new_view_mode)
+                {
+                    return new ReplaceTextResult();
+                }
 
                 var text = this.MergeText();
-                var new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+                //var new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
                 // 此时 _content _name _template 和 this._viewMode 关系暂时扭曲了
                 return ReplaceText(
                     new ViewModeTree { ViewMode = new_view_mode },
@@ -1104,8 +1135,6 @@ virtual_tail_length);
                     text,
                     pixel_width);
             }
-
-            return new ReplaceTextResult();
         }
 
     }

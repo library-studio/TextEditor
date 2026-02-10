@@ -447,7 +447,9 @@ e.Y + this.VerticalScroll.Value);
             base.OnMouseDoubleClick(e);
         }
 
-        void ToggleExpand(HitInfo info)
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
+        void ToggleExpand(HitInfo info, int action = 0)
         {
             ReplaceTextResult ret = null;
             using (var g = this.CreateGraphics())
@@ -459,8 +461,8 @@ e.Y + this.VerticalScroll.Value);
                         info,
                         _context,
                         dc,
-                        GetLimitWidth()
-                        );
+                        GetLimitWidth(),
+                        action);
                     _context.ClearFontCache();
                 }
             }

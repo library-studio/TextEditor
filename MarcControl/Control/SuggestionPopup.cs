@@ -167,8 +167,8 @@ namespace LibraryStudio.Forms
                         _listBox.SelectedIndex = i;
                     i++;
                 }
-                if (_listBox.SelectedIndex == -1)
-                    _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+                //if (_listBox.SelectedIndex == -1)
+                //    _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
             }
             finally
             {

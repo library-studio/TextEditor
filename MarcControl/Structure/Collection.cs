@@ -1162,14 +1162,18 @@ namespace LibraryStudio.Forms
         }
 
         // 利用 info 中的 Children 来展开下级
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
         public ReplaceTextResult ToggleExpand(
     HitInfo info,
     IContext context,
     SafeHDC dc,
-    int pixel_width)
+    int pixel_width,
+    int action = 0)
         {
             // 注: Collection 本身一定是已经展开的状态，这一段代码应该用不上
-            if (info.ChildIndex == (int)FieldRegion.Button)
+            if (action == 0
+                && info.ChildIndex == (int)FieldRegion.Button)
             {
                 if (this.ViewMode == ViewMode.Plane)
                     return new ReplaceTextResult();
@@ -1201,7 +1205,8 @@ namespace LibraryStudio.Forms
             info.InnerHitInfo,
             context,
             dc,
-            pixel_width);
+            pixel_width,
+            action);
                 ret.Offset(0, SumHeight(info.ChildIndex));
                 return ret;
             }
@@ -1246,11 +1251,14 @@ namespace LibraryStudio.Forms
     {
         Metrics Metrics { get; set; }
 
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
         ReplaceTextResult ToggleExpand(
     HitInfo info,
     IContext context,
     SafeHDC dc,
-    int pixel_width);
+    int pixel_width,
+    int action = 0);
 
         string MergeTextMask(int start = 0, int end = int.MaxValue);
     }

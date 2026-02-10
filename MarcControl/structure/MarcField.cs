@@ -1756,7 +1756,7 @@ clipRect);
             {
                 box = _content;
                 // 获得 _content 的第一行的高度
-                height = (int)( _content?.BaseLine ?? FontContext.DefaultFontHeight);
+                height = (int)(_content?.BaseLine ?? FontContext.DefaultFontHeight);
             }
             else
             {
@@ -2030,7 +2030,8 @@ clipRect);
             var caption = GetStructureInfo(this.IsHeader ? "###" : this.FieldName,
                 UnitType.Field,
                 1,
-                (o) => {
+                (o) =>
+                {
                     var text = this.MergePureText();
                     if (this.IsHeader)
                         return text;
@@ -3350,6 +3351,8 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             _caption = null;
         }
 
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
         // return:
         //      0   未给出本次修改的像素宽度。需要调主另行计算
         //      其它  本次修改后的像素宽度
@@ -3357,22 +3360,65 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             HitInfo info,
             IContext context,
             Gdi32.SafeHDC dc,
-            int pixel_width)
+            int pixel_width,
+            int action = 0)
         {
-            ReplaceTextResult ret1 = null;
-            ReplaceTextResult ret2 = null;
+            if (action != -1
+                && action != 0
+                && action != 1)
+                throw new ArgumentException($"{nameof(action)}参数值 {action} 不合法");
+
+            //ReplaceTextResult ret1 = null;
+            //ReplaceTextResult ret2 = null;
+
+            var results = new List<ReplaceTextResult>();
 
             bool changed = false;
             var old_width = this.GetPixelWidth();
             var old_height = this.GetPixelWidth();
-            if (info.ChildIndex == (int)FieldRegion.Button)
+
+            var new_view_mode = ViewMode.None;
+            if (action == 0
+    && info.ChildIndex == (int)FieldRegion.Button)
             {
+                if (this._viewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+                new_view_mode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
+            }
+            else if (action != 0)
+            {
+                if ((this._viewMode == ViewMode.Collapse && action == 1)
+                    || (this._viewMode == ViewMode.Expand && action == -1))
+                {
+                    new_view_mode = action == -1 ? ViewMode.Collapse : ViewMode.Expand;
+                }
+            }
+
+            // 收缩的时候，先收缩下级
+            if (action == -1 && new_view_mode != ViewMode.None)
+            {
+                var ret = ProcessChild();
+                // 如果下级收缩已经有实效，那就不再对本级进行收缩。也就是说一次调用只收缩一层
+                if (ret.UpdateRect != System.Drawing.Rectangle.Empty)
+                {
+                    var rect = new Rectangle(0,
+                        0,
+                        Math.Max(old_width, this.GetPixelWidth()),
+                        Math.Max(old_height, this.GetPixelHeight()));
+                    return new ReplaceTextResult { UpdateRect = rect };
+                }
+            }
+
+            if (new_view_mode != ViewMode.None)
+            {
+                Debug.Assert(new_view_mode != ViewMode.None);
+
                 if (this._viewMode == ViewMode.Plane)
                     return new ReplaceTextResult();
 
                 var text = this.MergeText();    // this.MergePureText();
                 this._viewMode = this._viewMode == ViewMode.Collapse ? ViewMode.Expand : ViewMode.Collapse;
-                ret1 = ReplaceText(
+                var ret1 = ReplaceText(
                     null,
                     context,
                     dc,
@@ -3380,43 +3426,44 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
                     -1,
                     text,
                     pixel_width);
-                changed = true;
+                results.Add(ret1);
+            }
+
+            // 如果不是 toggle，要用 info.Offs 判断插入符处在什么位置，
+            // 如果处在字段的字段名和指示符位置，则只展开或收缩字段这一层的下级即可。否则还要继续向下探索
+            bool stop = false;
+            if (action == 1)
+            {
+                int name_length = 0;
+                if (this.IsHeader)
+                    name_length = 0;
+                else if (this.IsControlField)
+                    name_length = 3;
+                else
+                    name_length = 5;
+                if (info.Offs < name_length)
+                    stop = true;
             }
 
             // 继续展开下级
-            if (info.InnerHitInfo != null
+            if (action != -1    // 收缩的情况，下级已经被提前做过了，这里不用做了
+                && stop == false
+                && info.InnerHitInfo != null
                 && _viewMode == ViewMode.Expand
                 && _content != null
                 && _content is IViewBox
                 )
             {
-                var collection = _content as IViewBox;
-
-                if (collection.ViewMode == ViewMode.Plane)
-                    return new ReplaceTextResult();
-                var x0 = GetContentX();
-
-                ret2 = collection.ToggleExpand(
-            info.InnerHitInfo,
-            context,
-            dc,
-            pixel_width - x0);
-                var y0 = GetContentY();
-                ret2.Offset(x0, y0);
-                if (ret1 != null)
-                    ret2.UpdateRect = Utility.Union(ret2.UpdateRect, ret1.UpdateRect);
-                this.ClearCacheHeight();
-                // return ret2;
-                changed = true;
+                ProcessChild();
             }
             else
             {
-                if (ret1 == null)
+                if (results.Count == 0)
                     return new ReplaceTextResult();
                 // return ret1;
             }
 
-            if (changed == true)
+            if (results.Count > 0)
             {
                 var rect = new Rectangle(0,
                     0,
@@ -3426,6 +3473,29 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             }
 
             return new ReplaceTextResult();
+
+            ReplaceTextResult ProcessChild()
+            {
+                var collection = _content as IViewBox;
+
+                if (collection.ViewMode == ViewMode.Plane)
+                    return new ReplaceTextResult();
+                var x0 = GetContentX();
+
+                var ret2 = collection.ToggleExpand(
+            info.InnerHitInfo,
+            context,
+            dc,
+            pixel_width - x0,
+            action);
+                var y0 = GetContentY();
+                ret2.Offset(x0, y0);
+                //if (ret1 != null)
+                //    ret2.UpdateRect = Utility.Union(ret2.UpdateRect, ret1.UpdateRect);
+                this.ClearCacheHeight();
+                results.Add(ret2);
+                return ret2;
+            }
         }
 
         public ViewModeTree GetViewModeTree()

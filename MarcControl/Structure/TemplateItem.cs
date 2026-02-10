@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Dynamic;
 using System.Xml.Linq;
 using Vanara.PInvoke;
+using static Vanara.PInvoke.LANGID;
 
 namespace LibraryStudio.Forms
 {
@@ -102,7 +103,9 @@ namespace LibraryStudio.Forms
 
         int GetContentY(int y0 = 0)
         {
-            return y0;
+            int gap_height = GetGapHeight(out int gap_width);
+
+            return y0 + gap_height;
         }
 
         public bool CaretMoveDown(int x, int y, out HitInfo info)
@@ -162,12 +165,42 @@ namespace LibraryStudio.Forms
 
         public int GetPixelHeight()
         {
-            return _content?.GetPixelHeight() ?? 0;
+            int gap_height = GetGapHeight(out int gap_width);
+
+            return _content?.GetPixelHeight() + gap_height * 3 ?? 0;
+        }
+
+        // 获得附加的宽度。附加宽度是指对 _content 内容按照模板定义不足的部分字符的预测宽度
+        // return:
+        //      -1  表示没有得到结构定义
+        //      其它  返回需要扩展的宽度
+        int GetExtendWidth(bool return_not_found = true)
+        {
+            var info = this.GetStructureInfoByBox(this, 1, null/* 从缓存中取得 */);
+            if (info == null || info.Length == 0)
+            {
+                if (return_not_found)
+                    return -1;
+                return 0;
+            }
+
+            int gap_height = GetGapHeight(out int gap_width);
+
+            if (_content != null)
+            {
+                int text_length = _content.TextLength;
+                if (text_length < info.Length)
+                {
+                    return (info.Length - text_length) * FontContext.DefaultReturnWidth;
+                }
+            }
+
+            return 0;
         }
 
         public int GetPixelWidth()
         {
-            return GetContentX() + _content?.GetPixelWidth() ?? 0;
+            return GetContentX() + (_content?.GetPixelWidth() ?? 0) + GetExtendWidth(false);
         }
 
         public Region GetRegion(int start_offs = 0, int end_offs = int.MaxValue, int virtual_tail_length = 0)
@@ -375,22 +408,98 @@ namespace LibraryStudio.Forms
                 }
             }
 
+            var edit_rect = GetEditBorderRect(x, y);
+            if (edit_rect.Width > 0)
+            {
+                PaintEditBorder(
+                    dc,
+                    edit_rect,
+                    clipRect);
+            }
+
             // 绘制内容
             if (_content != null)
             {
-                _content.Paint(context,
-                    dc,
-                    x + x0,
-                    y + y0,
-                    clipRect,
-                    blockOffs1,
-                    blockOffs2,
-                    virtual_tail_length);
+                // if (_content.TextLength > 0)
+                {
+                    _content.Paint(context,
+                        dc,
+                        x + x0,
+                        y + y0,
+                        clipRect,
+                        blockOffs1,
+                        blockOffs2,
+                        virtual_tail_length);
+                }
             }
         }
 
 
         #region Paint() 辅助函数
+
+        int GetGapHeight(out int gap_width)
+        {
+            gap_width = Metrics?.GapThickness ?? 0;
+            return Math.Max(1, gap_width / 2);
+        }
+
+        // 获得 Name 外围边框区域的 Rectangle
+        Rectangle GetEditBorderRect(int x = 0, int y = 0)
+        {
+            var delta = GetExtendWidth(return_not_found:true);
+            if (delta == -1)
+                return new Rectangle(x, y, 0, 0);
+
+            Debug.Assert(Metrics != null);
+            int caption_width = Metrics?.GetCaptionPixelWidth(this) ?? 0;
+            int button_width = Metrics?.ButtonWidth ?? 0;
+            int width = _content?.GetPixelWidth() ?? 0;
+            width += delta;
+            int gap_height = GetGapHeight(out int gap_width);
+
+            /*
+            if (_content != null)
+            {
+                int text_length = _content.TextLength;
+                if (text_length < info.Length)
+                {
+                    width += (info.Length - text_length) * FontContext.DefaultReturnWidth;
+                }
+            }
+            */
+
+            return new Rectangle(x + caption_width + button_width + gap_width * 2,
+                y,
+                width + gap_width * 2,
+                (_content?.GetPixelHeight() ?? FontContext.DefaultFontHeight)
+                + gap_height * 2);
+        }
+
+        // 绘制编辑区域边框
+        void PaintEditBorder(
+            Gdi32.SafeHDC hdc,
+            Rectangle rect00,
+            Rectangle clipRect)
+        {
+            if (rect00.IntersectsWith(clipRect) == false)
+                return;
+
+            bool isReadOnly = _metrics.GetReadOnly?.Invoke(null) ?? false;
+            // 如果控件为 Readonly 状态
+            Color back_color;
+            if (isReadOnly)
+                back_color = _metrics?.ReadOnlyBackColor ?? SystemColors.Control;
+            else
+                back_color = _metrics?.BackColor ?? SystemColors.Window;
+
+            MarcField.PaintEdit(hdc,
+rect00,
+clipRect,
+back_color,
+Math.Max(_metrics.BorderThickness / 2, 1),
+_metrics?.BorderColor ?? SystemColors.ControlDark);
+        }
+
 
         public static Rectangle GetCaptionRect(
             Line caption,
@@ -564,8 +673,15 @@ caption?.GetPixelHeight() ?? 0);
             }
         }
 
-        public ReplaceTextResult ToggleExpand(HitInfo info, IContext context, Gdi32.SafeHDC dc, int pixel_width)
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
+        public ReplaceTextResult ToggleExpand(HitInfo info,
+            IContext context,
+            Gdi32.SafeHDC dc,
+            int pixel_width,
+            int action = 0)
         {
+            // 目前 TemplateItem 不具备展开/收缩能力
             return new ReplaceTextResult();
         }
 
@@ -614,7 +730,7 @@ caption?.GetPixelHeight() ?? 0);
                 if (style == PaddingStyle.CurrentLeft
                     && sibling == this)
                 {
-                   break;
+                    break;
                 }
 
                 if (sibling.Overflow)

@@ -1770,6 +1770,16 @@ out long left_width);
                         }
                     }
                     break;
+                case Keys.Oemplus:
+                case Keys.OemMinus:
+                    if (controlPressed)
+                    {
+                        ToggleExpand(_caretInfo, e.KeyCode == Keys.Oemplus ? 1 : -1);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        return;
+                    }
+                    break;
             }
             base.OnKeyDown(e);
         }

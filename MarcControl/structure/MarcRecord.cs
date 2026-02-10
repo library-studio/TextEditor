@@ -3294,14 +3294,18 @@ out int count)
             fields.RemoveRange(start, count);
         }
 
+        // parameters:
+        //      action  动作。1 展开; 0 Toggle; -1 收缩
         public ReplaceTextResult ToggleExpand(HitInfo info,
             IContext context,
             Gdi32.SafeHDC dc,
-            int pixel_width)
+            int pixel_width,
+            int action = 0)
         {
             if (info.ChildIndex < 0
                 && info.ChildIndex >= this.FieldCount)
                 return new ReplaceTextResult();
+
             var field = this.GetField(info.ChildIndex);
 
             var y0 = SumHeight(_fields, 0, info.ChildIndex);
@@ -3312,7 +3316,8 @@ out int count)
             var ret = field.ToggleExpand(info.InnerHitInfo,
                 context,
                 dc,
-                pixel_width);
+                pixel_width,
+                action);
 
             var new_height = field.GetPixelHeight();
 
