@@ -2543,8 +2543,11 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
             if (_baseLine == 0)
                 _baseLine = FontContext.DefaultFontHeight;
             */
-            _baseLine += VerticalUnit() / 2;
-            _below = boxes.Max(y => y.Below) + VerticalUnit() / 2;
+            if (_baseLine > 0)
+                _baseLine += VerticalUnit() / 2;
+            _below = boxes.Max(y => y.Below);
+            if (_below > 0)
+                _below += VerticalUnit() / 2;
             return (old_baseLine != this._baseLine || old_below != this._below);
         }
 

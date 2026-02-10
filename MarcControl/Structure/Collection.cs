@@ -886,7 +886,12 @@ namespace LibraryStudio.Forms
             if (true/*string.IsNullOrEmpty(content) == false*/)
             {
                 var strings = SplitChildren(content);
-                int j = 0;
+
+                // TODO: 需要把 strings 与修改前的原有内容列表进行对比，
+                // 尽可能把没有变化的部分，排除到重新创建范围之外，减少更新运算和显示范围
+                // 但要注意 Template 这样的派生容器，对 index 变化的敏感性，中间插入和删除行的情形，要把后面全部的纳入更新范围。可以用一个表示特性的成员来定义
+
+                int j = first_line_index;
                 foreach (var s in strings)
                 {
                     // var child = new T();
@@ -909,6 +914,7 @@ namespace LibraryStudio.Forms
 
             }
 
+            // 去掉前方重复的行
             // offs 为(Paragraph)从头开始计算的第一个不同 char 的 offs
             var index = SameLines(old_lines, new_lines, out int offs);
             if (index > 0)
@@ -921,6 +927,14 @@ namespace LibraryStudio.Forms
                 old_lines.RemoveRange(0, index);
                 RemoveLines(new_lines, 0, index);   // 刚创建的 field 要删除必须要 Dispose()
                 first_line_index += index;
+            }
+
+            // 去掉后方重复的行
+            index = ReverseSameLines(old_lines, new_lines, out _);
+            if (index > 0)
+            {
+                old_lines.RemoveRange(old_lines.Count - index, index);
+                RemoveLines(new_lines, new_lines.Count - index, index);   // 刚创建的 field 要删除必须要 Dispose()
             }
 
             // TODO: 修改前的最后一个 Line 末尾的回车换行符号区域。
@@ -1079,6 +1093,30 @@ namespace LibraryStudio.Forms
             Debug.Assert(min_count <= lines2.Count);
             return min_count;
         }
+
+        // 检查两组行，后方有连续多少行互相没有不同
+        // parameters:
+        //      offs    [out] 返回第一个不同的 offs。是从后面倒着计算的，从 0 开始计数
+        // return:
+        //      返回第一个不同的 index。是从后面倒着计算的，从 0 开始计数
+        static int ReverseSameLines(List<T> lines1,
+            List<T> lines2,
+            out int offs)
+        {
+            offs = 0;
+            var min_count = Math.Min(lines1.Count, lines2.Count);
+            for (int i = 0; i < min_count; i++)
+            {
+                var text1 = lines1[lines1.Count - i - 1].MergeText();
+                if (text1 != lines2[lines2.Count - i - 1].MergeText())
+                    return i;
+                offs += text1.Length;
+            }
+            Debug.Assert(min_count <= lines1.Count);
+            Debug.Assert(min_count <= lines2.Count);
+            return min_count;
+        }
+
 
         // 比较两行文字，第一处不一样的 char index
         static int SameChars(T line1, T line2)

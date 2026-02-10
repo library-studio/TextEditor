@@ -57,11 +57,14 @@ namespace LibraryStudio.Forms
             {
                 if (y >= clipRect.Bottom)
                     break;
-                field.PaintBackAndBorder(hdc,
-x,
-y,
-clipRect,
-i == caret_field_index);
+                if (field.PlainText == false)
+                {
+                    field.PaintBackAndBorder(hdc,
+    x,
+    y,
+    clipRect,
+    i == caret_field_index);
+                }
                 y += field.GetPixelHeight();
                 i++;
             }

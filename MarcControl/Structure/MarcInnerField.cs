@@ -31,7 +31,8 @@ namespace LibraryStudio.Forms
         }
         */
 
-        public override int TextLength {
+        public override int TextLength
+        {
             get
             {
                 if (this.PlainText)
@@ -86,11 +87,21 @@ namespace LibraryStudio.Forms
 
         public override bool CaretMoveDown(int x, int y, out HitInfo info)
         {
-            var ret = base.CaretMoveDown(x, y, out info);
             if (this.PlainText)
-                return ret;
+            {
+                this.IsHeader = true;
+                try
+                {
+                    var ret = base.CaretMoveDown(x, y, out info);
+                    return ret;
+                }
+                finally {
+                    this.IsHeader = false;
+                }
+            }
             else
             {
+                var ret = base.CaretMoveDown(x, y, out info);
                 info.Offs += 2;
                 return ret;
             }
@@ -98,11 +109,22 @@ namespace LibraryStudio.Forms
 
         public override bool CaretMoveUp(int x, int y, out HitInfo info)
         {
-            var ret = base.CaretMoveUp(x, y, out info);
             if (this.PlainText)
-                return ret;
+            {
+                this.IsHeader = true;
+                try
+                {
+                    var ret = base.CaretMoveUp(x, y, out info);
+                    return ret;
+                }
+                finally
+                {
+                    this.IsHeader = false;
+                }
+            }
             else
             {
+                var ret = base.CaretMoveUp(x, y, out info);
                 info.Offs += 2;
                 return ret;
             }
@@ -126,8 +148,16 @@ namespace LibraryStudio.Forms
         {
             if (this.PlainText)
             {
-                var ret = base.MoveByOffs(offs, direction, out info);
-                return ret;
+                this.IsHeader = true;
+                try
+                {
+                    var ret = base.MoveByOffs(offs, direction, out info);
+                    return ret;
+                }
+                finally
+                {
+                    this.IsHeader = false;
+                }
             }
             else
             {
@@ -164,7 +194,15 @@ namespace LibraryStudio.Forms
         {
             if (this.PlainText)
             {
-                return base.GetRegion(start_offs, start_offs, 0);
+                this.IsHeader = true;
+                try
+                {
+                    return base.GetRegion(start_offs, start_offs, 0);
+                }
+                finally
+                {
+                    this.IsHeader = false;
+                }
             }
             else
             {
@@ -178,11 +216,22 @@ namespace LibraryStudio.Forms
 
         public override HitInfo HitTest(int x, int y)
         {
-            var ret = base.HitTest(x, y);
             if (this.PlainText)
-                return ret;
+            {
+                this.IsHeader = true;
+                try
+                {
+                    var ret = base.HitTest(x, y);
+                    return ret;
+                }
+                finally
+                {
+                    this.IsHeader = false;
+                }
+            }
             else
             {
+                var ret = base.HitTest(x, y);
                 ret.Offs += 2;
                 return ret;
             }

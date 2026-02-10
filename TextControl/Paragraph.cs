@@ -1661,7 +1661,8 @@ tag);
             return new HitInfo
             {
                 Area = Area.BottomBlank,
-                Box = this
+                Box = this,
+                LineHeight = this.GetPixelHeight(), // 2026/2/11
             };
         }
 

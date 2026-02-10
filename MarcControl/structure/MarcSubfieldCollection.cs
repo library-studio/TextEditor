@@ -140,7 +140,5 @@ namespace LibraryStudio.Forms
 
             return lines;
         }
-
-
     }
 }
