@@ -35,12 +35,15 @@ namespace LibraryStudio.Forms
                 // Debug.Assert(value == 42);
                 _lineHeight = value;
             }
-        } 
+        }
+
         public Area Area;
 
         public object Box;    // 命中的 Box 对象
 
         public HitInfo InnerHitInfo;
+
+        public int Direction;   // 前一次命中时采用过的 direction 参数。注意 HitInfo 这里返回的 Offs 值并没有和 Direction 对冲。
 
         public HitInfo Clone()
         {
@@ -55,7 +58,36 @@ namespace LibraryStudio.Forms
                 Area = this.Area,
                 Box = this.Box,
                 InnerHitInfo = this.InnerHitInfo?.Clone(),
+                Direction = this.Direction,
             };
+        }
+
+        // direction <= 0 表示倾向于选择后方的位置
+        public static HitInfo Select(List<HitInfo> infos, int direction)
+        {
+            if (direction <= 0)
+            {
+                return infos[infos.Count - 1];
+            }
+            return infos[0];
+        }
+
+        // 查找 HitInfo 链条中第一个匹配指定类型的 Box，并返回该类型实例（泛型版本）
+        public static T HitInner<T>(HitInfo info, out HitInfo hit_info) where T : class
+        {
+            var current = info;
+            while (current != null)
+            {
+                if (current.Box is T t)
+                {
+                    hit_info = current;
+                    return t;
+                }
+
+                current = current.InnerHitInfo;
+            }
+            hit_info = null;
+            return null;
         }
     }
 

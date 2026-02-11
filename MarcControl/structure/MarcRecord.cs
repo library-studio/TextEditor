@@ -692,7 +692,11 @@ namespace LibraryStudio.Forms
             int direction,
             out HitInfo info)
         {
-            info = new HitInfo { Box = this };
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction
+            };
 
             var infos = new List<HitInfo>();
 
@@ -727,6 +731,7 @@ namespace LibraryStudio.Forms
                             LineHeight = hit_info.LineHeight,
                             Box = this,
                             InnerHitInfo = hit_info,
+                            Direction = direction,
                         };
 
                         if (direction >= 0)
@@ -744,7 +749,9 @@ namespace LibraryStudio.Forms
                     // 于是及时返回，避免多余的后继匹配操作
                     if (infos.Count > 0)
                     {
-                        info = infos[infos.Count - 1];
+                        // info = infos[infos.Count - 1];
+                        info = HitInfo.Select(infos, direction);
+                        info.Direction = direction;
                         return 0;
                     }
                 }
@@ -781,6 +788,7 @@ namespace LibraryStudio.Forms
                             LineHeight = hit_info.LineHeight,
                             Box = this,
                             InnerHitInfo = hit_info,
+                            Direction = direction,
                         };
                         info = temp_info;
                         return 0;
@@ -800,6 +808,7 @@ namespace LibraryStudio.Forms
                         LineHeight = FontContext.DefaultFontHeight,
                         Box = this,
                         InnerHitInfo = null,
+                        Direction = direction,
                     };
                     return 0;
                 }
@@ -807,7 +816,9 @@ namespace LibraryStudio.Forms
 
             if (infos.Count > 0)
             {
-                info = infos[infos.Count - 1];
+                // info = infos[infos.Count - 1];
+                info = HitInfo.Select(infos, direction);
+                info.Direction = direction;
                 return 0;
             }
 

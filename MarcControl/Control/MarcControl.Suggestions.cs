@@ -83,13 +83,6 @@ namespace LibraryStudio.Forms
         }
 #endif
 
-        /*
-        // ValueList 窗口弹出前对应的插入符偏移
-        int _suggestion_caret_offs = -1;
-        // ValueList 窗口弹出前对应的拟替换的原有文字片段。注意可能比 Value 内容短
-        string _suggestion_start_text = "";
-        */
-
         public delegate void delegate_itemChosen(string text);
         public delegate void delegate_cancel();
         /// <summary>
@@ -341,9 +334,17 @@ namespace LibraryStudio.Forms
 
 #endregion
 
+        // ValueList 小窗口是否打开。注意打开后分为有焦点和无焦点两种状态
         public bool ValueListWindowOpened()
         {
             return (_suggestionPopup != null && _suggestionPopup.Visible);
+        }
+
+        // ValueList 小窗口是否拥有输入焦点。注意只有当打开后可能会拥有焦点。打开后也可能不拥有焦点。
+        // 拥有焦点的时候，小窗口显示在相关文字下方；没有输入焦点的时候，小窗口显示在相关文字右侧
+        public bool ValueListWindowHasFocus()
+        {
+            return (_suggestionPopup != null && _suggestionPopup.HasFocus);
         }
 
         public bool HandlePopupKeyDown(KeyEventArgs e)

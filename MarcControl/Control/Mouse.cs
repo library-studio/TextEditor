@@ -112,7 +112,7 @@ namespace LibraryStudio.Forms
                 // 按下了“展开/收缩”按钮
                 if (HitButton(result))
                 {
-                    ToggleExpand(result);
+                    ToggleExpand(result, 0);
                     base.OnMouseDown(e);
                     _isButtonDown = true;
                     return;
@@ -449,7 +449,8 @@ e.Y + this.VerticalScroll.Value);
 
         // parameters:
         //      action  动作。1 展开; 0 Toggle; -1 收缩
-        void ToggleExpand(HitInfo info, int action = 0)
+        void ToggleExpand(HitInfo info,
+            int action = 0)
         {
             ReplaceTextResult ret = null;
             using (var g = this.CreateGraphics())
@@ -508,9 +509,24 @@ e.Y + this.VerticalScroll.Value);
             if (max_pixel_width == 0)
                 max_pixel_width = this._record.GetPixelWidth();
             this.AutoScrollMinSize = new Size(max_pixel_width, _record.GetPixelHeight());
-            SetCaret(HitByCaretOffs(_caret_offs), reset_selection: false, ensure_caret_visible: false);
+
+            int delta = AdjustCaret();
+            SetCaret(
+                HitByCaretOffs(_caret_offs - delta,
+                delta),
+                reset_selection: false,
+                ensure_caret_visible: false);
 
             // TODO: 改变 _lastX ?
+
+            int AdjustCaret()
+            {
+                // 当插入符处在 001 第一字符位置的时候，要对后面的 Offs 定位添加调节因子，确保展开、收缩后还能定位到原位置
+                if (_caretInfo.Offs == 24
+                    && _caretInfo.ChildIndex == 1)
+                    return -1;
+                return 0;
+            }
         }
     }
 }

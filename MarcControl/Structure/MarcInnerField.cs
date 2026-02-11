@@ -175,6 +175,7 @@ namespace LibraryStudio.Forms
                         direction,
                         out info);
                     info.Offs += 2;
+                    info.Direction = direction;
                     return ret;
                 }
 

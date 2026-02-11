@@ -332,10 +332,15 @@ namespace LibraryStudio.Forms
                 // 保持 info.LineHeight
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
+                info.Direction = direction;
                 return ret;
             }
 
-            info = new HitInfo { Box = this };
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction
+            };
             return 0;
         }
 
@@ -446,7 +451,7 @@ namespace LibraryStudio.Forms
         // 获得 Name 外围边框区域的 Rectangle
         Rectangle GetEditBorderRect(int x = 0, int y = 0)
         {
-            var delta = GetExtendWidth(return_not_found:true);
+            var delta = GetExtendWidth(return_not_found: true);
             if (delta == -1)
                 return new Rectangle(x, y, 0, 0);
 

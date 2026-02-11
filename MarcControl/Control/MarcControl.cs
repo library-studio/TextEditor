@@ -1774,7 +1774,8 @@ out long left_width);
                 case Keys.OemMinus:
                     if (controlPressed)
                     {
-                        ToggleExpand(_caretInfo, e.KeyCode == Keys.Oemplus ? 1 : -1);
+                        ToggleExpand(_caretInfo,
+                            e.KeyCode == Keys.Oemplus ? 1 : -1);
                         e.Handled = true;
                         e.SuppressKeyPress = true;
                         return;

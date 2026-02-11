@@ -1941,3 +1941,32 @@ namespace LibraryStudio.Forms
 •	使用 Control.FromHandle 判断前台句柄对应的 WinForms 控件/窗体，从而避免把判断建立在控件失去焦点上（满足你提到的 popup 可能抢焦点的情况）。
 这样做比仅依赖控件焦点或 LostFocus 更稳健：既能响应宿主窗体被推到后台的情况（Form.Deactivate），也能处理前台窗口被其他进程或同进程其他窗口占用的情况（定时检测 GetForegroundWindow）。如果你希望更低延迟，可以把定时器间隔调小；若希望更节省资源可以放宽间隔或只订阅 Deactivate（但会在 popup 自身抢焦点时触发，需要按实际行为调整）。
 
+
+~~~~~~~~~~~~~~~
+深呼吸一下——问题原因是当序列为空时 `Enumerable.Max()` 会抛出异常。常见修复方式有三种：
+
+- 在取最大值前用 `Any()` 做空检查并提供默认值；
+- 把数据投成可空类型然后用 `?.Max() ?? 0`；
+- 或者更简洁：先 `Select(...)` 得到 int 序列，然后 `DefaultIfEmpty(0).Max()`。
+
+推荐使用 `Select(...).DefaultIfEmpty(0).Max()`，并同时检查父对象或 Children 为 null。把原来的那一行替换为下面代码：
+
+```csharp
+int item_width = 0;
+var parentTemplate = template_item.Parent as Template;
+if (parentTemplate != null && parentTemplate.Children != null)
+    item_width = parentTemplate.Children
+        .Where(o => o.Overflow == false)
+        .Select(o => o.GetPixelWidth())
+        .DefaultIfEmpty(0)
+        .Max();
+```
+
+说明：这样即使集合为空也会返回 0，避免抛出异常。另一可选写法（等价）是：
+```csharp
+int item_width = (template_item.Parent as Template)?.Children
+    ?.Where(o => !o.Overflow)
+    .Select(o => (int?)o.GetPixelWidth())
+    .Max() ?? 0;
+```
+两者都能安全处理空集合和 null 父对象。

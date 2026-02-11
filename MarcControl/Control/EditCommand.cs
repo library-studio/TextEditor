@@ -108,8 +108,9 @@ namespace LibraryStudio.Forms
             }
 
 
-            // 重新调整一次 caret 位置。因为有可能在最后一行删除最后一个字符时突然行数减少
-            _record.MoveByOffs(info.Offs + 1, -1, out info);
+            // 重新调整一次 caret 位置。
+            // 如果遇到等同位置倾向于用靠前的位置
+            _record.MoveByOffs(info.Offs - 1, +1, out info);
 
             //MoveCaret(info);
             SetCaret(info);
@@ -559,6 +560,12 @@ namespace LibraryStudio.Forms
             right = text.Substring(info.StartLength);
         }
 
+        // 保留旧的兼容方法
+        static MarcInnerField HitInnerField(HitInfo info)
+        {
+            return HitInfo.HitInner<MarcInnerField>(info, out _);
+        }
+#if REMOVED
         static MarcInnerField HitInnerField(HitInfo info)
         {
             var current = info;
@@ -573,6 +580,7 @@ namespace LibraryStudio.Forms
             }
             return null;
         }
+#endif
 
         // 处理输入回车字符
         public virtual bool ProcessInputReturnChar(char ch,
@@ -902,32 +910,102 @@ namespace LibraryStudio.Forms
             return true;
         }
 
+        // TODO: 在 Template 之内，到下一个 TemplateItem 开头。在 MarcSubfieldCollection 之内，到下一个 MarcSubfield 开头
         // 将插入符移动到下一个字段的内容第一字符位置
         public bool ToNextField()
         {
-            var index = this.CaretFieldIndex;
-            if (index < this._record.FieldCount - 1)
-                index++;
-            else
             {
-                var offs = this._record.TextLength;
-                //this.SetCaretOffs(offs);
-                MoveCaret(HitByCaretOffs(offs, 0));
-                return true;
+                var hit_template_item = HitInfo.HitInner<TemplateItem>(_caretInfo, out HitInfo hit);
+                if (hit_template_item != null)
+                {
+                    var delta = hit_template_item.TextLength - hit.Offs;
+                    MoveCaret(HitByCaretOffs(_caretInfo.Offs + delta + 1, -1));
+                    return true;
+                }
             }
-            if (this._record.GetFieldOffsRange(index,
-                out int start,
-                out int end) == false)
+
+            bool isLast(IEnumerable<object> children,
+                object hit_s)
+            {
+                int i = 0;
+                foreach (var c in children)
+                {
+                    if (object.ReferenceEquals(c, hit_s) || Equals(c, hit_s))
+                    {
+                        if (i == children.Count() - 1)
+                            return true;
+                        return false;
+                    }
+                    i++;
+                }
                 return false;
-            var field = this._record.GetField(index);
-            if (field.IsControlField)
-                start += 3;
-            else
-                start += 5;
-            start = Math.Min(end, start);
-            //this.SetCaretOffs(start);
-            MoveCaret(HitByCaretOffs(start, 0));
-            return true;
+            }
+
+            {
+                var hit_subfield = HitInfo.HitInner<MarcSubfield>(_caretInfo, out HitInfo hit);
+                if (hit_subfield != null)
+                {
+                    var delta = hit_subfield.TextLength - hit.Offs;
+
+                    // 观察是否为容器的最后一个 child
+                    if (isLast((hit_subfield.Parent as MarcSubfieldCollection)
+                        .Children, hit_subfield) == false)
+                    {
+                        // TODO: 最好是到下一个子字段的内容第一字符
+                        MoveCaret(HitByCaretOffs(_caretInfo.Offs + delta + 1, -1));
+                        return true;
+                    }
+
+                }
+            }
+
+            {
+                var hit_inner_field = HitInfo.HitInner<MarcInnerField>(_caretInfo, out HitInfo hit);
+                if (hit_inner_field != null)
+                {
+                    var delta = hit_inner_field.TextLength - hit.Offs;
+
+                    // 观察是否为容器的最后一个 child
+                    if (isLast((hit_inner_field.Parent as MarcFieldCollection)
+                        .Children, hit_inner_field) == false)
+                    {
+                        // TODO: 最好是到下一个内嵌字段的内容第一字符
+                        MoveCaret(HitByCaretOffs(_caretInfo.Offs + delta + 1 + 2, -1));
+                        return true;
+                    }
+                }
+            }
+
+            {
+                var hit_field = HitInfo.HitInner<MarcField>(_caretInfo, out _);
+                if (hit_field != null)
+                {
+                    var index = this.CaretFieldIndex;
+                    if (index < this._record.FieldCount - 1)
+                        index++;
+                    else
+                    {
+                        var offs = this._record.TextLength;
+                        //this.SetCaretOffs(offs);
+                        MoveCaret(HitByCaretOffs(offs, 0));
+                        return true;
+                    }
+                    if (this._record.GetFieldOffsRange(index,
+                        out int start,
+                        out int end) == false)
+                        return false;
+                    var field = this._record.GetField(index);
+                    if (field.IsControlField)
+                        start += 3;
+                    else
+                        start += 5;
+                    start = Math.Min(end, start);
+                    //this.SetCaretOffs(start);
+                    MoveCaret(HitByCaretOffs(start, 0));
+                    return true;
+                }
+            }
+            return false;
         }
 
         // 根据指定的 index 删除若干字段。可以出现提示对话框

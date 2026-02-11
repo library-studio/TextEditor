@@ -840,7 +840,8 @@ namespace LibraryStudio.Forms
                     // 于是及时返回，避免多余的后继匹配操作
                     if (infos.Count > 0)
                     {
-                        info = infos[infos.Count - 1];
+                        // info = infos[infos.Count - 1];
+                        info = HitInfo.Select(infos, direction);
                         return 0;
                     }
                 }
@@ -854,7 +855,8 @@ namespace LibraryStudio.Forms
 
             if (infos.Count > 0)
             {
-                info = infos[infos.Count - 1];
+                // info = infos[infos.Count - 1];
+                info = HitInfo.Select(infos, direction);
                 return 0;
             }
 

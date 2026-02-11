@@ -360,10 +360,15 @@ namespace LibraryStudio.Forms
         //      -1  越过左边
         //      0   成功
         //      1   越过右边
-        public int MoveByOffs(int offs, int direction, out HitInfo info)
+        public int MoveByOffs(int offs, int direction_param, out HitInfo info)
         {
             int ret = 0;
-            info = new HitInfo { Box = this};
+            int direction = direction_param;
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction_param
+            };
 
             Debug.Assert(this._text.Length == this._displayText.Length);
 

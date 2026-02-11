@@ -377,6 +377,20 @@ namespace LibraryStudio.Forms
                 return ret;
             }
 
+            // 2026/2/11
+            if (this.IsHeader && _content == null)
+            {
+                var x0 = GetContentX();
+                var y0 = GetContentY();
+                info = new HitInfo { X = x0, Y = y0 };
+                info.ChildIndex = 0;
+                info.TextIndex = 0;
+                info.Offs = 0;
+                info.Box = this;
+                info.InnerHitInfo = null;
+                return false;
+            }
+
             info = new HitInfo { Box = this };
             return false;
         }
@@ -447,6 +461,20 @@ namespace LibraryStudio.Forms
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 return ret;
+            }
+
+            // 2026/2/11
+            if (this.IsHeader && _content == null)
+            {
+                var x0 = GetContentX();
+                var y0 = GetContentY();
+                info = new HitInfo { X = x0, Y = y0 };
+                info.ChildIndex = 0;
+                info.TextIndex = 0;
+                info.Offs = 0;
+                info.Box = this;
+                info.InnerHitInfo = null;
+                return false;
             }
 
             info = new HitInfo { Box = this };
@@ -590,6 +618,20 @@ namespace LibraryStudio.Forms
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
                 // 保持 info.LineHeight
+                return info;
+            }
+
+            // 2026/2/11
+            if (this.IsHeader && _content == null)
+            {
+                var x0 = GetContentX();
+                var y0 = GetContentY();
+                var info = new HitInfo { X = x0, Y = y0 };
+                info.ChildIndex = caption_area_hitted != 0 ? caption_area_hitted : (int)FieldRegion.Content; // 2 表示 _content
+                info.TextIndex = 0;
+                info.Offs = 0;
+                info.Box = this;
+                info.InnerHitInfo = null;
                 return info;
             }
 
@@ -918,7 +960,11 @@ namespace LibraryStudio.Forms
             var offs_original = offs;
             if (offs + direction < 0)
             {
-                info = new HitInfo { Box = this };
+                info = new HitInfo
+                {
+                    Box = this,
+                    Direction = direction
+                };
                 return -1;
             }
 
@@ -938,7 +984,10 @@ namespace LibraryStudio.Forms
                     && _name.TextLength >= 3)
                     goto DO_INDICATOR;
                 var rect = GetNameRect();
-                var ret = _name.MoveByOffs(offs, direction, out info);
+                var ret = _name.MoveByOffs(offs, direction, out HitInfo sub_info);
+                info = sub_info.Clone();    // 2026/2/11
+                info.Box = this;
+                info.InnerHitInfo = sub_info;
                 info.X += rect.X;
                 info.Y += rect.Y;
                 info.ChildIndex = (int)FieldRegion.Name; // 0 表示 _name
@@ -946,6 +995,7 @@ namespace LibraryStudio.Forms
                 //info.Offs += 0;
                 info.Offs += offs_original - offs; // 保持原来的偏移量
                 info.LineHeight = FirstLineCaretHeight(_name);
+                info.Direction = direction;
                 if (_name.TextLength < 3)
                     return ret;
                 infos.Add(info);
@@ -971,6 +1021,7 @@ namespace LibraryStudio.Forms
                 info.LineHeight = FirstLineCaretHeight(_indicator);
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
+                info.Direction = direction;
                 if (_indicator.TextLength < 2 && this.IsControlField == false)
                     return ret;
                 infos.Add(info);
@@ -980,7 +1031,9 @@ namespace LibraryStudio.Forms
                 if (infos.Count > 0
                     && this.IsControlField == false/*控制字段要延迟返回，等 _content 判断了再说*/)
                 {
-                    info = infos[infos.Count - 1];
+                    // info = infos[infos.Count - 1];
+                    info = HitInfo.Select(infos, direction);
+                    info.Direction = direction;
                     return 0;
                 }
             }
@@ -1005,6 +1058,7 @@ namespace LibraryStudio.Forms
 
                 info.Box = this;
                 info.InnerHitInfo = sub_info;
+                info.Direction = direction;
                 // return ret;
                 infos.Add(info);
             }
@@ -1012,18 +1066,41 @@ namespace LibraryStudio.Forms
             {
                 if (infos.Count > 0)
                 {
-                    info = infos[infos.Count - 1];
+                    // info = infos[infos.Count - 1];
+                    info = HitInfo.Select(infos, direction);
+                    info.Direction = direction;
                     return 0;
                 }
             }
 
             if (infos.Count > 0)
             {
-                info = infos[infos.Count - 1];
+                // info = infos[infos.Count - 1];
+                info = HitInfo.Select(infos, direction);
+                info.Direction = direction;
                 return 0;
             }
 
-            info = new HitInfo { Box = this };
+            // 2026/2/11
+            if (this.IsHeader && _content == null)
+            {
+                var x0 = GetContentX();
+                var y0 = GetContentY();
+                info = new HitInfo { X = x0, Y = y0 };
+                info.ChildIndex = 0;
+                info.TextIndex = 0;
+                info.Offs = 0;
+                info.Box = this;
+                info.InnerHitInfo = null;
+                info.Direction = direction;
+                return (offs + direction >= 0 && offs + direction <= 0) ? 0 : 1;
+            }
+
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction
+            };
             return 1;
         }
 

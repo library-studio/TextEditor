@@ -426,9 +426,17 @@ namespace LibraryStudio.Forms
                 }
 
                 // 兄弟中最宽的宽度
+                /* // 这段代码遇到空会抛出异常。
                 int item_width = (template_item.Parent as Template).Children
                     .Where(o => o.Overflow == false)
                     .Max(o => o.GetPixelWidth());
+                */
+                int item_width = (template_item.Parent as Template)
+                    .Children
+                    .Where(o => o.Overflow == false)
+                    .Select(o => o.GetPixelWidth())
+                    .DefaultIfEmpty(0)
+                    .Max();
                 Rectangle ref_rect = new Rectangle(_caretInfo.X,
                     _caretInfo.Y,
                     0,

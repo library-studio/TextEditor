@@ -565,6 +565,7 @@ FontContext.DefaultFontHeight);
                     // 保持 info.LineHeight
                     info.Box = this;
                     info.InnerHitInfo = sub_info;
+                    info.Direction = direction;
                     return ret;
                 }
             }
@@ -583,6 +584,7 @@ FontContext.DefaultFontHeight);
                         // 保持 info.LineHeight
                         info.Box = this;
                         info.InnerHitInfo = sub_info;
+                        info.Direction = direction;
                         return ret;
                     }
                     else
@@ -597,12 +599,17 @@ FontContext.DefaultFontHeight);
                         // 保持 info.LineHeight
                         info.Box = this;
                         info.InnerHitInfo = sub_info;
+                        info.Direction = direction;
                         return ret;
                     }
                 }
             }
 
-            info = new HitInfo { Box = this };
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction
+            };
             return 0;
         }
 

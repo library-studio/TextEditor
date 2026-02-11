@@ -442,7 +442,12 @@ namespace LibraryStudio.Forms
             int direction,
             out HitInfo info)
         {
-            info = new HitInfo { Box = this };
+            info = new HitInfo
+            {
+                Box = this,
+                Direction = direction
+            };
+
             if (offs + direction < 0)
             {
                 return -1;
