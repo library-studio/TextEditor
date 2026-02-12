@@ -16,8 +16,10 @@ namespace LibraryStudio.Forms
     /// 一个 MARC 记录编辑区域
     /// 由若干 MarcField 构成
     /// </summary>
-    public class MarcRecord : IViewBox, IEnumerable<MarcField>, IDisposable
+    // public class MarcRecord : IViewBox, IEnumerable<MarcField>, IDisposable
+    public class MarcRecord : Collection<MarcField>, IEnumerable<MarcField>, IDisposable
     {
+#if REMOVED
         public string Name { get; set; }
 
         public IBox Parent
@@ -32,35 +34,39 @@ namespace LibraryStudio.Forms
                 // _marcControl = value as MarcControl;
             }
         }
+#endif
 
         internal MarcControl _marcControl = null;
         public MarcControl GetControl() { return _marcControl; }
 
-        List<MarcField> _fields = new List<MarcField>();
+        // List<MarcField> _lines = new List<MarcField>();
 
+#if REMOVED
         // 引用字段共同属性
-        Metrics _fieldProperty;
+        Metrics _metrics;
         public Metrics Metrics
         {
             get
             {
-                return _fieldProperty;
+                return _metrics;
             }
             set
             {
-                _fieldProperty = value;
+                _metrics = value;
             }
         }
 
         public ViewMode ViewMode { get; set; } = ViewMode.Expand;
+#endif
 
         public MarcRecord(MarcControl control,
             Metrics fieldProperty)
         {
             _marcControl = control;
-            _fieldProperty = fieldProperty;
+            _metrics = fieldProperty;
         }
 
+#if REMOVED
         // 包含了(除了头标区以外)每个字段的结束符
         public int TextLength
         {
@@ -72,6 +78,7 @@ namespace LibraryStudio.Forms
                 return _fields.Sum(f => f.TextLength);
             }
         }
+#endif
 
         // 向下移动插入符一行
         // parameters:
@@ -82,7 +89,7 @@ namespace LibraryStudio.Forms
         // return:
         //      true    成功。新的插入符位置返回在 info 中了
         //      false   无法移动。注意此时 info 中返回的内容无意义
-        public bool CaretMoveDown(int x, int y, out HitInfo info)
+        public override bool CaretMoveDown(int x, int y, out HitInfo info)
         {
             /*
             info = new HitInfo();
@@ -94,7 +101,7 @@ namespace LibraryStudio.Forms
             return true;
             */
 
-            if (this._fields == null)
+            if (this._lines == null)
             {
                 info = new HitInfo { Box = this };
                 return false;
@@ -106,15 +113,15 @@ namespace LibraryStudio.Forms
             // 先定位当前字段的 index
             var temp = this.HitTest(x, y);
             var index = temp.ChildIndex;
-            if (index < 0 || index >= _fields.Count)
+            if (index < 0 || index >= _lines.Count)
             {
                 info = new HitInfo { Box = this };
                 return false;
             }
 
-            var start_y = SumHeight(_fields, index);
+            var start_y = SumHeight(_lines, index);
 
-            var field = _fields[index];
+            var field = _lines[index];
             var ret = field.CaretMoveDown(x,
                 y - start_y,
                 out info);
@@ -133,16 +140,16 @@ namespace LibraryStudio.Forms
                 */
                 var sub_info = info.Clone();
                 info.Y += start_y;
-                info.Offs += _fields.GetRange(0, index).Sum(o => o.TextLength);
+                info.Offs += _lines.GetRange(0, index).Sum(o => o.TextLength);
                 info.ChildIndex = index;
                 info.InnerHitInfo = sub_info;
                 return true;
             }
 
-            if (index >= this._fields.Count - 1)
+            if (index >= this._lines.Count - 1)
             {
                 // 到最后一个字段之下的 Name 区第一个字符位置
-                if (index == this._fields.Count - 1)
+                if (index == this._lines.Count - 1)
                 {
                     MoveByOffs(this.TextLength,
                         0,
@@ -178,7 +185,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public bool CaretMoveUp(int x, int y, out HitInfo info)
+        public override bool CaretMoveUp(int x, int y, out HitInfo info)
         {
             /*
             info = new HitInfo();
@@ -189,7 +196,7 @@ namespace LibraryStudio.Forms
             return true;
             */
 
-            if (this._fields == null)
+            if (this._lines == null)
             {
                 info = new HitInfo { Box = this };
                 return false;
@@ -199,9 +206,9 @@ namespace LibraryStudio.Forms
             var temp = this.HitTest(x, y);
             var index = temp.ChildIndex;
             // 当前正在最后一个字段以下位置。要移动到最后一个字段的 name 区第一字符位置
-            if (index == _fields.Count)
+            if (index == _lines.Count)
             {
-                int y0 = SumHeight(_fields, _fields.Count);
+                int y0 = SumHeight(_lines, _lines.Count);
                 info = this.HitTest(x, y0 - 1);
                 return true;
                 /*
@@ -214,15 +221,15 @@ namespace LibraryStudio.Forms
                 return true;
                 */
             }
-            if (index < 0 || index >= _fields.Count)
+            if (index < 0 || index >= _lines.Count)
             {
                 info = new HitInfo { Box = this };
                 return false;
             }
 
-            var start_y = SumHeight(_fields, index);
+            var start_y = SumHeight(_lines, index);
 
-            var field = _fields[index];
+            var field = _lines[index];
             var ret = field.CaretMoveUp(x,
                 y - start_y,
                 out info);
@@ -242,7 +249,7 @@ namespace LibraryStudio.Forms
                 */
                 var sub_info = info.Clone();
                 info.Y += start_y;
-                info.Offs += _fields.GetRange(0, index).Sum(o => o.TextLength);
+                info.Offs += _lines.GetRange(0, index).Sum(o => o.TextLength);
                 info.ChildIndex = index;
                 info.InnerHitInfo = sub_info;
                 return true;
@@ -260,7 +267,7 @@ namespace LibraryStudio.Forms
                 {
                     Debug.Assert(index > 0);
                     // 减去前一个字段的像素高度
-                    var prev_field = _fields[index - 1] as MarcField;
+                    var prev_field = _lines[index - 1] as MarcField;
                     y -= prev_field.GetPixelHeight();
                 }
                 else
@@ -280,10 +287,12 @@ namespace LibraryStudio.Forms
 
         }
 
+#if REMOVED
         public void Clear()
         {
             DisposeFields();
         }
+#endif
 
         int _blankLineHeigh = 0;
 
@@ -296,17 +305,17 @@ namespace LibraryStudio.Forms
         }
 
         // 加上 FontContext.DefaultFontHeight 是为了让最后一行的 caret 可见
-        public int GetPixelHeight()
+        public override int GetPixelHeight()
         {
             _blankLineHeigh = FontContext.DefaultFontHeight;
-            if (_fields == null
-                || _fields.Count == 0)
+            if (_lines == null
+                || _lines.Count == 0)
                 return _blankLineHeigh;
-            return _fields.Sum(field => field.GetPixelHeight())
+            return _lines.Sum(field => field.GetPixelHeight())
                 + _blankLineHeigh;
         }
 
-        public HitInfo HitTest(int x, int y)
+        public override HitInfo HitTest(int x, int y)
         {
             // 把小于 0 的 y 位置调整为 0，这样当作是点击在第一行的顶部
             if (y < 0)
@@ -317,9 +326,9 @@ namespace LibraryStudio.Forms
             var result = new HitInfo { Box = this };
             int current_y = 0;
             int offs = 0;
-            for (int i = 0; i < _fields.Count; i++)
+            for (int i = 0; i < _lines.Count; i++)
             {
-                var field = _fields[i] as MarcField;
+                var field = _lines[i] as MarcField;
                 Debug.Assert(field != null);
                 int return_length = (i == 0 ? 0 : 1); // 第一行没有字段结束符
                 // bool isLastField = (i == _fields.Count - 1);
@@ -541,14 +550,14 @@ namespace LibraryStudio.Forms
             */
         }
 
-        public string MergeText(int start = 0, int end = int.MaxValue)
+        public override string MergeText(int start = 0, int end = int.MaxValue)
         {
             if (end <= start || end <= 0)
                 return "";
 
             StringBuilder builder = new StringBuilder();
             int offs = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 var current_length = field.FullTextLength;
                 // 包含字段结束符
@@ -568,69 +577,9 @@ namespace LibraryStudio.Forms
             */
         }
 
-
-#if OLD
-        public string MergeText(int start = 0, int end = int.MaxValue)
-        {
-            if (end <= start || end <= 0)
-                return "";
-
-            StringBuilder builder = new StringBuilder();
-            int offs = 0;
-            int i = 0;
-            foreach (var field in _fields)
-            {
-                var current_length = field.TextLength;
-                builder.Append(field.MergeText(start - offs, end - offs));
-                offs += current_length;
-                // 除了头标区以外，每个字段末尾都有一个字段结束符
-                if (i > 0)
-                {
-                    if (InRange(offs, start, end))
-                        builder.Append(Metrics.FieldEndCharDefault);
-                    offs++;
-                }
-                if (offs > end)
-                    break;
-                i++;
-            }
-
-            return builder.ToString();
-
-            bool InRange(int offs0, int start0, int end0)
-            {
-                return offs0 >= start0 && offs0 < end0;
-            }
-        }
-#endif
-
-#if REMOVED
-        // parameters:
-        //      next_char_is_field_end  [out] end 位置之后的一个字符，如果存在这个字符，并且这个字符是字段结束符，则本参数返回 true
-        public string MergeTextMask(int start,
-            int end,
-            out bool reach_field_end)
-        {
-            reach_field_end = false;
-            var text1 = MergeTextMask(start, end);
-
-            if (end != int.MaxValue)
-            {
-                int end1 = end + 1;
-                var next_char = MergeTextMask(start + text1.Length, start + text1.Length + 1);
-                if (next_char.Length == 1
-                    && next_char[0] == Metrics.FieldEndCharDefault)
-                {
-                    reach_field_end = true;
-                }
-            }
-            return text1;
-        }
-#endif
-
         // TODO: 单元测试
         // 获得带有 Mask Char 的文本内容
-        public string MergeTextMask(int start = 0, int end = int.MaxValue)
+        public override string MergeTextMask(int start = 0, int end = int.MaxValue)
         {
             if (end <= start || end <= 0)
                 return "";
@@ -638,7 +587,7 @@ namespace LibraryStudio.Forms
             StringBuilder builder = new StringBuilder();
             int offs = 0;
             int i = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 var current_length = field.FullTextLength;
                 // mask char 规则: 0x01~0x03 表示字段名位置, 0x04~0x05 表示指示符位置, 0x06 表示头标区位置(最多 24 个字符都是这个值)
@@ -688,7 +637,7 @@ namespace LibraryStudio.Forms
         //      -1  越过左边
         //      0   成功
         //      1   越过右边
-        public int MoveByOffs(int offs_param,
+        public override int MoveByOffs(int offs_param,
             int direction,
             out HitInfo info)
         {
@@ -703,10 +652,10 @@ namespace LibraryStudio.Forms
             int offs = 0;
             MarcField field = null;
             int start_y = 0;
-            for (int i = 0; i < _fields.Count; i++)
+            for (int i = 0; i < _lines.Count; i++)
             {
                 // info.RangeIndex = 0;
-                field = _fields[i] as MarcField;
+                field = _lines[i] as MarcField;
                 // TODO: 改为使用 .FullTextLength
                 //var line_text_length = field.PureTextLength;
                 //var return_length = i == 0 ? 0 : 1;
@@ -762,11 +711,11 @@ namespace LibraryStudio.Forms
 
             if (offs == offs_param + direction)
             {
-                var caption_pixel_width = _fieldProperty.GetCaptionPixelWidth(field);
-                if (_fields.Count > 0)
+                var caption_pixel_width = _metrics.GetCaptionPixelWidth(field);
+                if (_lines.Count > 0)
                 {
                     // 最后一个字段的结束符右侧
-                    var last_field = _fields.Last();
+                    var last_field = _lines.Last();
                     // 找最后一个字段的第一个字符的 caret 位置
                     var ret = last_field.MoveByOffs(0,
         0,
@@ -774,15 +723,15 @@ namespace LibraryStudio.Forms
                     if (ret == 0)
                     {
                         // 头标区得到的 x 在 content 区，要调整到 name 区
-                        if (this._fields.Count == 1)
-                            hit_info.X = _fieldProperty.GetNameX(caption_pixel_width);
+                        if (this._lines.Count == 1)
+                            hit_info.X = _metrics.GetNameX(caption_pixel_width);
 
                         var temp_info = new HitInfo
                         {
                             X = hit_info.X,
                             Y = hit_info.Y + start_y,
                             Area = hit_info.Area,
-                            ChildIndex = _fields.Count,
+                            ChildIndex = _lines.Count,
                             TextIndex = hit_info.Offs,
                             Offs = offs + hit_info.Offs,
                             LineHeight = hit_info.LineHeight,
@@ -799,10 +748,10 @@ namespace LibraryStudio.Forms
                     // 连头标区都没有
                     info = new HitInfo
                     {
-                        X = _fieldProperty.GetNameX(caption_pixel_width),
+                        X = _metrics.GetNameX(caption_pixel_width),
                         Y = 0 + start_y,
                         Area = Area.BottomBlank,
-                        ChildIndex = _fields.Count,
+                        ChildIndex = _lines.Count,
                         TextIndex = 0,
                         Offs = offs,
                         LineHeight = FontContext.DefaultFontHeight,
@@ -823,7 +772,7 @@ namespace LibraryStudio.Forms
             }
 
             // 没有任何 MarcField 的情况
-            if (_fields.Count == 0
+            if (_lines.Count == 0
                 && offs + direction == 0)
             {
                 info.X = 0;
@@ -842,7 +791,7 @@ namespace LibraryStudio.Forms
         }
 
         // 获得一段文本显示范围的 Region
-        public Region GetRegion(int start_offs = 0,
+        public override Region GetRegion(int start_offs = 0,
             int end_offs = int.MaxValue,
             int virtual_tail_length = 0)
         {
@@ -853,7 +802,7 @@ namespace LibraryStudio.Forms
     || virtual_tail_length > 1)
                 throw new ArgumentException($"virtual_tail_length ({virtual_tail_length}) 必须为 0 或 1");
 
-            if (this._fields?.Count == 0)
+            if (this._lines?.Count == 0)
                 return null;
 
             if (start_offs == end_offs)
@@ -867,7 +816,7 @@ namespace LibraryStudio.Forms
             int current_offs = 0;
             int y = 0;
             int i = 0;
-            foreach (MarcField field in this._fields)
+            foreach (MarcField field in this._lines)
             {
                 var result = field.GetRegion(start_offs - current_offs,
                     end_offs - current_offs,
@@ -897,7 +846,7 @@ namespace LibraryStudio.Forms
         }
 
 
-        public void Paint(
+        public override void Paint(
             IContext context,
             SafeHDC dc,
             int x,
@@ -911,7 +860,7 @@ namespace LibraryStudio.Forms
             var block_start = Math.Min(blockOffs1, blockOffs2);
             var block_end = Math.Max(blockOffs1, blockOffs2);
             int i = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 // 剪切区域下方的部分不必参与循环了
                 if (y >= clipRect.Bottom)
@@ -938,7 +887,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public ReplaceTextResult ReplaceText(
+        public override ReplaceTextResult ReplaceText(
     IContext context,
     SafeHDC dc,
     int start,
@@ -962,7 +911,7 @@ namespace LibraryStudio.Forms
         //      context.splitRange  为初始化新行准备
         // return:
         //      进行折行处理以后，所发现的最大行宽像素数。可能比 pixel_width 参数值要大
-        public ReplaceTextResult ReplaceText(
+        public override ReplaceTextResult ReplaceText(
             ViewModeTree view_mode_tree,
             IContext context,
             SafeHDC dc,
@@ -1098,8 +1047,8 @@ namespace LibraryStudio.Forms
             // 若 text 中没有包含字段结束符，意味着不会产生字段增多(分裂)
             if (start > 24
                 && old_fields.Count == 1
-                && text.Contains(_fieldProperty.FieldEndChar) == false
-                && replaced.Contains(_fieldProperty.FieldEndChar) == false)
+                && text.Contains(_metrics.FieldEndChar) == false
+                && replaced.Contains(_metrics.FieldEndChar) == false)
             {
                 var field = old_fields[0] as MarcField;
 
@@ -1120,8 +1069,8 @@ namespace LibraryStudio.Forms
     pixel_width);
 
                 if (clear_on_empty
-    && _fields.Count == 1
-    && _fields[0].PureTextLength == 0)
+    && _lines.Count == 1
+    && _lines[0].PureTextLength == 0)
                     this.Clear();
 
                 update_rect = ret.UpdateRect;
@@ -1142,7 +1091,7 @@ namespace LibraryStudio.Forms
                 ProcessBaseline();
 
                 // 如果高度没有变化，则最小刷新区域
-                int y0 = SumHeight(_fields, first_paragraph_index);
+                int y0 = SumHeight(_lines, first_paragraph_index);
                 Utility.Offset(ref update_rect, 0, y0);
                 result.UpdateRect = update_rect;
                 result.MaxPixel = max_pixel_width;
@@ -1153,7 +1102,7 @@ namespace LibraryStudio.Forms
 
             if (old_fields.Count > 0)
             {
-                _fields.RemoveRange(first_paragraph_index, old_fields.Count);
+                _lines.RemoveRange(first_paragraph_index, old_fields.Count);
             }
 
             var new_fields = new List<MarcField>();
@@ -1190,7 +1139,7 @@ namespace LibraryStudio.Forms
                 foreach (var line in lines)
                 {
                     var new_field = new MarcField(this,
-                        _fieldProperty/*, this.ConvertText*/);
+                        _metrics/*, this.ConvertText*/);
                     if (first_paragraph_index == 0 && new_fields.Count == 0)
                     {
                         // 头标区尺寸不足
@@ -1225,7 +1174,7 @@ namespace LibraryStudio.Forms
 
                     // 为了让外部探测的过程感知到已经创建好的部分字段。
                     // 因为创建中途，后面新创建的字段，需要动态探测已经创建的字段(比如 008 需要了解头标区)才能查询到结构，用于创建
-                    _fields.Insert(first_paragraph_index + new_fields.Count, new_field);
+                    _lines.Insert(first_paragraph_index + new_fields.Count, new_field);
 
                     new_fields.Add(new_field);
                 }
@@ -1245,7 +1194,7 @@ namespace LibraryStudio.Forms
             */
 
             if (first_paragraph_index == 0
-                && (end == -1 || _fields.Count == new_fields.Count))
+                && (end == -1 || _lines.Count == new_fields.Count))
                 update_all = true;
 
 
@@ -1266,7 +1215,7 @@ namespace LibraryStudio.Forms
 
             // update_rect 用 old_paragraphs 和 new_fields 两个矩形的较大一个算出
             // 矩形宽度最后用 max_pixel_width 矫正一次
-            int y = SumHeight(_fields, first_paragraph_index);
+            int y = SumHeight(_lines, first_paragraph_index);
 
             if (update_all)
             {
@@ -1286,7 +1235,7 @@ namespace LibraryStudio.Forms
                 result.ScrolledDistance = new_h - old_h;
                 if (result.ScrolledDistance != 0)
                 {
-                    int move_height = SumHeight(_fields, first_paragraph_index, _fields.Count - first_paragraph_index);
+                    int move_height = SumHeight(_lines, first_paragraph_index, _lines.Count - first_paragraph_index);
                     result.ScrollRect = new Rectangle(0,
             y + old_h,
             Math.Max(max_pixel_width + FontContext.DefaultReturnWidth, max_update_width + FontContext.DefaultReturnWidth),
@@ -1512,12 +1461,12 @@ namespace LibraryStudio.Forms
                 // 头标区长度不足
                 if (start >= this.TextLength && start < 24)
                 {
-                    left_text = this._fields.Count == 0 ? "" : this._fields[0].MergeFullText();
+                    left_text = this._lines.Count == 0 ? "" : this._lines[0].MergeFullText();
                     right_text = "";
                     first_paragraph_index = 0;
                     replaced = "";
-                    if (this._fields.Count > 0)
-                        return new List<MarcField>() { _fields[0] };
+                    if (this._lines.Count > 0)
+                        return new List<MarcField>() { _lines[0] };
                     else
                         return new List<MarcField>();
                 }
@@ -1526,7 +1475,7 @@ namespace LibraryStudio.Forms
                     // 走到这里，一定是 start == end 并且在最后一个字符以右位置
                     left_text = "";
                     right_text = "";
-                    first_paragraph_index = _fields.Count;
+                    first_paragraph_index = _lines.Count;
                     replaced = "";
                     return new List<MarcField>();
                 }
@@ -1595,7 +1544,7 @@ namespace LibraryStudio.Forms
             StringBuilder middle = new StringBuilder();
             StringBuilder right = new StringBuilder();
             bool complete = false;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 var length = field.FullTextLength;
                 var compare_length = length;
@@ -1854,7 +1803,7 @@ namespace LibraryStudio.Forms
         {
             if (index == 0)
                 return 0;
-            return SumHeight(_fields, index);
+            return SumHeight(_lines, index);
         }
 
         public void PaintBack(
@@ -1878,11 +1827,11 @@ namespace LibraryStudio.Forms
 
                 // var height = this.AutoScrollMinSize.Height - FontContext.DefaultFontHeight;
                 var height = this.GetPixelHeight() - this._blankLineHeigh;
-                var caption_pixel = _fieldProperty.GetCaptionPixelWidth(1);
+                var caption_pixel = _metrics.GetCaptionPixelWidth(1);
 
                 // 绘制提示文字区的底色
                 {
-                    var color = _fieldProperty?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor;
+                    var color = _metrics?.CaptionBackColor ?? Metrics.DefaultCaptionBackColor;
                     if (color != Color.Transparent)
                     {
                         var left_rect = new Rectangle(
@@ -1896,13 +1845,13 @@ namespace LibraryStudio.Forms
 
                 // Solid 区
                 {
-                    var color = _fieldProperty?.SolidColor ?? Metrics.DefaultSolidColor;
+                    var color = _metrics?.SolidColor ?? Metrics.DefaultSolidColor;
                     if (color != Color.Transparent)
                     {
                         var left_rect = new Rectangle(
                             x + caption_pixel,
                             y,
-                            _fieldProperty.GetContentBorderX(caption_pixel) - caption_pixel,
+                            _metrics.GetContentBorderX(caption_pixel) - caption_pixel,
                             height);
                         MarcField.PaintBack(hdc, left_rect, clipRect, color);
                     }
@@ -1927,11 +1876,11 @@ namespace LibraryStudio.Forms
                             height);
                     MarcField.DrawSolidRectangle(hdc, rect, backColor);
                     */
-                    var backColor = _fieldProperty.BorderColor;
+                    var backColor = _metrics.BorderColor;
                     if (backColor != Color.Transparent)
                     {
-                        var x0 = x + _fieldProperty.GetSolidX(_fieldProperty.GetCaptionPixelWidth(1)) + _fieldProperty.SolidPixelWidth;
-                        var line_rect = new Rectangle(x0, y, _fieldProperty.BorderThickness, height);
+                        var x0 = x + _metrics.GetSolidX(_metrics.GetCaptionPixelWidth(1)) + _metrics.SolidPixelWidth;
+                        var line_rect = new Rectangle(x0, y, _metrics.BorderThickness, height);
                         if (line_rect.IntersectsWith(clipRect))
                         {
                             MarcField.DrawVertLine(hdc,
@@ -1957,7 +1906,7 @@ namespace LibraryStudio.Forms
             int caret_field_index = -1)
         {
             int i = 0;
-            foreach (var field in _fields)
+            foreach (var field in _lines)
             {
                 if (y >= clipRect.Bottom)
                     break;
@@ -1982,7 +1931,7 @@ i == caret_field_index);
             List<Rectangle> results = new List<Rectangle>();
             int current_y = y;
             int i = 0;
-            foreach (var field in _fields)
+            foreach (var field in _lines)
             {
                 if (Array.IndexOf(caret_field_indices, i) != -1)
                 {
@@ -2252,6 +2201,7 @@ out int max_pixel_width)
 
 #endif
 
+#if REMOVED
         float _baseLine;
         float _below;
 
@@ -2284,11 +2234,11 @@ out int max_pixel_width)
             _below = this._fields[0].Below;  // TODO: 加上除第一行以外的所有行的高度?
         }
 
-
         public int GetPixelWidth()
         {
             return _fields.Count == 0 ? 0 : _fields.Max(l => l.GetPixelWidth());
         }
+#endif
 
         public class InputInfo
         {
@@ -2310,15 +2260,15 @@ out int max_pixel_width)
             var index = info.ChildIndex;
 
             // 在最后一个字段以后
-            if (index >= _fields.Count)
+            if (index >= _lines.Count)
             {
                 var text_length = this.TextLength;
                 if (padding_char != 0)
                 {
                     // 如果头标区字符数不足，当前 index 正好位于头标区的下一个字段
-                    if (index == 1 && _fields[0].FullTextLength < 24)
+                    if (index == 1 && _lines[0].FullTextLength < 24)
                     {
-                        var header = _fields[0];
+                        var header = _lines[0];
                         var header_length = header.FullTextLength;
 
                         var content = header.MergeFullText() + new string(padding_char, 24 - header_length) + new string(padding_char, 5);
@@ -2348,8 +2298,8 @@ out int max_pixel_width)
                 };
             }
 
-            Debug.Assert(index < _fields.Count);
-            var field = _fields[index];
+            Debug.Assert(index < _lines.Count);
+            var field = _lines[index];
 
             if (this.GetFieldOffsRange(index, out int start, out int end) == false)
                 return null;
@@ -2367,8 +2317,8 @@ out int max_pixel_width)
                 // 实际上在下一个字段的第一字符进行替换或插入
                 if (end == caret_offs_in_field)
                 {
-                    if (_fields.Count == 1
-                        || _fields[1].TextLength <= 1)
+                    if (_lines.Count == 1
+                        || _lines[1].TextLength <= 1)
                     {
                         index = 1;  // 调整到头标区后第一个字段，重做
                         var temp = info.Clone();
@@ -2505,15 +2455,15 @@ out int max_pixel_width)
             var index = info.ChildIndex;
 
             // 在最后一个字段以后
-            if (index >= _fields.Count)
+            if (index >= _lines.Count)
             {
                 var text_length = this.TextLength;
                 if (padding_char != 0)
                 {
                     // 如果头标区字符数不足，当前 index 正好位于头标区的下一个字段
-                    if (index == 1 && _fields[0].FullTextLength < 24)
+                    if (index == 1 && _lines[0].FullTextLength < 24)
                     {
-                        var header = _fields[0];
+                        var header = _lines[0];
                         var header_length = header.FullTextLength;
 
                         Debug.Assert(padding_char != 0);
@@ -2546,8 +2496,8 @@ out int max_pixel_width)
                 };
             }
 
-            Debug.Assert(index < _fields.Count);
-            var field = _fields[index];
+            Debug.Assert(index < _lines.Count);
+            var field = _lines[index];
 
             if (this.GetFieldOffsRange(index, out int start, out int end) == false)
                 return null;
@@ -2664,32 +2614,34 @@ out int max_pixel_width)
                 }
             }
 
+            // 处理在 TemplateItem 末尾插入，自动根据模板内容字数定义填充字符
+            if (padding_char != 0)
+            {
+                var template_item = MarcControl.FindTemplateItem(info,
+out HitInfo hit_info);
+                if (template_item != null && template_item.Overflow == false)
+                {
+                    int padding_length = template_item.GetPaddingText(PaddingStyle.TemplateWhole,
+    out int myself_offs);
+                    if (padding_length > 0)
+                    {
+                        Debug.Assert(padding_char != 0);
+                        return new InputInfo
+                        {
+                            Text = ch + new string(padding_char, padding_length - 1),
+                            Start = info.Offs,
+                            End = info.Offs,
+                            Caret = info.Offs + myself_offs,
+                        };
+                    }
+
+                }
+            }
+
             // 在字段结束符以右，或者以左，都只能是插入
             if (end - 1 <= start + caret_offs_in_field)
             {
-                // 处理在 TemplateItem 末尾插入，自动根据模板内容字数定义填充字符
-                if (padding_char != 0)
-                {
-                    var template_item = MarcControl.FindTemplateItem(info,
-out HitInfo hit_info);
-                    if (template_item != null && template_item.Overflow == false)
-                    {
-                        int padding_length = template_item.GetPaddingText(PaddingStyle.TemplateWhole,
-        out int myself_offs);
-                        if (padding_length > 0)
-                        {
-                            Debug.Assert(padding_char != 0);
-                            return new InputInfo
-                            {
-                                Text = ch + new string(padding_char, padding_length - 1),
-                                Start = info.Offs,
-                                End = info.Offs,
-                                Caret = info.Offs + myself_offs,
-                            };
-                        }
 
-                    }
-                }
 
                 return new InputInfo
                 {
@@ -2765,7 +2717,7 @@ out HitInfo hit_info);
                 }
                 else
                 {
-                    var field = info.ChildIndex >= _fields.Count ? null : _fields[info.ChildIndex];
+                    var field = info.ChildIndex >= _lines.Count ? null : _lines[info.ChildIndex];
                     // var field_name = (field as MarcField).FieldName;
                     var is_control_field = field == null ? false : (field as MarcField).IsControlField;
                     if (is_control_field)
@@ -2783,7 +2735,7 @@ out HitInfo hit_info);
                 // replace 情况下检查已有内容字符是否足够
                 if (replace)
                 {
-                    var length = SumTextLength(_fields, info.ChildIndex);
+                    var length = SumTextLength(_lines, info.ChildIndex);
                     if (length <= _global_offs + 1)
                     {
                         fill_char_count = _global_offs + 1 - length;
@@ -2813,7 +2765,7 @@ out HitInfo hit_info);
                     replace = true;
                 else
                 {
-                    var field = _fields[info.ChildIndex];
+                    var field = _lines[info.ChildIndex];
                     // var field_name = (field as MarcField).FieldName;
                     var is_control_field = (field as MarcField).IsControlField;
                     if (is_control_field)
@@ -2867,21 +2819,20 @@ out HitInfo hit_info);
         {
             update_rect = System.Drawing.Rectangle.Empty;
             int y = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 field.RefreshCaptionText(
                     context,
                     dc,
                     out Rectangle update_rect_caption);
 
-                Utility.Offset(ref update_rect_caption, _fieldProperty.CaptionX, y);
+                Utility.Offset(ref update_rect_caption, _metrics.CaptionX, y);
                 update_rect = Utility.Union(update_rect, update_rect_caption);
                 y += field.GetPixelHeight();
             }
         }
 
         #region 外部接口
-
 
         /*
 变更说明（简短）
@@ -2890,10 +2841,10 @@ out HitInfo hit_info);
 如果你希望枚举器在集合被修改时抛出（类似 List 的行为），我可以改为返回 _fields.OfType<MarcField>().GetEnumerator() 或 (_fields.Cast<MarcField>()).GetEnumerator()（后者会在存在非 MarcField 元素时抛出）。现在实现更稳健：忽略非目标类型元素。         * */
         IEnumerator<MarcField> IEnumerable<MarcField>.GetEnumerator()
         {
-            if (_fields == null)
+            if (_lines == null)
                 yield break;
 
-            foreach (var box in _fields)
+            foreach (var box in _lines)
             {
                 if (box is MarcField field)
                     yield return field;
@@ -2908,22 +2859,22 @@ out HitInfo hit_info);
 
         public MarcField GetField(int index)
         {
-            if (this._fields == null)
+            if (this._lines == null)
                 return null;
             // 获得最后一个
             if (index == -1)
-                return this._fields.LastOrDefault() as MarcField;
+                return this._lines.LastOrDefault() as MarcField;
 
-            if (index >= this._fields.Count)
-                throw new ArgumentException($"index {index} 越过范围。({_fields.Count})");
-            return this._fields[index] as MarcField;
+            if (index >= this._lines.Count)
+                throw new ArgumentException($"index {index} 越过范围。({_lines.Count})");
+            return this._lines[index] as MarcField;
         }
 
         public int FieldCount
         {
             get
             {
-                return _fields?.Count ?? 0;
+                return _lines?.Count ?? 0;
             }
         }
 
@@ -2933,7 +2884,7 @@ out HitInfo hit_info);
     out int start,
     out int end)
         {
-            int index = _fields.IndexOf(field);
+            int index = _lines.IndexOf(field);
             if (index == -1)
                 throw new ArgumentException("指定的字段对象在 _fields 集合中没有找到");
             return GetFieldOffsRange(index,
@@ -2964,7 +2915,7 @@ out HitInfo hit_info);
         {
             if (field_index == 0
                 && count == 1
-                && _fields.Count == 0)
+                && _lines.Count == 0)
             {
                 start = 0;
                 end = 0;
@@ -2972,25 +2923,25 @@ out HitInfo hit_info);
             }
 
             // index 刚好在末尾。相当于追加效果
-            if (field_index == _fields.Count)
+            if (field_index == _lines.Count)
             {
                 start = this.TextLength;
                 end = start;
                 return false;
             }
 
-            if (field_index < 0 || field_index >= _fields.Count)
-                throw new ArgumentException($"field_index ({field_index}) 越过 字段数 {_fields.Count} 范围");
+            if (field_index < 0 || field_index >= _lines.Count)
+                throw new ArgumentException($"field_index ({field_index}) 越过 字段数 {_lines.Count} 范围");
 
-            if (count != -1 && field_index + count > _fields.Count)
-                throw new ArgumentException($"field_index ({field_index}) + count ({count}) 越过 字段数 {_fields.Count}");
+            if (count != -1 && field_index + count > _lines.Count)
+                throw new ArgumentException($"field_index ({field_index}) + count ({count}) 越过 字段数 {_lines.Count}");
 
             start = -1;
             end = -1;
 
             int offs = 0;
             int i = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 // TODO: 改为使用 .FullTextLength
                 // var raw_text_length = field.PureTextLength;
@@ -3028,30 +2979,30 @@ out HitInfo hit_info);
         {
             if (field_index == 0
                 && count == 1
-                && _fields.Count == 0)
+                && _lines.Count == 0)
             {
                 return new List<int> { 0 };
             }
 
             // index 刚好在末尾。相当于追加效果
-            if (field_index == _fields.Count)
+            if (field_index == _lines.Count)
             {
                 return new List<int> { this.TextLength };
             }
 
-            if (field_index < 0 || field_index >= _fields.Count)
-                throw new ArgumentException($"field_index ({field_index}) 越过 字段数 {_fields.Count} 范围");
+            if (field_index < 0 || field_index >= _lines.Count)
+                throw new ArgumentException($"field_index ({field_index}) 越过 字段数 {_lines.Count} 范围");
 
-            if (count != -1 && field_index + count > _fields.Count)
-                throw new ArgumentException($"field_index ({field_index}) + count ({count}) 越过 字段数 {_fields.Count}");
+            if (count != -1 && field_index + count > _lines.Count)
+                throw new ArgumentException($"field_index ({field_index}) + count ({count}) 越过 字段数 {_lines.Count}");
 
             if (count == -1)
-                count = _fields.Count - field_index;
+                count = _lines.Count - field_index;
 
             var results = new List<int>();
             int offs = 0;
             int i = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 // TODO: 改为使用 .FullTextLength
                 // var raw_text_length = field.PureTextLength;
@@ -3094,7 +3045,7 @@ out HitInfo hit_info);
             var results = new List<LocateInfo>();
             int offs = 0;
             int i = 0;
-            foreach (MarcField field in _fields)
+            foreach (MarcField field in _lines)
             {
                 // TODO: 改为使用 .FullTextLength
                 //var raw_text_length = field.PureTextLength;
@@ -3218,6 +3169,7 @@ out int count)
             return value;
         }
 
+#if REMOVED
         public void ClearCache()
         {
             if (_fields == null)
@@ -3227,6 +3179,7 @@ out int count)
                 field.ClearCache();
             }
         }
+#endif
 
         // return:
         //      false   没有完成校验。
@@ -3251,19 +3204,19 @@ out int count)
 
         public int GetFieldIndex(MarcField field)
         {
-            return _fields.IndexOf(field);
+            return _lines.IndexOf(field);
         }
 
         // 按照字段名对所有字段重新排序
         public bool SortFields()
         {
-            if (_fields.Count < 2)
+            if (_lines.Count < 2)
             {
                 return false;
             }
             // 头标区除外
-            var header = _fields[0];
-            var list = _fields.GetRange(1, _fields.Count - 1)
+            var header = _lines[0];
+            var list = _lines.GetRange(1, _lines.Count - 1)
                 .Select(o => new Tuple<string, MarcField>(o.FieldName, o))
                 .ToList();
             list.Sort((a, b) =>
@@ -3273,10 +3226,11 @@ out int count)
             var temp = new List<MarcField>();
             temp.Add(header);
             temp.AddRange(list.Select(o => o.Item2));
-            _fields = temp;
+            _lines = temp;
             return true;
         }
 
+#if REMOVED
         public void Dispose()
         {
             DisposeFields();
@@ -3293,6 +3247,7 @@ out int count)
 
             _fields.Clear();
         }
+#endif
 
         // 避免 field 没有 Dispose() 就删除
         static void RemoveFields(List<MarcField> fields, int start, int count)
@@ -3307,7 +3262,7 @@ out int count)
 
         // parameters:
         //      action  动作。1 展开; 0 Toggle; -1 收缩
-        public ReplaceTextResult ToggleExpand(HitInfo info,
+        public override ReplaceTextResult ToggleExpand(HitInfo info,
             IContext context,
             Gdi32.SafeHDC dc,
             int pixel_width,
@@ -3319,10 +3274,10 @@ out int count)
 
             var field = this.GetField(info.ChildIndex);
 
-            var y0 = SumHeight(_fields, 0, info.ChildIndex);
+            var y0 = SumHeight(_lines, 0, info.ChildIndex);
             var old_height = field.GetPixelHeight();
             var old_width = field.GetPixelWidth();
-            var blow_height = SumHeight(_fields, info.ChildIndex, _fields.Count - info.ChildIndex);
+            var blow_height = SumHeight(_lines, info.ChildIndex, _lines.Count - info.ChildIndex);
 
             var ret = field.ToggleExpand(info.InnerHitInfo,
                 context,
@@ -3347,11 +3302,12 @@ out int count)
             return ret;
         }
 
+#if REMOVED
         // 注: “我”自己的 ViewMode 是无所谓的，要靠父对象的 ViewMode 来定义
-        public ViewModeTree GetViewModeTree()
+        public override ViewModeTree GetViewModeTree()
         {
             var results = new List<ViewModeTree>();
-            foreach (var child in _fields)
+            foreach (var child in Children)
             {
                 results.Add(child.GetViewModeTree());
             }
@@ -3362,5 +3318,6 @@ out int count)
                 ChildViewModes = results
             };
         }
+#endif
     }
 }

@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using LibraryStudio.Forms.MarcControlDialog;
 using static LibraryStudio.Forms.MarcField;
 using static Vanara.PInvoke.Gdi32;
+using static Vanara.PInvoke.Kernel32.DEBUG_EVENT;
 
 namespace LibraryStudio.Forms
 {
@@ -910,20 +911,98 @@ namespace LibraryStudio.Forms
             return true;
         }
 
-        // TODO: 在 Template 之内，到下一个 TemplateItem 开头。在 MarcSubfieldCollection 之内，到下一个 MarcSubfield 开头
-        // 将插入符移动到下一个字段的内容第一字符位置
+        // 寻找层级最深的 IViewBox 类型的对象
+        public static IViewBox HitInnerIViewBox(HitInfo info, out HitInfo hit_info)
+        {
+            IViewBox result = null;
+            hit_info = null;
+
+            var current = info;
+            while (current != null)
+            {
+                if (current.Box is IViewBox t)
+                {
+                    hit_info = current;
+                    result = t;
+                }
+
+                current = current.InnerHitInfo;
+            }
+            if (result == null)
+                hit_info = null;
+            return result;
+        }
+
+        // 将插入符移动到下一个结构的内容第一字符位置
+        // 在 Template 之内，到下一个 TemplateItem 开头。
+        // 在 MarcSubfieldCollection 之内，到下一个 MarcSubfield 开头
         public bool ToNextField()
         {
             {
-                var hit_template_item = HitInfo.HitInner<TemplateItem>(_caretInfo, out HitInfo hit);
+                var hit_template_item = HitInnerIViewBox(_caretInfo, out HitInfo hit);
                 if (hit_template_item != null)
                 {
-                    var delta = hit_template_item.TextLength - hit.Offs;
+                    // var delta = hit_template_item.TextLength - hit.Offs;
+
+                    var sibling = hit_template_item.GetNextSibling();
+                    if (sibling == null)
+                    {
+                        // 当前已经是最后一个结构了。那么就转到末尾
+                        int total_length = this._record.TextLength;
+                        if (_caretInfo.Offs < total_length)
+                        {
+                            Select(total_length, total_length, total_length);
+                            EnsureCaretVisible();
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        int offs = sibling.GetGlobalOffset();
+                        // 微调 offs
+                        if (sibling is MarcInnerField i)
+                        {
+                            // 首先要跳过 $1 两字符，然后要跳过字段名和指示符到达内容第一字符
+                            if (i.PlainText == false)
+                                offs += 2 + i.NameAndIndicatorLength;
+                        }
+                        else if (sibling is MarcField f)
+                        {
+                            // 越过字段名和指示符
+                            offs += f.NameAndIndicatorLength;
+                        }
+                        else if (sibling is MarcSubfield sf)
+                        {
+                            /*
+                            // 越过 $?
+                            var prefix = sf.MergeText(0, 2);
+                            if (prefix.Length == 2 && prefix.StartsWith("\u001f"))
+                                offs += 2;
+                            else
+                                offs += sf.NameLength;
+                            */
+                        }
+                        // MoveCaret(HitByCaretOffs(offs + 1, -1));
+                        Select(offs, offs, offs + 1, -1);
+                        EnsureCaretVisible();
+                        return true;
+                    }
+
+                    /*
+                    // 观察是否为容器的最后一个 child
+                    if (isLast((hit_template_item.Parent as Template)
+                        .Children, hit_template_item) == true)
+                    {
+                        delta++;
+                    }
                     MoveCaret(HitByCaretOffs(_caretInfo.Offs + delta + 1, -1));
                     return true;
+
+                    */
                 }
             }
 
+#if REMOVED
             bool isLast(IEnumerable<object> children,
                 object hit_s)
             {
@@ -976,6 +1055,7 @@ namespace LibraryStudio.Forms
                 }
             }
 
+
             {
                 var hit_field = HitInfo.HitInner<MarcField>(_caretInfo, out _);
                 if (hit_field != null)
@@ -1005,6 +1085,8 @@ namespace LibraryStudio.Forms
                     return true;
                 }
             }
+
+#endif
             return false;
         }
 

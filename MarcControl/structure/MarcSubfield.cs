@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 
 using Vanara.PInvoke;
+// using static Vanara.PInvoke.Gdi32;
 
 namespace LibraryStudio.Forms
 {
@@ -12,7 +13,7 @@ namespace LibraryStudio.Forms
     /// 有两种模式: 平面、表格
     /// 表格模式下，如果 _name 内容为空，表示这是一个字段的指示符后面到第一个子字段之间的文本。这部分文本没有子字段名 
     /// </summary>
-    public class MarcSubfield : Base, IViewBox, ICaption, IDisposable
+    public class MarcSubfield : Base, IViewBox, IContainer, ICaption, IDisposable
     {
         Line _caption = null;
         public Line Caption
@@ -59,6 +60,13 @@ namespace LibraryStudio.Forms
         // 子字段节点的父节点可能是一个 MarcRecord 节点，也可能是一个 MarcField 节点(比如 UNIMARC 4XX 情形)
         // public IBox Parent { get; set; }
 
+        public virtual int NameLength
+        {
+            get
+            {
+                return _name?.TextLength ?? 0;
+            }
+        }
 
         public int TextLength
         {
@@ -80,6 +88,33 @@ namespace LibraryStudio.Forms
         public float BaseLine => _content?.BaseLine ?? 0;
 
         public float Below => _content?.Below ?? 0;
+
+        IEnumerable<IBox> IContainer.Children => GetBoxes();
+
+        List<IBox> GetBoxes()
+        {
+            var boxes = new List<IBox>();
+
+            if (_viewMode == ViewMode.Plane || _viewMode == ViewMode.Collapse)
+            {
+                if (_content != null)
+                {
+                    boxes.Add(_content);
+                }
+            }
+            else if (_viewMode == ViewMode.Expand)
+            {
+                if (_name != null)
+                {
+                    boxes.Add(_name);
+                }
+                if (_template != null)
+                {
+                    boxes.Add(_template);
+                }
+            }
+            return boxes;
+        }
 
         int GetContentX(int x0 = 0)
         {
@@ -695,6 +730,7 @@ virtual_tail_length);
             throw new NotFiniteNumberException();
         }
 
+        // 返回规划化以后的子字段名字。注意这是一个字符，并不包含子字段符号
         public string SubfieldName
         {
             get

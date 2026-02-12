@@ -14,7 +14,7 @@ namespace LibraryStudio.Forms
     /// MARC 字段编辑区域
     /// 由一个 Line(字段名)，一个 Line(字段指示符)，一个 Paragraph (字段内容) 构成
     /// </summary>
-    public class MarcField : Base, IViewBox, ICaption, IDisposable
+    public class MarcField : Base, IViewBox, IContainer, ICaption, IDisposable
     {
         public string Name { get; set; }
 
@@ -282,6 +282,19 @@ namespace LibraryStudio.Forms
             Parent = record;
             _metrics = property;
             // ProcessBaseline();  // testing
+        }
+
+        public virtual int NameAndIndicatorLength
+        {
+            get
+            {
+                if (this.IsHeader)
+                    return 0;
+                if (this.IsControlField)
+                    return Math.Min(3, _name?.TextLength ?? 0);
+                return Math.Min(5, (_name?.TextLength ?? 0)
+                    +(_indicator?.TextLength ?? 0));
+            }
         }
 
         public virtual int TextLength => (NameTextLength)
@@ -2577,6 +2590,8 @@ pixel_width == -1 ? -1 : Math.Max(pixel_width - (_metrics.GetContentX(caption_pi
                 return _below;
             }
         }
+
+        IEnumerable<IBox> IContainer.Children => GetBoxes();
 
         // 注: 头标区只返回 _content，控制字段不返回 _indicator
         List<IBox> GetBoxes()

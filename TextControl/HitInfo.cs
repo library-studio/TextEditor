@@ -89,6 +89,59 @@ namespace LibraryStudio.Forms
             hit_info = null;
             return null;
         }
+
+#if REF
+        // 新增：按类型集合匹配，返回第一个命中的对象（object），并通过 out 返回对应的 HitInfo
+        public static object HitInner(HitInfo info, IEnumerable<Type> types, out HitInfo hit_info)
+        {
+            if (info == null)
+            {
+                hit_info = null;
+                return null;
+            }
+            if (types == null)
+            {
+                hit_info = null;
+                return null;
+            }
+
+            // 为避免多次枚举，先 materialize
+            var typeList = types as IList<Type> ?? types.ToList();
+            if (typeList.Count == 0)
+            {
+                hit_info = null;
+                return null;
+            }
+
+            var current = info;
+            while (current != null)
+            {
+                var box = current.Box;
+                if (box != null)
+                {
+                    foreach (var t in typeList)
+                    {
+                        if (t != null && t.IsInstanceOfType(box))
+                        {
+                            hit_info = current;
+                            return box;
+                        }
+                    }
+                }
+                current = current.InnerHitInfo;
+            }
+
+            hit_info = null;
+            return null;
+        }
+
+        // 便捷重载：使用 params 语法并带 out HitInfo
+        public static object HitInner(HitInfo info, out HitInfo hit_info, params Type[] types)
+        {
+            return HitInner(info, (IEnumerable<Type>)types ?? Array.Empty<Type>(), out hit_info);
+        }
+
+#endif
     }
 
 

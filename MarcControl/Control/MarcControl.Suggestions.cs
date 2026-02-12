@@ -229,7 +229,7 @@ namespace LibraryStudio.Forms
         public void CheckAndHide()
         {
             Task.Run(async () => {
-                // await Task.Delay(1000);
+                await Task.Delay(500);
                 this.Invoke(new Action(() => {
                     _checkHide();
                 }));

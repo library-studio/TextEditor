@@ -416,7 +416,7 @@ namespace LibraryStudio.Forms
                 if (list_item_text_length > 0)
                     offs = info.Offs - hit_info.Offs + ((hit_info.Offs / list_item_text_length) * list_item_text_length);
                 suggestion_caret_offs = offs;
-                replaced_text = this._record.MergeText(offs, offs + Math.Min(list_item_text_length, template_item_text_length - hit_info.Offs));
+                replaced_text = this._record.MergeText(offs, offs + Math.Min(list_item_text_length, template_item.TextLength));  // Math.Min(list_item_text_length, template_item_text_length - hit_info.Offs)
                 // 将编辑器对应的文本选中
                 if (has_focus)
                 {

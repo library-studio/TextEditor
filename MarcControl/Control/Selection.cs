@@ -107,7 +107,8 @@ namespace LibraryStudio.Forms
                 auto_adjust_caret_and_selection:false);
 
             {
-                ChangeSelection(start);
+                // ChangeSelection(start);
+                Select(start, start, start);
             }
 
 #if REMOVED

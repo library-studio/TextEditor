@@ -103,7 +103,7 @@ namespace LibraryStudio.Forms
         {
             // 确保新的颜色可以显示出来
             // TODO: IBox 实现 ClearCache() 接口，可以清除各个部分缓存的颜色
-            Relayout(this._record.MergeText(), false);
+            Relayout(this._record.MergeText(), auto_adjust_global_offs:false);
             // 底部有部分空白不属于任何字段，也要 Invalidate()
             this.Invalidate();
         }

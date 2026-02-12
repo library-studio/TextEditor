@@ -1970,3 +1970,144 @@ int item_width = (template_item.Parent as Template)?.Children
     .Max() ?? 0;
 ```
 两者都能安全处理空集合和 null 父对象。
+
+
+~~~
+GitHub Copilot
+
+深呼吸……回答要点：不要用反射作为长期方案。推荐一次性引入一个“容器契约 + 可选索引化契约 + 辅助树工具”组合：
+- 基础契约 `IContainer`（暴露 `IEnumerable<IBox> Children`）用于所有真正有子项的类型；
+- 可选优化契约 `IIndexedContainer`（额外提供 `GetChildOffs`/`IndexOf`）供性能关键的容器实现；
+- 提供无反射的静态帮助类 `BoxTree`，优先使用上面两个接口，只有在未实现时才回退（可保留现有的扩展/反射回退，作为迁移过渡）。
+
+优点：
+- 类型安全、性能好、易测试；
+- 新需求不需要不停往 `IBox` 加方法（避免接口膨胀）；
+- 容器逐步迁移到 `IContainer`/`IIndexedContainer` 即可，leaf 节点无须改动；
+- `BoxTree` 把遍历、偏移等通用算法集中，便于后续统一改进。
+
+下面给出可直接复制的三个文件：`IContainer`、`IIndexedContainer`、`BoxTree`（不含反射主路径，优先用接口）。把这些文件加入项目后：
+1. 在容器类（例如 `Collection<T>`、`Paragraph`、`MarcRecord` 等）实现 `IContainer`；  
+2. 对性能敏感的容器再实现 `IIndexedContainer`（在 `Collection<T>` 中直接用现有 `GetChildOffs(IViewBox)` 包装实现）；  
+3. 之后把项目中其它地方计算偏移统一改用 `BoxTree.GetGlobalOffset()` 等方法，逐步移除反射回退逻辑。
+
+```csharp
+using System.Collections.Generic;
+
+namespace LibraryStudio.Forms
+{
+    // 只描述“有子节点”的能力，尽量保持精简
+    public interface IContainer
+    {
+        // 返回该容器的子节点序列（逻辑上的直接子节点）
+        IEnumerable<IBox> Children { get; }
+    }
+}
+```
+```csharp
+using System.Collections.Generic;
+
+namespace LibraryStudio.Forms
+{
+    // 可选接口：为容器提供索引化访问/快速偏移计算，供性能关键路径实现
+    public interface IIndexedContainer : IContainer
+    {
+        // 返回 child 在当前容器内从头开始的偏移（若找不到可返回 -1 或抛异常，按实现决定）
+        int GetChildOffs(IBox child);
+
+        // 可选：返回 child 的 index，找不到返回 -1
+        int IndexOf(IBox child);
+    }
+}
+```
+```csharp
+using System;
+using System.Collections.Generic;
+
+namespace LibraryStudio.Forms
+{
+    public static class BoxTree
+    {
+        // 遍历祖先（从 parent 开始向上）
+        public static IEnumerable<IBox> Ancestors(this IBox node)
+        {
+            if (node == null)
+                yield break;
+            var current = node.Parent;
+            while (current != null)
+            {
+                yield return current;
+                current = current.Parent;
+            }
+        }
+
+        // 计算全局线性偏移（不使用反射作为主路径）
+        // 逻辑：对每一级 parent，优先使用 IIndexedContainer.GetChildOffs，
+        // 否则使用 IContainer.Children 枚举累加到 child 之前的 TextLength，
+        // 若都不可用则回退到 BoxExtensions.GetChildOffs（兼容旧逻辑）。
+        public static int GetGlobalOffset(this IBox node)
+        {
+            if (node == null)
+                return 0;
+
+            int offs = 0;
+            var child = node;
+            while (child != null)
+            {
+                var parent = child.Parent;
+                if (parent == null)
+                    break;
+
+                // 优先：父容器实现 IIndexedContainer（快速路径，无反射）
+                if (parent is IIndexedContainer indexed)
+                {
+                    int v = indexed.GetChildOffs(child);
+                    if (v >= 0)
+                        offs += v;
+                    else
+                        offs += 0;
+                }
+                else if (parent is IContainer container)
+                {
+                    // 普通容器：遍历子项累加到 child 之前
+                    int local = 0;
+                    foreach (var c in container.Children)
+                    {
+                        if (ReferenceEquals(c, child))
+                            break;
+                        local += c?.TextLength ?? 0;
+                    }
+                    offs += local;
+                }
+                else
+                {
+                    // 回退：如果项目中已有 BoxExtensions（或其它兼容实现），使用它作为最后手段
+                    // 这样既能避免在主路径使用反射，也能兼容现有代码（逐步迁移）
+                    offs += BoxExtensions.GetChildOffs(parent, child);
+                }
+
+                // 向上继续
+                child = parent as IBox;
+            }
+
+            return offs;
+        }
+    }
+}
+```
+
+迁移建议（小步快跑）
+- 第一步（立即）：把上面三个文件加入代码库，改用 `BoxTree.GetGlobalOffset()` 在新代码中替代老的反射逻辑。
+- 第二步（逐步）：为所有容器类实现 `IContainer`（最小改动，只是显式提供 `Children`）。示例：在 `Collection<T>` 添加 `IContainer` 实现（返回 `Children.Cast<IBox>()`）。
+- 第三步（优化）：对性能敏感的容器实现 `IIndexedContainer`，复用现有内部高效方法（例如 `Collection<T>` 的 `GetChildOffs(IViewBox)`）。
+- 第四步：逐步移除所有反射回退代码与 `BoxExtensions` 的反射实现（`BoxExtensions` 可暂留作兼容层，后期删除）。
+
+如果你愿意，我可以：
+- 生成并提交上述三个文件补丁；
+- 为 `Collection<T>` 生成最小实现 `IContainer`/`IIndexedContainer` 的补丁（把现有 `GetChildOffs(IViewBox)` 包装为 `GetChildOffs(IBox)` 并实现 `Children` 转换）；
+- 列出其它候选容器类型（文件列表）以便逐步迁移。
+
+要我先把三个新文件直接加入仓库，还是先为 `Collection<T>` 自动生成接口包装？
+
+
+~~~~

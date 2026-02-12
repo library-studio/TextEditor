@@ -1,8 +1,11 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 using static Vanara.PInvoke.Gdi32;
@@ -12,10 +15,10 @@ namespace LibraryStudio.Forms
     /// <summary>
     /// 容纳若干 IBox 对象的容器
     /// </summary>
-    public class Collection<T> : Base, IViewBox, IDisposable
+    public class Collection<T> : Base, IViewBox, IContainer, IDisposable
         where T : IViewBox, IDisposable, new()
     {
-        List<T> _lines = new List<T>();
+        internal List<T> _lines = new List<T>();
 
         public IEnumerable<T> Children
         {
@@ -49,7 +52,7 @@ namespace LibraryStudio.Forms
 
         // public IBox Parent { get; set; }
 
-        public int TextLength => _lines.Sum(c => c.TextLength);
+        public virtual int TextLength => _lines?.Sum(c => c.TextLength) ?? 0;
 
         float _baseLine;
         float _below;
@@ -70,6 +73,7 @@ namespace LibraryStudio.Forms
             }
         }
 
+        IEnumerable<IBox> IContainer.Children => Children.Cast<IBox>();
 
         // 向下移动插入符一行
         // parameters:
@@ -80,7 +84,7 @@ namespace LibraryStudio.Forms
         // return:
         //      true    成功。新的插入符位置返回在 info 中了
         //      false   无法移动。注意此时 info 中返回的内容无意义
-        public bool CaretMoveDown(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveDown(int x, int y, out HitInfo info)
         {
             if (this._lines == null)
             {
@@ -164,7 +168,7 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public bool CaretMoveUp(int x, int y, out HitInfo info)
+        public virtual bool CaretMoveUp(int x, int y, out HitInfo info)
         {
             if (this._lines == null)
             {
@@ -311,7 +315,7 @@ namespace LibraryStudio.Forms
 
         public ColorCache ColorCache = new ColorCache();
 
-        public void Clear()
+        public virtual void Clear()
         {
             DisposeLines();
             ColorCache?.Clear();
@@ -329,7 +333,7 @@ namespace LibraryStudio.Forms
             _lines.Clear();
         }
 
-        public void ClearCache()
+        public virtual void ClearCache()
         {
             if (_lines == null)
                 return;
@@ -340,12 +344,12 @@ namespace LibraryStudio.Forms
             }
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             DisposeLines();
         }
 
-        public int GetPixelHeight(/*int line_height*/)
+        public virtual int GetPixelHeight(/*int line_height*/)
         {
             if (_lines == null)
                 return 0;
@@ -356,7 +360,7 @@ namespace LibraryStudio.Forms
             // return _lines.Count * Line._line_height;
         }
 
-        public int GetPixelWidth()
+        public virtual int GetPixelWidth()
         {
             return _lines.Count == 0 ? 0 : _lines.Max(l => l.GetPixelWidth());
         }
@@ -364,7 +368,7 @@ namespace LibraryStudio.Forms
         // 获得一段文本显示范围的 Region
         // parameters:
         //      virtual_tail_length 如果为 1，表示需要关注末尾结束符是否在选择范围内，如果在，要加入一个表示结束符的矩形
-        public Region GetRegion(int start_offs = 0,
+        public virtual Region GetRegion(int start_offs = 0,
             int end_offs = int.MaxValue,
             int virtual_tail_length = 0)
         {
@@ -424,7 +428,7 @@ namespace LibraryStudio.Forms
             return region;
         }
 
-        public HitInfo HitTest(int x,
+        public virtual HitInfo HitTest(int x,
             int y)
         {
             // 2025/12/3
@@ -505,7 +509,7 @@ namespace LibraryStudio.Forms
         //      -1  越过左边
         //      0   成功
         //      1   越过右边
-        public int MoveByOffs(int offs_param,
+        public virtual int MoveByOffs(int offs_param,
             int direction,
             out HitInfo info)
         {
@@ -1175,7 +1179,7 @@ namespace LibraryStudio.Forms
 
         // 处理整个 Collection 的基线
         // 以第一行 Line 的基线为基线
-        void ProcessBaseline()
+        public virtual void ProcessBaseline()
         {
             if (this._lines == null || this._lines.Count == 0)
             {
@@ -1188,7 +1192,7 @@ namespace LibraryStudio.Forms
         }
 
         // 注: “我”自己的 ViewMode 是无所谓的，要靠父对象的 ViewMode 来定义
-        public ViewModeTree GetViewModeTree()
+        public virtual ViewModeTree GetViewModeTree()
         {
             var results = new List<ViewModeTree>();
             foreach (var child in Children)
@@ -1204,7 +1208,7 @@ namespace LibraryStudio.Forms
             }
             return new ViewModeTree
             {
-                Name = "!collection",
+                Name = this.Name,   // "!collection",
                 ViewMode = ViewMode.Expand, // 当前容器这一层永远是展开状态
                 ChildViewModes = results
             };
@@ -1213,7 +1217,7 @@ namespace LibraryStudio.Forms
         // 利用 info 中的 Children 来展开下级
         // parameters:
         //      action  动作。1 展开; 0 Toggle; -1 收缩
-        public ReplaceTextResult ToggleExpand(
+        public virtual ReplaceTextResult ToggleExpand(
     HitInfo info,
     IContext context,
     SafeHDC dc,
@@ -1293,8 +1297,23 @@ namespace LibraryStudio.Forms
             return builder.ToString();
         }
 
-    }
+        /*
+        // 获得一个下级对象在当前对象视角的全局 offs
+        public int GetChildOffs(IViewBox child)
+        {
+            int offs = 0;
+            foreach (var c in Children)
+            {
+                if (c.Equals(child))
+                    return offs;
+                offs += c.TextLength;
+            }
+            return 0;
+        }
+        */
 
+
+    }
 
     public interface IViewBox : IBox, IViewMode
     {

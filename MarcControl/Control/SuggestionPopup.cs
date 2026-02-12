@@ -64,16 +64,18 @@ namespace LibraryStudio.Forms
             StartPosition = FormStartPosition.Manual;
             TopMost = true;
             DoubleBuffered = true;
-            BackColor = metrics.BackColor;
+            BackColor = metrics.BorderColor;
+            Padding = new Padding(1, 1, 1, 1);
 
             _listBox = new NoActivateListBox
             {
-                BorderStyle = BorderStyle.FixedSingle, // .FixedSingle,
+                BorderStyle = BorderStyle.None, // .FixedSingle,
                 IntegralHeight = false,
                 SelectionMode = SelectionMode.One,
                 TabStop = false,
                 DrawMode = DrawMode.OwnerDrawFixed,
                 BackColor = metrics.BackColor,
+                Dock = DockStyle.Fill,
             };
 
             // 固定项高度，留出一点内边距
@@ -243,9 +245,10 @@ namespace LibraryStudio.Forms
             // 限制总宽度
             totalW = Math.Min(maxClientWidth, totalW);
 
-            _listBox.Location = new Point(2, 2);
-            _listBox.Size = new Size(totalW - 4, h);
-            this.ClientSize = new Size(totalW + 2, h + 4);
+            //_listBox.Location = new Point(2, 2);
+            //_listBox.Size = new Size(totalW - 4, h);
+            this.ClientSize = new Size(totalW /*+ 2*/,
+                h + 4);
         }
 
         /// <summary>

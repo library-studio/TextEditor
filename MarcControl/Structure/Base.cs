@@ -27,6 +27,10 @@ namespace LibraryStudio.Forms
             }
         }
 
+        public Base()
+        {
+        }
+
         UnitInfo _struct_info = null;   // 里面包含了 .Name
         int _struct_level = 0;
         // string _struct_content = null;

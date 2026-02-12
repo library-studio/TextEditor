@@ -669,6 +669,7 @@ namespace LibraryStudio.Forms
 
         void InitializeContent(SafeHDC dc,
             string text,
+            bool clear_before,
             bool auto_adjust_global_offs = true)
         {
             if (text == null)   // string.IsNullOrEmpty(text)
@@ -692,8 +693,11 @@ namespace LibraryStudio.Forms
                     _selectOffs2 = text.Length;
             }
 
+            var tree = _record.GetViewModeTree();
+            if (clear_before)
+                _record.Clear();
             var ret = _record.ReplaceText(
-                _record.GetViewModeTree(),
+                tree,
                 _context,
                 dc,
                 0,
@@ -956,9 +960,9 @@ out long left_width);
             _marcMetrics.Refresh(this.Font, this.FixedSizeFont);
 
             var text = _record.MergeText();
-            this._record.Clear();   // 清除所有 IBox 对象，释放所有对原有字体的引用
+
             // 迫使重新计算行高，重新布局 Layout
-            Relayout(text);
+            Relayout(text, clear_before: true); // 清除所有 IBox 对象，释放所有对原有字体的引用
 
             // 重新创建一次 Caret，改变 caret 高度
             RecreateCaret();
@@ -981,7 +985,7 @@ out long left_width);
                 var current_width = this.ClientSize.Width;
                 if (current_width != _lastWidth)    // 减少大量无谓的调用
                 {
-                    Relayout(this._record.MergeText(), false);
+                    Relayout(this._record.MergeText(), auto_adjust_global_offs: false);
                     _lastWidth = this.ClientSize.Width;
                 }
             }
@@ -1014,19 +1018,20 @@ out long left_width);
         // 注意本函数默认不会自动调整 Caret 和 Block Start End 数值
         void Relayout(
             string text,
+            bool clear_before = false,
             bool auto_adjust_global_offs = false)
         {
-            // if (_initialized == false)
+            using (var g = this.CreateGraphics())
             {
-                using (var g = this.CreateGraphics())
+                var handle = g.GetHdc();
+                using (var dc = new SafeHDC(handle))
                 {
-                    var handle = g.GetHdc();
-                    using (var dc = new SafeHDC(handle))
-                    {
-                        InitializeContent(dc, text, auto_adjust_global_offs);
-                    }
-                    _initialized = true;
+                    InitializeContent(dc,
+                        text,
+                        clear_before: clear_before,
+                        auto_adjust_global_offs: auto_adjust_global_offs);
                 }
+                _initialized = true;
             }
         }
 
@@ -1375,7 +1380,7 @@ out long left_width);
 
                                 // 向右移动，且在头标区 或 TemplateItem 内，需要特殊处理
                                 if (shiftPressed == false && e.KeyCode == Keys.Right
-                                    && CaretAtHeaderOrTemplateItem())
+                                    /*&& CaretAtHeaderOrTemplateItem()*/)
                                 {
                                     // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征
                                     // 注: 诧异位置比如头标区的右侧末尾，001 字段的字段名末尾，等等

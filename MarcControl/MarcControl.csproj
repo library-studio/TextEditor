@@ -114,8 +114,11 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="Structure\Base.cs" />
+    <Compile Include="Structure\BoxTree.cs" />
     <Compile Include="Structure\Collection.cs" />
     <Compile Include="Structure\FixedLine.cs" />
+    <Compile Include="Structure\IContainer.cs" />
+    <Compile Include="Structure\IIndexedContainer.cs" />
     <Compile Include="Structure\MarcContext.cs" />
     <Compile Include="Structure\MarcField.cs" />
     <Compile Include="Structure\MarcFieldCollection.cs" />

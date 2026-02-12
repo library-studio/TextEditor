@@ -31,6 +31,16 @@ namespace LibraryStudio.Forms
         }
         */
 
+        public override int NameAndIndicatorLength
+        {
+            get
+            {
+                if (this.PlainText)
+                    return 0;
+                return base.NameAndIndicatorLength;
+            }
+        }
+
         public override int TextLength
         {
             get
