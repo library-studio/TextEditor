@@ -55,6 +55,7 @@
     <Compile Include="Control\DragBlock.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="Control\FuzzyMatch.cs" />
     <Compile Include="Control\MarcControl.Suggestions.cs">
       <SubType>UserControl</SubType>
     </Compile>

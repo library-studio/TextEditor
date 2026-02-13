@@ -11,7 +11,6 @@ using System.Windows.Forms;
 using LibraryStudio.Forms.MarcControlDialog;
 using static LibraryStudio.Forms.MarcField;
 using static Vanara.PInvoke.Gdi32;
-using static Vanara.PInvoke.Kernel32.DEBUG_EVENT;
 
 namespace LibraryStudio.Forms
 {
@@ -116,7 +115,8 @@ namespace LibraryStudio.Forms
             //MoveCaret(info);
             SetCaret(info);
 
-            _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+            // _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+            SetLastX();
 
             /*
             // 2026/1/11
@@ -983,7 +983,7 @@ namespace LibraryStudio.Forms
                             */
                         }
                         // MoveCaret(HitByCaretOffs(offs + 1, -1));
-                        Select(offs, offs, offs + 1, -1);
+                        Select(offs, offs, offs + 1, -1, true);
                         EnsureCaretVisible();
                         return true;
                     }

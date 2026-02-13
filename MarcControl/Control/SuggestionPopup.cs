@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using static Vanara.PInvoke.User32;
 
@@ -169,14 +170,29 @@ namespace LibraryStudio.Forms
                         _listBox.SelectedIndex = i;
                     i++;
                 }
-                //if (_listBox.SelectedIndex == -1)
-                //    _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+                if (_listBox.SelectedIndex == -1)
+                {
+                    var result = FuzzyMatch.MatchList(items.Select(o => o.Value).ToList(), selected_item_text);
+                    if (result.Count > 0)
+                    {
+                        var best = result[0];
+                        if (best.Score > 0)
+                        {
+                            int index = items.ToList().FindIndex(o => o.Value == best.Text);
+                            EnsureVisible(index);
+                            // _listBox.SelectedItem = items.Where(o => o.Value == best.Text).FirstOrDefault();
+                        }
+                    }
+                    //    _listBox.SelectedIndex = _listBox.Items.Count > 0 ? 0 : -1;
+                }
             }
             finally
             {
                 _listBox.EndUpdate();
             }
         }
+
+
 
         int _left_width = 0;
         int _right_width = 0;

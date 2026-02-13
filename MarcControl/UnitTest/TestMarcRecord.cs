@@ -1383,6 +1383,7 @@ string correct_result)
                     //      0   未给出本次修改的像素宽度。需要调主另行计算
                     //      其它  本次修改后的像素宽度
                     var ret = new_field.ReplaceText(
+                        null,
                         context,
                         dc,
                         0,
@@ -1421,7 +1422,9 @@ string correct_result)
                 var dc = new SafeHDC(handle);
 
                 var record = new MarcRecord(null, property);
-                record.ReplaceText(context,
+                record.ReplaceText(
+                    null,
+                    context,
                     dc,
                     0,
                     -1,

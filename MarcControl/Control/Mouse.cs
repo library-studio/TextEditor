@@ -269,34 +269,13 @@ namespace LibraryStudio.Forms
 
                     {
                         MoveCaret(result, true, true/*有条件地触发事件*/);
-                        _lastX = _caretInfo.X; // 记录最后一次点击鼠标 x 坐标
+                        SetLastX(); // 记录最后一次点击鼠标 x 坐标
 
                         ChangeSelection(() =>
                         {
                             _selectOffs2 = _caret_offs;
                         });
                     }
-#if OLD
-                    {
-                        _blockOffs2 = _global_offs;
-
-                        var changed = DetectBlockChange2(_blockOffs1, _blockOffs2);
-
-                        MoveCaret(result, true, true/*有条件地触发事件*/);
-
-                        _lastX = _caretInfo.X; // 记录最后一次点击鼠标 x 坐标
-
-                        if (changed)
-                        {
-                            //this.BlockChanged?.Invoke(this, new EventArgs());
-
-                            // TODO: 可以改进为只失效影响到的 Line
-                            // this.Invalidate(); // 重绘
-                            InvalidateBlockRegion();
-                        }
-                    }
-#endif
-
                 }
             }
             base.OnMouseUp(e);
@@ -449,7 +428,7 @@ e.Y + this.VerticalScroll.Value);
 
         // parameters:
         //      action  动作。1 展开; 0 Toggle; -1 收缩
-        void ToggleExpand(HitInfo info,
+        bool ToggleExpand(HitInfo info,
             int action = 0)
         {
             ReplaceTextResult ret = null;
@@ -470,7 +449,7 @@ e.Y + this.VerticalScroll.Value);
 
             if (ret.UpdateRect == System.Drawing.Rectangle.Empty
                 && ret.ScrollRect == System.Drawing.Rectangle.Empty)
-                return;
+                return false;
 
             var max_pixel_width = ret.MaxPixel;
             var replaced_text = ret.ReplacedText;
@@ -516,6 +495,8 @@ e.Y + this.VerticalScroll.Value);
                 delta),
                 reset_selection: false,
                 ensure_caret_visible: false);
+            SetLastX(); // 重置 _lastX，确保展开、收缩后还能定位到原位置
+            return true;
 
             // TODO: 改变 _lastX ?
 

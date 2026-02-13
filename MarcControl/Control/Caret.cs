@@ -273,7 +273,8 @@ namespace LibraryStudio.Forms
             //SetCaretOffs(info.Offs); // 更新 _global_offs
             MoveCaret(info);
 
-            _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
+            // _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
+            SetLastX();
 
             // 平移块范围
             if (_selectOffs1 >= start_offs)

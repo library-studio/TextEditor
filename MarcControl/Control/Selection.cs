@@ -2,10 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static Vanara.PInvoke.Kernel32.DEBUG_EVENT;
 
 namespace LibraryStudio.Forms
 {
@@ -32,10 +28,13 @@ namespace LibraryStudio.Forms
         }
 
         // 选择一段文字
+        // parameters:
+        //      must    是否必须移动插入符。即使插入符位置没有发生变化，也要触发相关事件
         public void Select(int start,
             int end,
             int caret_offs,
-            int caret_delta = 0)
+            int caret_delta = 0,
+            bool must = false)
         {
             ChangeSelection(() => {
                 if (start >= 0)
@@ -46,7 +45,8 @@ namespace LibraryStudio.Forms
 
             if (caret_offs + caret_delta >= 0)
             {
-                if (caret_offs + caret_delta != _caret_offs)
+                if (must == true
+                    || caret_offs + caret_delta != _caret_offs)
                 {
                     // _global_offs = caret_offs + caret_delta;
                     //SetCaretOffs(caret_offs + caret_delta);

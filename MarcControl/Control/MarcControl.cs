@@ -56,8 +56,8 @@ namespace LibraryStudio.Forms
                     // 迫使重新布局 Layout
                     Relayout(_record.MergeText());
 
-                    _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
-
+                    //_lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
+                    SetLastX();
                     // this.Invalidate();
                 }
             }
@@ -1002,18 +1002,6 @@ out long left_width);
         }
         */
 
-        /*
-        public void Relayout()
-        {
-            // 迫使重新布局 Layout
-            Relayout(_record.MergeText());
-
-            _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
-
-            this.Invalidate();
-        }
-        */
-
         // 重新布局。
         // 注意本函数默认不会自动调整 Caret 和 Block Start End 数值
         void Relayout(
@@ -1407,8 +1395,8 @@ out long left_width);
                                 _selectOffs1 = _caret_offs;
                                 _selectOffs2 = _caret_offs;
                             }
-                            _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
-
+                            // _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+                            SetLastX();
                             // this.Invalidate();  // TODO: 优化为失效具体的行。失效范围可以根据 offs1 -- offs2 整数可以设法直接提供给 Paint() 函数，用以替代 Rectangle
                             InvalidateSelectionRegion();
                         }
@@ -1688,8 +1676,8 @@ out long left_width);
                             _selectOffs1 = _caret_offs;
                             _selectOffs2 = _caret_offs;
                         }
-                        _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
-
+                        // _lastX = _caretInfo.X; // 记录最后一次左右移动的 x 坐标
+                        SetLastX();
                         InvalidateSelectionRegion();
                     }
                     break;

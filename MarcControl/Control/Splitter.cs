@@ -42,7 +42,7 @@ namespace LibraryStudio.Forms
                     // 迫使重新布局 Layout
                     Relayout(_record.MergeText());
                     // TODO: 折行位置发生变化，可能会让 _caretInfo.X 失效
-                    _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标 
+                    SetLastX(); // 调整最后一次左右移动的 x 坐标 
                 }
             }
         }
@@ -105,7 +105,7 @@ namespace LibraryStudio.Forms
                 // 迫使重新布局 Layout
                 Relayout(_record.MergeText());
                 // TODO: 折行位置发生变化，可能会让 _caretInfo.X 失效
-                _lastX = _caretInfo.X; // 调整最后一次左右移动的 x 坐标
+                SetLastX(); // 调整最后一次左右移动的 x 坐标
                 // this.Invalidate();
                 return true;
             }

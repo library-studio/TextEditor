@@ -1092,8 +1092,13 @@ namespace MarcSample
                         },                        new ValueItem {
                             Value = "33",
                             Comment = "注释"
-                        },                        new ValueItem {
+                        },
+                        new ValueItem {
                             Value = "33",
+                            Comment = "注释"
+                        },
+                        new ValueItem {
+                            Value = "99",
                             Comment = "注释"
                         },
                     };
