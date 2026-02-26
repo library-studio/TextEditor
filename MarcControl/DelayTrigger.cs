@@ -69,8 +69,11 @@ namespace LibraryStudio.Forms
             }
 
             // 启动 debounce 计时器（如果尚未启动）
-            if (!_invalidateTimer.Enabled)
-                _invalidateTimer.Start();
+            if (_invalidateTimer!= null
+                && !_invalidateTimer.Enabled)
+            {
+                _invalidateTimer?.Start();
+            }
         }
 
         private void Trigger()

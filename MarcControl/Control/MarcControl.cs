@@ -1367,7 +1367,7 @@ out long left_width);
                                 */
 
                                 // 向右移动，且在头标区 或 TemplateItem 内，需要特殊处理
-                                if (shiftPressed == false && e.KeyCode == Keys.Right
+                                if (/*shiftPressed == false &&*/ e.KeyCode == Keys.Right
                                     /*&& CaretAtHeaderOrTemplateItem()*/)
                                 {
                                     // 为了避免向右移动后 caret 处在令人诧异的等同位置，向右移动也需要模仿向左的 -1 特征

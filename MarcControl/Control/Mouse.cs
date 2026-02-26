@@ -385,6 +385,10 @@ e.Y + this.VerticalScroll.Value);
             {
                 var splitter_test = TestSplitterArea(e.X);
 
+                // 是否为 ExpandButton 位置，在先前 HitTest() 位置已经判断过了。这里 -3 应当作 Text 区域(也就是 0)看待
+                if (splitter_test == -3)
+                    splitter_test = 0;
+
                 if (HitSplitter(result) != null/*splitter_test == -1*/)
                 {
                     Cursor = Cursors.SizeWE;
@@ -506,6 +510,7 @@ e.Y + this.VerticalScroll.Value);
                 if (_caretInfo.Offs == 24
                     && _caretInfo.ChildIndex == 1)
                     return -1;
+                return -1;  // 为了避免: 头标区展开后，将插入符放在一个区域的第一个字符左侧。收缩，再展开，插入符跑到上一个区域的最右侧了。
                 return 0;
             }
         }
